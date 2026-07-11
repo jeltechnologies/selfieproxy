@@ -1,14 +1,14 @@
-FROM golang:1.17-alpine3.15 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.17-alpine3.15 AS builder
 LABEL boringproxy=builder
-ARG GOOS="linux"
-ARG GOARCH="amd64"
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION="0.11"
 WORKDIR /build
 RUN apk add --no-cache libcap
 COPY go.* ./
 RUN go mod download
 COPY . .
-RUN cd cmd/boringproxy && CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} \
+RUN cd cmd/boringproxy && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 	go build -ldflags "-X main.Version=${VERSION}" \
 	-o boringproxy
 RUN setcap cap_net_bind_service=+ep cmd/boringproxy/boringproxy

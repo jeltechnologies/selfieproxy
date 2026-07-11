@@ -25,5 +25,5 @@ replay_pid*
 
 .env
 data/
-selfieproxie-portal/target
+selfieproxy-portal/target
 
