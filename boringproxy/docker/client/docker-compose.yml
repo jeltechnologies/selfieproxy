@@ -1,0 +1,11 @@
+services:
+  boringproxy-client:
+    image: boringproxy
+    build: ../../
+    container_name: boringproxy-client
+    restart: unless-stopped
+    env_file: .env
+    command: ["client", "-server", "${BORING_PROXY_ADMIN_SUBDOMAIN}.${DOMAIN}", "-token", "${CLIENT_TOKEN}", "-acme-email", "${ACME_EMAIL}", "-cert-dir", "/certmagic"]
+    volumes:
+      - ./data/certmagic:/certmagic
+      - /etc/ssl/certs/:/etc/ssl/certs/:ro

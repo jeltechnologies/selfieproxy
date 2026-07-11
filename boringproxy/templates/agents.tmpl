@@ -1,0 +1,31 @@
+{{ template "header.tmpl" . }}
+<div class='list'>
+  {{range $username, $user := .Users}}
+    {{range $agentName, $agent := $user.Agents}}
+
+    <div class='list-item'>
+      <span class='agent'>{{$agentName}} (Owner: {{$username}})</span>
+      <a href="/confirm-delete-agent?owner={{$username}}&agent-name={{$agentName}}">
+        <button class='button'>Delete</button>
+      </a>
+    </div>
+
+    {{end}}
+  {{end}}
+</div>
+
+<div class='agent-adder'>
+  <form action="/agents" method="POST">
+     <label for="agent-owner">Owner:</label>
+     <select id="agent-owner" name="owner">
+       {{range $username, $user := .Users}}
+       <option value="{{$username}}">{{$username}}</option>
+       {{end}}
+     </select>
+     <label for="agent-name">Agent Name:</label>
+     <input type="text" name="agent-name" required></input>
+     <button class='button' type="submit">Add Agent</button>
+  </form>
+</div>
+
+{{ template "footer.tmpl" . }}

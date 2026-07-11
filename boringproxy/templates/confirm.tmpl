@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    {{ template "head_common.tmpl" }}
+    <style>
+      .dialog {
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <div class='dialog'>
+        <a href="{{.CancelUrl}}" class='dialog__overlay'></a>
+        <div class='dialog__content'>
+          <p>
+          {{.Message}}
+          </p>
+          <div class='button-row'>
+            <a href="{{.ConfirmUrl}}">
+              <button class='button red-button'>Confirm</button>
+            </a>
+            <a href="{{.CancelUrl}}">
+              <button class='button green-button'>Cancel</button>
+            </a>
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

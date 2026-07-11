@@ -1,0 +1,38 @@
+services:
+  dns-check:
+    image: alpine:3.20
+    env_file: .env
+    volumes:
+      - ./check-dns.sh:/check-dns.sh:ro
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl bind-tools >/dev/null && /check-dns.sh"]
+
+  boringproxy:
+    build: ./boringproxy
+    container_name: boringproxy-server
+    restart: unless-stopped
+    depends_on:
+      dns-check:
+        condition: service_completed_successfully
+    network_mode: host
+    volumes:
+      - ./data/boringproxy/storage:/storage/
+      - ./data/boringproxy/runtime:/runtime
+      - /root/.ssh:/root/.ssh
+      - /etc/ssl/certs/:/etc/ssl/certs/:ro
+    command: ["server", "-admin-domain", "${BORING_PROXY_ADMIN_SUBDOMAIN}.${DOMAIN}", "-portal-domain", "${SELFIEPROXY_SUBDOMAIN}.${DOMAIN}", "-portal-port", "8081", "-acme-email", "${ACME_EMAIL}", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime"]
+    environment:
+      USER: "root"
+      HOME: "/root"
+
+  selfieproxy-portal:
+    build: ./selfieproxy-portal
+    container_name: selfieproxy-portal
+    restart: unless-stopped
+    depends_on:
+      - boringproxy
+    env_file: .env
+    volumes:
+      - ./data/boringproxy/runtime:/runtime:ro
+      - ./data/selfieproxy:/data
+    ports:
+      - "127.0.0.1:8081:8080"

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add application - Selfie Proxy' : 'Edit application - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='apps')}"></header>
+
+	<main class="page">
+		<h1 th:text="${isNew} ? 'Add application' : 'Edit application'"></h1>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<form id="app-form" method="post"
+			  th:action="${isNew} ? @{/apps} : @{/apps/{subdomain}(subdomain=${app.subdomain()})}">
+
+			<div class="field">
+				<label for="type">Type</label>
+				<select id="type" name="type">
+					<option value="WEB_APPLICATION" th:selected="${app.type().name() == 'WEB_APPLICATION'}">Web application</option>
+					<option value="NETWORK_SERVICE" th:selected="${app.type().name() == 'NETWORK_SERVICE'}">Network service</option>
+				</select>
+			</div>
+
+			<p id="network-service-warning" class="warning">
+				Use this at your own risk. Anyone on the internet who scans your domain can see that port is open
+				and attempt to connect to it.
+			</p>
+
+			<div class="field" id="name-field">
+				<label for="name">Name</label>
+				<input type="text" id="name" name="name" th:value="${app.name()}">
+			</div>
+
+			<div class="field-row">
+				<div class="field" id="exposed-port-field">
+					<label for="exposedPort">Exposed port to the internet</label>
+					<input type="number" id="exposedPort" name="exposedPort" th:value="${app.exposedPort()}" min="1024" max="65535">
+				</div>
+
+				<div class="field" id="subdomain-field">
+					<label for="subdomain">Subdomain</label>
+					<input type="text" id="subdomain" name="subdomain" th:value="${app.subdomain()}">
+				</div>
+
+				<div class="field">
+					<label>Fully qualified domain name</label>
+					<p id="result" class="result-text"></p>
+				</div>
+			</div>
+
+			<fieldset class="local-address">
+				<legend>Address in the local network</legend>
+
+				<div class="field">
+					<label for="localNetworkName">Local network</label>
+					<select id="localNetworkName" name="localNetworkName" required>
+						<option th:if="${!#lists.contains(localNetworks, app.localNetworkName())}" value=""
+								disabled="disabled" selected="selected">Select a local network</option>
+						<option th:each="n : ${localNetworks}" th:value="${n}" th:text="${n}"
+								th:selected="${n == app.localNetworkName()}"></option>
+					</select>
+				</div>
+
+				<div class="field-row">
+					<div class="field" id="protocol-field">
+						<label for="protocol">Protocol</label>
+						<select id="protocol" name="protocol">
+							<option value="HTTP" th:selected="${app.protocol() != null and app.protocol().name() == 'HTTP'}">HTTP</option>
+							<option value="HTTPS" th:selected="${app.protocol() != null and app.protocol().name() == 'HTTPS'}">HTTPS</option>
+						</select>
+					</div>
+					<div class="field" id="protocol-tcp-field">
+						<label>Protocol</label>
+						<p class="result-text">TCP</p>
+					</div>
+
+					<div class="field">
+						<label for="host">Host or IP address</label>
+						<input type="text" id="host" name="host" th:value="${app.host()}" placeholder="127.0.0.1">
+					</div>
+
+					<div class="field">
+						<label for="port">Port</label>
+						<input type="number" id="port" name="port" th:value="${app.port()}" required>
+					</div>
+				</div>
+			</fieldset>
+
+			<div id="https-warning" class="warning">
+				Your web application must provide a valid signed certificate from LetsEncrypt. This is typically
+				achieved by using NGINX proxy in the local network.
+			</div>
+
+			<button type="button" id="advanced-settings-toggle" class="link-button">Advanced settings</button>
+
+			<fieldset id="advanced-settings" class="advanced-settings">
+				<legend>Connectivity between Selfie Proxy and local network</legend>
+				<div class="field" th:each="mode : ${T(online.selfieproxy.portal.domain.TlsMode).values()}">
+					<label>
+						<input type="radio" name="tlsMode" th:value="${mode.name()}"
+							   th:checked="${app.effectiveTlsMode() == mode}">
+						<strong th:text="${mode.label()}"></strong> - <span th:text="${mode.description()}"></span>
+					</label>
+				</div>
+			</fieldset>
+
+			<div class="button-panel">
+				<button type="submit" class="button">OK</button>
+				<button type="button" id="remove-button" class="button button-danger" th:unless="${isNew}">Remove</button>
+				<a class="button button-cancel" th:href="@{/apps}">Cancel</a>
+			</div>
+		</form>
+
+		<form id="delete-form" method="post"
+			  th:action="${isNew} ? '' : @{/apps/{subdomain}/delete(subdomain=${app.subdomain()})}">
+		</form>
+	</main>
+
+	<div id="confirm-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>Remove this application? This cannot be undone.</p>
+			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
+			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<script th:inline="javascript">
+		window.selfieProxy = {
+			domain: /*[[${domain}]]*/ 'example.com'
+		};
+	</script>
+	<script th:src="@{/js/edit-app.js}"></script>
+</body>
+</html>

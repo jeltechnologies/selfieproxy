@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Local networks')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='networks')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<h1>Local networks</h1>
+			<a class="button" th:href="@{/agents/new}">Add local network</a>
+		</section>
+
+		<p class="muted" th:if="${#lists.isEmpty(agents)}">
+			No local networks yet. Add one, then copy its name and secret into that local network's .env.
+		</p>
+
+		<table class="apps-table" th:if="${not #lists.isEmpty(agents)}">
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Status</th>
+					<th>Applications</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr th:each="agent : ${agents}" th:attr="data-agent-name=${agent.name()}">
+					<td th:text="${agent.name()}"></td>
+					<td>
+						<span class="status">
+							<span class="status-dot" th:classappend="${agent.online()} ? 'status-dot-online' : 'status-dot-offline'"></span>
+							<span class="status-text" th:text="${agent.online()} ? 'Connected' : 'Disconnected'"></span>
+						</span>
+					</td>
+					<td th:text="${agent.appCount()}"></td>
+					<td>
+						<a class="button-small" th:href="@{/agents/{name}/edit(name=${agent.name()})}">Edit</a>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</main>
+
+	<script th:src="@{/js/agents.js}"></script>
+</body>
+</html>

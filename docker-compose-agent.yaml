@@ -1,0 +1,11 @@
+services:
+  selfieproxy-agent:
+    image: boringproxy
+    build: ./boringproxy
+    container_name: selfieproxy-agent
+    restart: unless-stopped
+    env_file: .env
+    command: ["agent", "-server", "${BORING_PROXY_ADMIN_SUBDOMAIN}.${DOMAIN}", "-secret", "${AGENT_SECRET}", "-agent-name", "${AGENT_NAME}", "-acme-email", "${ACME_EMAIL}", "-cert-dir", "/certmagic"]
+    volumes:
+      - ./data/boringproxy/certmagic:/certmagic
+      - /etc/ssl/certs/:/etc/ssl/certs/:ro

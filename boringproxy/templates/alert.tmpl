@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+
+      {{ template "styles.tmpl" }}
+
+      .dialog {
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class='dialog'>
+      <div class='dialog__overlay'>
+      <div class='dialog__content'>
+        <p>
+        {{.Message}}
+        </p>
+        <div class='button-row'>
+          <a href="{{.RedirectUrl}}">
+            <button class='button green-button'>Ok</button>
+          </a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

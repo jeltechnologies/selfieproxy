@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${title}">Selfie Proxy</title>
+	<link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+	<header class="topbar" th:fragment="topbar(active)">
+		<a class="brand" th:href="@{/}">Selfie Proxy</a>
+		<nav class="topbar-nav">
+			<a th:href="@{/}" th:classappend="${active == 'networks'} ? 'active'">Local networks</a>
+			<a th:href="@{/apps}" th:classappend="${active == 'apps'} ? 'active'">Applications</a>
+		</nav>
+		<form method="post" th:action="@{/logout}">
+			<button type="submit" class="link-button">Log out</button>
+		</form>
+	</header>
+</body>
+</html>

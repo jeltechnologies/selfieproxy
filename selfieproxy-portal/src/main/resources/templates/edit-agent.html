@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add local network - Selfie Proxy' : 'Edit local network - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='networks')}"></header>
+
+	<main class="page">
+		<h1 th:text="${isNew} ? 'Add local network' : 'Edit local network'"></h1>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<form id="agent-form" method="post"
+			  th:action="${isNew} ? @{/agents} : @{/agents/{name}(name=${agent.name()})}">
+
+			<div class="field">
+				<label for="name">Name</label>
+				<input type="text" id="name" name="name" th:value="${agent.name()}" required>
+			</div>
+
+			<div class="field" th:unless="${isNew}">
+				<label for="secret">Secret</label>
+				<div class="secret-field">
+					<div class="secret-input-wrap">
+						<input type="password" id="secret" readonly="readonly" th:value="${agent.secret()}" onclick="this.select()">
+						<button type="button" id="secret-copy" class="icon-button" title="Copy" aria-label="Copy secret">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+						</button>
+					</div>
+					<button type="button" id="secret-toggle" class="icon-button icon-button-boxed" title="Show secret" aria-label="Show secret">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+					</button>
+					<button type="submit" form="regenerate-form" class="link-button">New</button>
+				</div>
+			</div>
+
+			<div class="button-panel">
+				<button type="submit" class="button">OK</button>
+				<button type="button" id="remove-button" class="button button-danger" th:unless="${isNew}">Remove</button>
+				<a class="button button-cancel" th:href="@{/}">Cancel</a>
+			</div>
+		</form>
+
+		<form id="regenerate-form" method="post" th:unless="${isNew}"
+			  th:action="@{/agents/{name}/regenerate-secret(name=${agent.name()})}"></form>
+
+		<form id="delete-form" method="post" th:unless="${isNew}"
+			  th:action="@{/agents/{name}/delete(name=${agent.name()})}">
+		</form>
+	</main>
+
+	<div id="confirm-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>Remove this local network? Anything connecting with its secret will stop working. This cannot be undone.</p>
+			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
+			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<script th:src="@{/js/agents.js}"></script>
+</body>
+</html>
