@@ -9,14 +9,16 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Selfie Proxy's own complete record of every ExposedApp, keyed by subdomain,
  * held alongside (not instead of) BoringProxy's own Tunnel database. Two
  * purposes: (1) BoringProxy's Tunnel schema can't reliably represent some
- * fields we care about -- eg. the local network's protocol is only
+ * fields we care about -- eg. the homelab's protocol is only
  * recoverable by convention (an "https://" prefix on client_address) that
  * BoringProxy's own legacy web UI doesn't follow -- and (2) this is meant to
  * become a complete, BoringProxy-independent description of every exposed
@@ -30,7 +32,15 @@ import tools.jackson.databind.ObjectMapper;
 public class ExposedAppStore {
 
 	private final Path filePath;
-	private final ObjectMapper objectMapper = new ObjectMapper();
+	// New boolean fields (eg. ownDomain, managedStaticSite) are absent -- not
+	// merely null -- in exposed-apps.json entries written before they existed;
+	// without this, Jackson's default record deserialization treats an absent
+	// primitive-boolean property as an explicit null and throws instead of
+	// defaulting to false, breaking every schema addition since the store's
+	// whole point is to evolve over time (see the class javadoc).
+	private final ObjectMapper objectMapper = JsonMapper.builder()
+			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+			.build();
 	private final Object lock = new Object();
 
 	public ExposedAppStore(@Value("${selfieproxy.exposed-apps-path}") String path) {
@@ -59,7 +69,7 @@ public class ExposedAppStore {
 	 * as-is (a best-effort full snapshot, capturing apps that only ever
 	 * existed via the legacy BoringProxy UI) and returns it unchanged.
 	 * Otherwise leaves the existing record untouched and overlays our own
-	 * protocol/tlsMode -- the fields BoringProxy can't reliably represent --
+	 * protocol/tlsMode -- fields BoringProxy can't reliably represent --
 	 * onto BoringProxy's live connectivity data (host/port/etc.), so an
 	 * explicit edit made through Selfie Proxy is never clobbered by a
 	 * subsequent auto-capture.
@@ -73,9 +83,16 @@ public class ExposedAppStore {
 				writeAll(all);
 				return fromBoringProxy;
 			}
-			return new ExposedApp(fromBoringProxy.subdomain(), stored.name(), fromBoringProxy.localNetworkName(),
-					fromBoringProxy.type(), stored.protocol(), fromBoringProxy.host(), fromBoringProxy.port(),
-					fromBoringProxy.exposedPort(), stored.tlsMode());
+			return new ExposedApp(fromBoringProxy.subdomain(), fromBoringProxy.ownDomain(), stored.name(),
+					fromBoringProxy.homelabName(), fromBoringProxy.type(), stored.protocol(), fromBoringProxy.host(),
+					fromBoringProxy.port(), fromBoringProxy.exposedPort(), stored.tlsMode());
+		}
+	}
+
+	/** The stored record for subdomain, or null if none exists yet (eg. a tunnel that's never been through reconcile/save). */
+	public ExposedApp find(String subdomain) {
+		synchronized (lock) {
+			return readAll().get(subdomain);
 		}
 	}
 

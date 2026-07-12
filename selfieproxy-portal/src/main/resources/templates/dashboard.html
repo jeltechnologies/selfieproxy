@@ -7,16 +7,16 @@
 	<main class="page">
 		<section class="page-header">
 			<h1>Applications</h1>
-			<a class="button" th:if="${not #lists.isEmpty(localNetworks)}" th:href="@{/apps/new}">Add application</a>
+			<a class="button" th:if="${not #lists.isEmpty(homelabs)}" th:href="@{/apps/new}">Add application</a>
 		</section>
 
-		<p class="muted" th:if="${#lists.isEmpty(localNetworks)}">
-			No local networks are registered yet. Add one and connect it first.
+		<p class="muted" th:if="${#lists.isEmpty(homelabs)}">
+			No homelabs are registered yet. Add one and connect it first.
 		</p>
 
 		<p class="warning" th:if="${hasOrphanedApps}">
-			One of the applications is not configured to a local network. Please update the application to assign
-			them to a working local network.
+			One of the applications is not configured to a homelab. Please update the application to assign
+			them to a working homelab.
 		</p>
 
 		<table class="apps-table" th:if="${not #lists.isEmpty(exposedApps)}">
@@ -24,7 +24,7 @@
 				<tr>
 					<th>Name</th>
 					<th>Internet</th>
-					<th>Local network</th>
+					<th>Homelab</th>
 					<th>Local address</th>
 					<th></th>
 				</tr>
@@ -33,15 +33,15 @@
 				<tr th:each="app : ${exposedApps}">
 					<td>
 						<span th:text="${app.isNetworkService()} ? ${app.name()} : ${app.subdomain()}"></span>
-						<span th:if="${!#lists.contains(localNetworks, app.localNetworkName())}"
-							  class="warning-icon" title="This application's local network no longer exists">&#9888;</span>
+						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
+							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
 					</td>
 					<td>
 						<a th:if="${tunnelMapper.resultIsLink(app)}" th:href="${tunnelMapper.result(app)}"
 						   target="_blank" rel="noopener" th:text="${tunnelMapper.result(app)}"></a>
 						<span th:unless="${tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
 					</td>
-					<td th:text="${app.localNetworkName()}"></td>
+					<td th:text="${app.homelabName()}"></td>
 					<td th:text="${app.host()} + ':' + ${app.port()}"></td>
 					<td>
 						<a class="button-small" th:href="@{/apps/{subdomain}/edit(subdomain=${app.subdomain()})}">Edit</a>
@@ -50,7 +50,7 @@
 			</tbody>
 		</table>
 
-		<p class="muted" th:if="${not #lists.isEmpty(localNetworks) and #lists.isEmpty(exposedApps)}">
+		<p class="muted" th:if="${not #lists.isEmpty(homelabs) and #lists.isEmpty(exposedApps)}">
 			No applications yet.
 		</p>
 	</main>

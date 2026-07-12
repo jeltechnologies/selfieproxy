@@ -73,6 +73,6 @@
 				});
 		};
 
-		setInterval(refreshStatus, 1000);
+		setInterval(refreshStatus, 60000);
 	}
 })();

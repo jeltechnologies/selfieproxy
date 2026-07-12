@@ -7,8 +7,9 @@ import online.selfieproxy.portal.domain.TlsMode;
 /** What edit-app.html submits. The original subdomain (when editing) comes from the URL path variable instead. */
 public record ExposedAppForm(
 		String subdomain,
+		boolean ownDomain,
 		String name,
-		String localNetworkName,
+		String homelabName,
 		ExposedAppType type,
 		Protocol protocol,
 		String host,

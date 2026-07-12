@@ -100,7 +100,7 @@ body {
 	border-radius: 6px;
 }
 
-/* Name and Secret on the local network edit page read as a matched pair. */
+/* Name and Secret on the homelab edit page read as a matched pair. */
 #name { max-width: 24rem; }
 
 .page {

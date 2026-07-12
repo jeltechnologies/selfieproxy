@@ -36,5 +36,59 @@ services:
     volumes:
       - ./data/boringproxy/runtime:/runtime:ro
       - ./data/selfieproxy:/data
+      - ./data/selfieproxy/sites-conf:/sites-conf
+      - ./data/selfieproxy/sites:/sites
     ports:
       - "127.0.0.1:8081:8080"
+
+  # Shared static webserver for "This Server" homelab apps whose hosting mode
+  # is "Selfie Proxy hosts this" -- see StaticSiteProvisioner and
+  # sites-webserver/. One process, many domains: boringproxy always forwards
+  # the tunnel's own domain as the Host header, so NGINX picks the right site
+  # by server_name, same as sitting behind any other reverse proxy.
+  selfieproxy-sites:
+    image: ghcr.io/jeltechnologies/selfieproxy-sites:latest
+    build: ./sites-webserver
+    container_name: selfieproxy-sites
+    restart: unless-stopped
+    volumes:
+      - ./data/selfieproxy/sites-conf:/etc/nginx/conf.d
+      - ./data/selfieproxy/sites:/sites:ro
+    ports:
+      - "127.0.0.1:8090:80"
+
+  # An ordinary boringproxy Agent, like docker-compose-agent.yaml's, except
+  # colocated with the server itself instead of a remote network -- this is
+  # what makes the "This Server" homelab work (see ThisServerBootstrap,
+  # which creates the homelab and republishes its secret to
+  # this-server-agent-secret on every portal startup, so no manual
+  # copy-paste is needed here). network_mode: host matches boringproxy-server
+  # rather than the default bridge network, since connecting to this same
+  # box's own public admin domain is fast and reliable over host networking
+  # (it's routed locally by the kernel) and this avoids depending on hairpin
+  # NAT working for a bridge-networked container reaching the host's own
+  # public IP.
+  this-server-agent:
+    image: ghcr.io/jeltechnologies/boringproxy:latest
+    build: ./boringproxy
+    container_name: this-server-agent
+    restart: unless-stopped
+    depends_on:
+      - selfieproxy-portal
+    network_mode: host
+    env_file: .env
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        until [ -s /selfieproxy-data/this-server-agent-secret ]; do sleep 1; done;
+        exec /boringproxy agent
+        -server ${BORING_PROXY_ADMIN_SUBDOMAIN}.${DOMAIN}
+        -secret "$$(cat /selfieproxy-data/this-server-agent-secret)"
+        -agent-name ${THIS_SERVER_AGENT_NAME:-this-server}
+        -user admin
+        -acme-email ${ACME_EMAIL}
+        -cert-dir /certmagic
+    volumes:
+      - ./data/selfieproxy:/selfieproxy-data:ro
+      - ./data/boringproxy/this-server-certmagic:/certmagic
+      - /etc/ssl/certs/:/etc/ssl/certs/:ro

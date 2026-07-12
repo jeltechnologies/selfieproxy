@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add local network - Selfie Proxy' : 'Edit local network - Selfie Proxy')}"></head>
+<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add homelab - Selfie Proxy' : 'Edit homelab - Selfie Proxy')}"></head>
 <body>
-	<header th:replace="~{fragments/layout :: topbar(active='networks')}"></header>
+	<header th:replace="~{fragments/layout :: topbar(active='homelabs')}"></header>
 
 	<main class="page">
-		<h1 th:text="${isNew} ? 'Add local network' : 'Edit local network'"></h1>
+		<h1 th:text="${isNew} ? 'Add homelab' : 'Edit homelab'"></h1>
 
 		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
 			<li th:each="e : ${errors}" th:text="${e}"></li>
@@ -52,7 +52,7 @@
 
 	<div id="confirm-overlay" class="overlay">
 		<div class="overlay-card">
-			<p>Remove this local network? Anything connecting with its secret will stop working. This cannot be undone.</p>
+			<p>Remove this homelab? Anything connecting with its secret will stop working. This cannot be undone.</p>
 			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
 			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
 		</div>

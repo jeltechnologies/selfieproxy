@@ -7,7 +7,7 @@ import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 
 /**
- * Translates between Selfie Proxy's ExposedApp/LocalNetwork model and
+ * Translates between Selfie Proxy's ExposedApp/Homelab model and
  * BoringProxy's Tunnel/CreateTunnelRequest, per the TLS-termination mapping
  * table in the project plan (derived from selfieproxy.md's own parenthetical
  * BoringProxy-mode hints).
@@ -24,7 +24,7 @@ public class TunnelMapper {
 	}
 
 	public String fqdn(ExposedApp app) {
-		return properties.fqdn(app.subdomain());
+		return app.ownDomain() ? app.subdomain() : properties.fqdn(app.subdomain());
 	}
 
 	/** The doc's "Result" field: the URL for a Web Application, or "domain:port" for a Network Service. */
@@ -64,7 +64,7 @@ public class TunnelMapper {
 		return new CreateTunnelRequestDto(
 				fqdn(app),
 				owner,
-				app.localNetworkName(), // Agent name, matches the Local Network name 1:1
+				app.homelabName(), // Agent name, matches the Homelab name 1:1
 				app.port(),
 				clientAddr,
 				tunnelPort,
@@ -79,12 +79,13 @@ public class TunnelMapper {
 
 	public ExposedApp toExposedApp(TunnelDto tunnel) {
 		String suffix = "." + properties.domain();
-		String subdomain = tunnel.domain().endsWith(suffix)
-				? tunnel.domain().substring(0, tunnel.domain().length() - suffix.length())
-				: tunnel.domain();
+		boolean ownDomain = !tunnel.domain().endsWith(suffix);
+		String subdomain = ownDomain
+				? tunnel.domain()
+				: tunnel.domain().substring(0, tunnel.domain().length() - suffix.length());
 
 		if ("passthrough".equals(tunnel.tlsTermination()) && tunnel.allowExternalTcp()) {
-			return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
+			return new ExposedApp(subdomain, ownDomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
 					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null);
 		}
 
@@ -98,7 +99,7 @@ public class TunnelMapper {
 			default -> null;
 		};
 
-		return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
+		return new ExposedApp(subdomain, ownDomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
 				https ? Protocol.HTTPS : Protocol.HTTP, host, tunnel.clientPort(), null, tlsMode);
 	}
 }

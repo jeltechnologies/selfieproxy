@@ -32,6 +32,12 @@
 				<input type="text" id="name" name="name" th:value="${app.name()}">
 			</div>
 
+			<div class="field" id="domain-mode-field">
+				<label>Domain</label>
+				<label><input type="radio" name="ownDomain" value="false" th:checked="${!app.ownDomain()}"> Subdomain</label>
+				<label><input type="radio" name="ownDomain" value="true" th:checked="${app.ownDomain()}"> Own domain</label>
+			</div>
+
 			<div class="field-row">
 				<div class="field" id="exposed-port-field">
 					<label for="exposedPort">Exposed port to the internet</label>
@@ -50,15 +56,15 @@
 			</div>
 
 			<fieldset class="local-address">
-				<legend>Address in the local network</legend>
+				<legend>Address in the homelab</legend>
 
 				<div class="field">
-					<label for="localNetworkName">Local network</label>
-					<select id="localNetworkName" name="localNetworkName" required>
-						<option th:if="${!#lists.contains(localNetworks, app.localNetworkName())}" value=""
-								disabled="disabled" selected="selected">Select a local network</option>
-						<option th:each="n : ${localNetworks}" th:value="${n}" th:text="${n}"
-								th:selected="${n == app.localNetworkName()}"></option>
+					<label for="homelabName">Homelab</label>
+					<select id="homelabName" name="homelabName" required>
+						<option th:if="${!#lists.contains(homelabs, app.homelabName())}" value=""
+								disabled="disabled" selected="selected">Select a homelab</option>
+						<option th:each="n : ${homelabs}" th:value="${n}" th:text="${n}"
+								th:selected="${n == app.homelabName()}"></option>
 					</select>
 				</div>
 
@@ -89,13 +95,13 @@
 
 			<div id="https-warning" class="warning">
 				Your web application must provide a valid signed certificate from LetsEncrypt. This is typically
-				achieved by using NGINX proxy in the local network.
+				achieved by using NGINX proxy in the homelab.
 			</div>
 
 			<button type="button" id="advanced-settings-toggle" class="link-button">Advanced settings</button>
 
 			<fieldset id="advanced-settings" class="advanced-settings">
-				<legend>Connectivity between Selfie Proxy and local network</legend>
+				<legend>Connectivity between Selfie Proxy and homelab</legend>
 				<div class="field" th:each="mode : ${T(online.selfieproxy.portal.domain.TlsMode).values()}">
 					<label>
 						<input type="radio" name="tlsMode" th:value="${mode.name()}"

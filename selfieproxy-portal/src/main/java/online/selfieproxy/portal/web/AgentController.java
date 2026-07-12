@@ -21,6 +21,7 @@ import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.AgentStatusDto;
 import online.selfieproxy.portal.boringproxy.dto.TokenDataDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
+import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
 @Controller
 public class AgentController {
@@ -37,9 +38,11 @@ public class AgentController {
 	private static final Duration ONLINE_THRESHOLD = Duration.ofSeconds(10);
 
 	private final BoringProxyClient boringProxyClient;
+	private final ThisServerAgentProperties thisServerAgentProperties;
 
-	public AgentController(BoringProxyClient boringProxyClient) {
+	public AgentController(BoringProxyClient boringProxyClient, ThisServerAgentProperties thisServerAgentProperties) {
 		this.boringProxyClient = boringProxyClient;
+		this.thisServerAgentProperties = thisServerAgentProperties;
 	}
 
 	@GetMapping("/")
@@ -48,7 +51,7 @@ public class AgentController {
 		return "agents";
 	}
 
-	/** Polled every second by agents.js to refresh the connected/disconnected dot without a full page reload. */
+	/** Polled every 60s by agents.js to refresh the connected/disconnected dot without a full page reload. */
 	@GetMapping(value = "/agents/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public List<AgentListItem> status() {
@@ -64,6 +67,9 @@ public class AgentController {
 
 	@GetMapping("/agents/{name}/edit")
 	public String editAgent(@PathVariable String name, Model model) {
+		if (isThisServer(name)) {
+			return "redirect:/";
+		}
 		model.addAttribute("agent", new AgentView(name, secretFor(name)));
 		model.addAttribute("isNew", false);
 		return "edit-agent";
@@ -86,6 +92,9 @@ public class AgentController {
 
 	@PostMapping("/agents/{name}")
 	public String rename(@PathVariable String name, @ModelAttribute AgentForm form, Model model) {
+		if (isThisServer(name)) {
+			return "redirect:/";
+		}
 		String newName = form.name();
 
 		if (newName.equals(name)) {
@@ -104,7 +113,7 @@ public class AgentController {
 		// it under the new name and remove the old one. Its secret is just a token
 		// re-pointed at an agent name, though, so that part we retarget in place
 		// instead of minting a fresh one -- renaming must never invalidate a secret
-		// that's already configured on the local network's .env. Every exposed app
+		// that's already configured on the homelab's .env. Every exposed app
 		// under the old name must follow the rename too, or it'd be silently
 		// orphaned (see the warning icon/banner on the Exposed applications page).
 		boringProxyClient.createAgent(OWNER, newName);
@@ -116,6 +125,9 @@ public class AgentController {
 
 	@PostMapping("/agents/{name}/regenerate-secret")
 	public String regenerateSecret(@PathVariable String name) {
+		if (isThisServer(name)) {
+			return "redirect:/";
+		}
 		deleteTokensForAgent(name);
 		boringProxyClient.createToken(OWNER, name);
 		return "redirect:/agents/" + name + "/edit";
@@ -123,19 +135,30 @@ public class AgentController {
 
 	@PostMapping("/agents/{name}/delete")
 	public String delete(@PathVariable String name) {
+		if (isThisServer(name)) {
+			return "redirect:/";
+		}
 		deleteTokensForAgent(name);
 		boringProxyClient.deleteAgent(OWNER, name);
 		return "redirect:/";
 	}
 
+	/** "This Server" is an ordinary Agent under the hood, but it's reserved for the Local Websites feature, not a Homelab a user manages here. */
+	private boolean isThisServer(String name) {
+		return thisServerAgentProperties.agentName().equals(name);
+	}
+
 	private List<AgentListItem> loadAgentListItems() {
-		Map<String, Long> appCountsByNetwork = boringProxyClient.listTunnels().values().stream()
+		Map<String, Long> appCountsByHomelab = boringProxyClient.listTunnels().values().stream()
 				.collect(Collectors.groupingBy(TunnelDto::agentName, Collectors.counting()));
 
 		List<AgentListItem> items = new ArrayList<>();
 		for (Map.Entry<String, AgentStatusDto> entry : boringProxyClient.listAgents().entrySet()) {
 			String name = entry.getKey();
-			int appCount = appCountsByNetwork.getOrDefault(name, 0L).intValue();
+			if (isThisServer(name)) {
+				continue;
+			}
+			int appCount = appCountsByHomelab.getOrDefault(name, 0L).intValue();
 			items.add(new AgentListItem(name, isOnline(entry.getValue()), appCount));
 		}
 		items.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
@@ -191,7 +214,11 @@ public class AgentController {
 	private List<String> validateName(String name, String originalName) {
 		List<String> errors = new ArrayList<>();
 		if (name == null || name.isBlank()) {
-			errors.add("Local network name is required.");
+			errors.add("Homelab name is required.");
+			return errors;
+		}
+		if (isThisServer(name)) {
+			errors.add("\"" + name + "\" is reserved for Local Websites.");
 			return errors;
 		}
 
@@ -199,7 +226,7 @@ public class AgentController {
 				.anyMatch(existing -> existing.equalsIgnoreCase(name)
 						&& (originalName == null || !existing.equalsIgnoreCase(originalName)));
 		if (taken) {
-			errors.add("Local network \"" + name + "\" already exists.");
+			errors.add("Homelab \"" + name + "\" already exists.");
 		}
 
 		return errors;

@@ -85,7 +85,8 @@ class AdminPortalSmokeTest {
 		mockMvc.perform(post("/apps")
 						.session(session)
 						.param("subdomain", "newapp")
-						.param("localNetworkName", "home")
+						.param("ownDomain", "false")
+						.param("homelabName", "home")
 						.param("type", "WEB_APPLICATION")
 						.param("protocol", "HTTP")
 						.param("host", "127.0.0.1")
@@ -121,7 +122,7 @@ class AdminPortalSmokeTest {
 
 		mockMvc.perform(get("/agents/new").session(session))
 				.andExpect(status().isOk())
-				.andExpect(content().string(containsString("Add local network")));
+				.andExpect(content().string(containsString("Add homelab")));
 
 		when(boringProxyClient.createToken(eq("admin"), eq("office"))).thenReturn("secret-xyz");
 
@@ -151,10 +152,10 @@ class AdminPortalSmokeTest {
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
 				12345, "", "127.0.0.1", 8096, false, "client", "admin", "default", "", "");
-		TunnelDto otherNetworkTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
+		TunnelDto otherHomelabTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
 				51234, "", "127.0.0.1", 22, true, "passthrough", "admin", "office", "", "");
 		when(boringProxyClient.listTunnels())
-				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", otherNetworkTunnel));
+				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", otherHomelabTunnel));
 
 		mockMvc.perform(post("/agents/default").session(session).param("name", "renamed"))
 				.andExpect(status().is3xxRedirection())

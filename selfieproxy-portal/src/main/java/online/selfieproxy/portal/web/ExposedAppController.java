@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
+import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
 import online.selfieproxy.portal.domain.ExposedAppType;
@@ -35,34 +36,37 @@ public class ExposedAppController {
 	private final TunnelMapper tunnelMapper;
 	private final BoringProxyProperties properties;
 	private final ExposedAppStore exposedAppStore;
+	private final ThisServerAgentProperties thisServerAgentProperties;
 
 	public ExposedAppController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
-			BoringProxyProperties properties, ExposedAppStore exposedAppStore) {
+			BoringProxyProperties properties, ExposedAppStore exposedAppStore,
+			ThisServerAgentProperties thisServerAgentProperties) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.properties = properties;
 		this.exposedAppStore = exposedAppStore;
+		this.thisServerAgentProperties = thisServerAgentProperties;
 	}
 
 	@GetMapping("/apps/new")
 	public String newApp(Model model) {
-		List<String> localNetworks = localNetworks();
-		ExposedApp app = new ExposedApp("", null, localNetworks.stream().findFirst().orElse(null),
+		List<String> homelabs = homelabs();
+		ExposedApp app = new ExposedApp("", false, null, homelabs.stream().findFirst().orElse(null),
 				ExposedAppType.WEB_APPLICATION, Protocol.HTTP, "127.0.0.1", 80, null, null);
 		model.addAttribute("app", app);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domain", properties.domain());
-		model.addAttribute("localNetworks", localNetworks);
+		model.addAttribute("homelabs", homelabs);
 		return "edit-app";
 	}
 
 	@GetMapping("/apps/{subdomain}/edit")
 	public String editApp(@PathVariable String subdomain, Model model) {
-		TunnelDto tunnel = boringProxyClient.getTunnel(properties.fqdn(subdomain));
+		TunnelDto tunnel = boringProxyClient.getTunnel(currentFqdn(subdomain));
 		model.addAttribute("app", exposedAppStore.reconcile(tunnelMapper.toExposedApp(tunnel)));
 		model.addAttribute("isNew", false);
 		model.addAttribute("domain", properties.domain());
-		model.addAttribute("localNetworks", localNetworks());
+		model.addAttribute("homelabs", homelabs());
 		return "edit-app";
 	}
 
@@ -77,7 +81,7 @@ public class ExposedAppController {
 			model.addAttribute("isNew", true);
 			model.addAttribute("errors", errors);
 			model.addAttribute("domain", properties.domain());
-			model.addAttribute("localNetworks", localNetworks());
+			model.addAttribute("homelabs", homelabs());
 			return "edit-app";
 		}
 
@@ -98,11 +102,11 @@ public class ExposedAppController {
 			model.addAttribute("isNew", false);
 			model.addAttribute("errors", errors);
 			model.addAttribute("domain", properties.domain());
-			model.addAttribute("localNetworks", localNetworks());
+			model.addAttribute("homelabs", homelabs());
 			return "edit-app";
 		}
 
-		boringProxyClient.deleteTunnel(properties.fqdn(subdomain));
+		boringProxyClient.deleteTunnel(currentFqdn(subdomain));
 		Thread.sleep(2000);
 		boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, session.owner()));
 		if (!subdomain.equals(app.subdomain())) {
@@ -114,13 +118,23 @@ public class ExposedAppController {
 
 	@PostMapping("/apps/{subdomain}/delete")
 	public String delete(@PathVariable String subdomain) {
-		boringProxyClient.deleteTunnel(properties.fqdn(subdomain));
+		boringProxyClient.deleteTunnel(currentFqdn(subdomain));
 		exposedAppStore.delete(subdomain);
 		return "redirect:/apps";
 	}
 
-	private List<String> localNetworks() {
-		return boringProxyClient.listAgents().keySet().stream().sorted().toList();
+	/** Every ordinary Homelab except "This Server" -- that one is reserved for the Local Websites feature, not user-selectable here. */
+	private List<String> homelabs() {
+		return boringProxyClient.listAgents().keySet().stream()
+				.filter(name -> !name.equals(thisServerAgentProperties.agentName()))
+				.sorted()
+				.toList();
+	}
+
+	/** The tunnel domain for subdomain as it exists right now (mode-aware via the stored record), or the default subdomain.DOMAIN composition if we have no record for it yet. */
+	private String currentFqdn(String subdomain) {
+		ExposedApp stored = exposedAppStore.find(subdomain);
+		return stored != null ? tunnelMapper.fqdn(stored) : properties.fqdn(subdomain);
 	}
 
 	private ExposedApp toExposedApp(ExposedAppForm form) {
@@ -129,7 +143,8 @@ public class ExposedAppController {
 				? generateUniqueSubdomain()
 				: form.subdomain() == null ? null : form.subdomain().trim().toLowerCase();
 		String name = networkService && form.name() != null && !form.name().isBlank() ? form.name().trim() : null;
-		return new ExposedApp(subdomain, name, form.localNetworkName(), form.type(),
+		boolean ownDomain = !networkService && form.ownDomain();
+		return new ExposedApp(subdomain, ownDomain, name, form.homelabName(), form.type(),
 				networkService ? null : form.protocol(),
 				form.host(), form.port() != null ? form.port() : 0, form.exposedPort(), form.tlsMode());
 	}
@@ -151,7 +166,7 @@ public class ExposedAppController {
 		List<String> errors = new ArrayList<>();
 
 		if (app.subdomain() == null || app.subdomain().isBlank()) {
-			errors.add("Subdomain is required.");
+			errors.add(app.ownDomain() ? "Domain is required." : "Subdomain is required.");
 			return errors;
 		}
 		if (app.subdomain().equalsIgnoreCase(properties.adminSubdomain())) {
@@ -165,9 +180,9 @@ public class ExposedAppController {
 		Map<String, TunnelDto> existing = boringProxyClient.listTunnels();
 		boolean taken = existing.keySet().stream()
 				.anyMatch(domain -> domain.equalsIgnoreCase(fqdn)
-						&& (originalSubdomain == null || !domain.equalsIgnoreCase(properties.fqdn(originalSubdomain))));
+						&& (originalSubdomain == null || !domain.equalsIgnoreCase(currentFqdn(originalSubdomain))));
 		if (taken) {
-			errors.add("Subdomain \"" + app.subdomain() + "\" is already in use.");
+			errors.add((app.ownDomain() ? "Domain \"" : "Subdomain \"") + app.subdomain() + "\" is already in use.");
 		}
 
 		if (app.isNetworkService() && (app.name() == null || app.name().isBlank())) {

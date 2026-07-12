@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Local networks')}"></head>
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Homelabs')}"></head>
 <body>
-	<header th:replace="~{fragments/layout :: topbar(active='networks')}"></header>
+	<header th:replace="~{fragments/layout :: topbar(active='homelabs')}"></header>
 
 	<main class="page">
 		<section class="page-header">
-			<h1>Local networks</h1>
-			<a class="button" th:href="@{/agents/new}">Add local network</a>
+			<h1>Homelabs</h1>
+			<a class="button" th:href="@{/agents/new}">Add homelab</a>
 		</section>
 
 		<p class="muted" th:if="${#lists.isEmpty(agents)}">
-			No local networks yet. Add one, then copy its name and secret into that local network's .env.
+			No homelabs yet. Add one, then copy its name and secret into that homelab's .env.
 		</p>
 
 		<table class="apps-table" th:if="${not #lists.isEmpty(agents)}">

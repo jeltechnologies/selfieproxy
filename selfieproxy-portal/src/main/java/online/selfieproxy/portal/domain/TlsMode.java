@@ -2,7 +2,7 @@ package online.selfieproxy.portal.domain;
 
 /**
  * The 3 "Advanced settings" connectivity options shown when a Web Application's
- * Local Network protocol is HTTPS. Only relevant for ExposedAppType.WEB_APPLICATION.
+ * Homelab protocol is HTTPS. Only relevant for ExposedAppType.WEB_APPLICATION.
  */
 public enum TlsMode {
 
@@ -12,7 +12,7 @@ public enum TlsMode {
 
 	/** BoringProxy tls-termination "client-tls". */
 	BYO_CERT("End-to-end encrypted (you provide the certificate)",
-			"You provide the certificate on the web application in the local network."),
+			"You provide the certificate on the web application in the homelab."),
 
 	/** BoringProxy tls-termination "server-tls". */
 	HOP_BY_HOP("Hop-by-hop encryption (compatibility mode)",

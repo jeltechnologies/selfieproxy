@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add local website - Selfie Proxy' : 'Edit local website - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='local-websites')}"></header>
+
+	<main class="page">
+		<h1 th:text="${isNew} ? 'Add local website' : 'Edit local website'"></h1>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<form id="website-form" method="post"
+			  th:action="${isNew} ? @{/local-websites} : @{/local-websites/{domain}(domain=${website.domain()})}">
+
+			<div class="field">
+				<label for="domain">Domain</label>
+				<input type="text" id="domain" name="domain" th:value="${website.domain()}" placeholder="www.example.com" required>
+			</div>
+
+			<p class="muted" th:unless="${isNew}">
+				Renaming keeps the site's files -- they're moved to the new domain's folder.
+			</p>
+
+			<div class="button-panel">
+				<button type="submit" class="button">OK</button>
+				<button type="button" id="remove-button" class="button button-danger" th:unless="${isNew}">Remove</button>
+				<a class="button button-cancel" th:href="@{/local-websites}">Cancel</a>
+			</div>
+		</form>
+
+		<form id="delete-form" method="post" th:unless="${isNew}"
+			  th:action="@{/local-websites/{domain}/delete(domain=${website.domain()})}">
+		</form>
+	</main>
+
+	<div id="confirm-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>Remove this local website? This takes it off the internet, but its files stay on the server -- adding the same domain again later reuses them.</p>
+			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
+			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<script th:src="@{/js/local-websites.js}"></script>
+</body>
+</html>

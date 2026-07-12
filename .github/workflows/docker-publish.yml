@@ -7,6 +7,7 @@ on:
     paths:
       - "boringproxy/**"
       - "selfieproxy-portal/**"
+      - "sites-webserver/**"
       - ".github/workflows/docker-publish.yml"
   workflow_dispatch: {}
 
@@ -26,6 +27,8 @@ jobs:
             context: ./boringproxy
           - image: selfieproxy-portal
             context: ./selfieproxy-portal
+          - image: selfieproxy-sites
+            context: ./sites-webserver
     steps:
       - name: Checkout
         uses: actions/checkout@v4
