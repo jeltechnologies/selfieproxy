@@ -20,7 +20,7 @@ services:
       - ./data/boringproxy/runtime:/runtime
       - /root/.ssh:/root/.ssh
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
-    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime"]
+    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime"]
     environment:
       USER: "root"
       HOME: "/root"
@@ -48,6 +48,24 @@ services:
       - ./data/selfieproxy/sites:/sites
     ports:
       - "127.0.0.1:8081:8080"
+
+  selfieproxy-sso-server:
+    image: ghcr.io/jeltechnologies/selfieproxy-sso-server:latest
+    build: ./selfieproxy-sso-server
+    container_name: selfieproxy-sso-server
+    restart: unless-stopped
+    depends_on:
+      boringproxy:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      SSO_ISSUER_URL: "https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}"
+      SSO_CLIENT_REDIRECT_URI: "https://${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}/oidc/callback"
+      SSO_SIGNING_KEY_PATH: "/data/sso-signing-key.pem"
+    volumes:
+      - ./data/selfieproxy:/data
+    ports:
+      - "127.0.0.1:8082:8080"
 
   selfieproxy-local-websites:
     image: ghcr.io/jeltechnologies/selfieproxy-local-websites:latest

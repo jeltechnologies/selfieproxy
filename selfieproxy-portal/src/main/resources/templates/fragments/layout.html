@@ -14,9 +14,6 @@
 			<a th:href="@{/apps}" th:classappend="${active == 'apps'} ? 'active'">Applications</a>
 			<a th:href="@{/local-websites}" th:classappend="${active == 'local-websites'} ? 'active'">Local websites</a>
 		</nav>
-		<form method="post" th:action="@{/logout}">
-			<button type="submit" class="link-button">Log out</button>
-		</form>
 	</header>
 </body>
 </html>

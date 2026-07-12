@@ -64,6 +64,7 @@ type Tunnel struct {
 	ClientPort       int    `json:"client_port"`
 	AllowExternalTcp bool   `json:"allow_external_tcp"`
 	TlsTermination   string `json:"tls_termination"`
+	SsoProtected     bool   `json:"sso_protected"`
 
 	// TODO: These are not used by agents and possibly shouldn't be
 	// returned in API calls.

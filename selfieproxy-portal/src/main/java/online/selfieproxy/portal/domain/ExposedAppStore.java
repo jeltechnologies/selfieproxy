@@ -85,7 +85,7 @@ public class ExposedAppStore {
 			}
 			return new ExposedApp(fromBoringProxy.subdomain(), fromBoringProxy.ownDomain(), stored.name(),
 					fromBoringProxy.homelabName(), fromBoringProxy.type(), stored.protocol(), fromBoringProxy.host(),
-					fromBoringProxy.port(), fromBoringProxy.exposedPort(), stored.tlsMode());
+					fromBoringProxy.port(), fromBoringProxy.exposedPort(), stored.tlsMode(), stored.ssoProtected());
 		}
 	}
 

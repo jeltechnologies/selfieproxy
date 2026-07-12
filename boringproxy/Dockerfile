@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.17-alpine3.15 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
 LABEL boringproxy=builder
 ARG TARGETOS
 ARG TARGETARCH

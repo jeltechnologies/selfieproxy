@@ -19,6 +19,7 @@ public record TunnelDto(
 		@JsonProperty("client_port") int clientPort,
 		@JsonProperty("allow_external_tcp") boolean allowExternalTcp,
 		@JsonProperty("tls_termination") String tlsTermination,
+		@JsonProperty("sso_protected") boolean ssoProtected,
 		String owner,
 		@JsonProperty("agent_name") String agentName,
 		@JsonProperty("auth_username") String authUsername,

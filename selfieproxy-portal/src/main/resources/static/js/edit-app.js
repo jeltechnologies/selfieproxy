@@ -22,6 +22,8 @@
 	var httpsWarning = document.getElementById("https-warning");
 	var advancedToggle = document.getElementById("advanced-settings-toggle");
 	var advancedSettings = document.getElementById("advanced-settings");
+	var ssoProtectedField = document.getElementById("sso-protected-field");
+	var ssoProtectedCheckbox = document.getElementById("ssoProtected");
 
 	var ownDomainRadios = document.querySelectorAll('input[name="ownDomain"]');
 
@@ -72,6 +74,16 @@
 		advancedToggle.style.display = showHttpsSettings ? "" : "none";
 		if (!showHttpsSettings) {
 			advancedSettings.style.display = "none";
+		}
+
+		// "Server HTTPS" only -- MANAGED is boringproxy's own name for it, and
+		// the default TLS mode when nothing else has been chosen yet (mirrors
+		// ExposedApp.canProtectWithSso() server-side).
+		var canProtectWithSso = showHttpsSettings &&
+			(selectedTlsMode() === "MANAGED" || selectedTlsMode() === null);
+		ssoProtectedField.style.display = canProtectWithSso ? "" : "none";
+		if (!canProtectWithSso) {
+			ssoProtectedCheckbox.checked = false;
 		}
 	}
 

@@ -48,6 +48,11 @@ func Listen() {
 	newAdminDomain := flagSet.String("admin-domain", "", "Admin Domain")
 	portalDomain := flagSet.String("portal-domain", "", "Domain reverse-proxied directly to -portal-port on localhost, without a Tunnel/Agent (eg. Selfie Proxy's own admin portal, which must be reachable before any agent exists)")
 	portalPort := flagSet.Int("portal-port", 0, "Local port -portal-domain is proxied to")
+	ssoDomain := flagSet.String("sso-domain", "", "Domain reverse-proxied directly to -sso-port on localhost, without a Tunnel/Agent (Selfie Proxy's bundled OIDC IdP, selfieproxy-sso-server, which must be reachable before any agent exists)")
+	ssoPort := flagSet.Int("sso-port", 0, "Local port -sso-domain is proxied to")
+	oidcIssuer := flagSet.String("oidc-issuer", "", "OIDC issuer URL boringproxy authenticates the portal domain and any SSO-protected tunnel against; blank disables SSO entirely")
+	oidcClientId := flagSet.String("oidc-client-id", "", "OIDC client ID boringproxy registers as with -oidc-issuer")
+	oidcClientSecret := flagSet.String("oidc-client-secret", "", "OIDC client secret, if the issuer requires one (blank for the bundled selfieproxy-sso-server, which trusts PKCE alone)")
 	sshServerPort := flagSet.Int("ssh-server-port", 22, "SSH Server Port")
 	dbDir := flagSet.String("db-dir", "", "Database file directory")
 	certDir := flagSet.String("cert-dir", "", "TLS cert directory")
@@ -157,6 +162,16 @@ func Listen() {
 		}
 		log.Print(fmt.Sprintf("Successfully acquired certificate for portal domain (%s)", *portalDomain))
 	}
+
+	if *ssoDomain != "" && autoCerts {
+		err = certConfig.ManageSync(context.Background(), []string{*ssoDomain})
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print(fmt.Sprintf("Successfully acquired certificate for sso domain (%s)", *ssoDomain))
+	}
+
+	StartOidcAuth(*oidcIssuer, *oidcClientId, *oidcClientSecret, adminDomain)
 
 	// Add admin user if it doesn't already exist
 	users := db.GetUsers()
@@ -317,6 +332,22 @@ func Listen() {
 				http.StripPrefix("/api", api).ServeHTTP(w, r)
 			} else if strings.HasPrefix(r.URL.Path, "/rest/") {
 				http.StripPrefix("/rest", restApi).ServeHTTP(w, r)
+			} else if r.URL.Path == "/oidc/authorize" {
+				oidcAuth := oidcAuthHolder.Load()
+				if oidcAuth == nil {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					io.WriteString(w, "SSO is starting up, please retry shortly")
+					return
+				}
+				oidcAuth.HandleAuthorize(w, r)
+			} else if r.URL.Path == "/oidc/callback" {
+				oidcAuth := oidcAuthHolder.Load()
+				if oidcAuth == nil {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					io.WriteString(w, "SSO is starting up, please retry shortly")
+					return
+				}
+				oidcAuth.HandleCallback(w, r)
 			} else {
 				// Legacy boringproxy web UI (ui_handler.go), superseded by
 				// Selfie Proxy's own admin portal (reached via
@@ -330,8 +361,21 @@ func Listen() {
 			// Proxied directly to a fixed local address, not through a
 			// Tunnel/Agent -- this must work before any agent is ever
 			// connected, since it's how the portal used to set one up.
+			// Always SSO-gated (unlike ordinary tunnels, where it's opt-in
+			// via SsoProtected): the portal has no login of its own left,
+			// see selfieproxy-portal's SessionInterceptor.
 			portalTunnel := Tunnel{Domain: *portalDomain}
+			if !requireSsoIfNeeded(w, r, portalTunnel.Domain, true) {
+				return
+			}
+			r.Header.Set("X-Selfieproxy-Sso-Verified", "true")
 			proxyRequest(w, r, portalTunnel, httpClient, "localhost", *portalPort, *behindProxy)
+		} else if *ssoDomain != "" && hostDomain == *ssoDomain {
+			// Proxied directly to selfieproxy-sso-server, same
+			// before-any-agent-exists carve-out as -portal-domain. Never
+			// SSO-gated itself -- it's the IdP the gate calls out to.
+			ssoTunnel := Tunnel{Domain: *ssoDomain}
+			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, *behindProxy)
 		} else {
 
 			tunnel, exists := db.GetTunnel(hostDomain)
@@ -339,6 +383,10 @@ func Listen() {
 				errMessage := fmt.Sprintf("No tunnel attached to %s", hostDomain)
 				w.WriteHeader(500)
 				io.WriteString(w, errMessage)
+				return
+			}
+
+			if !requireSsoIfNeeded(w, r, tunnel.Domain, tunnel.SsoProtected) {
 				return
 			}
 

@@ -377,6 +377,13 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 
 	allowExternalTcp := params.Get("allow-external-tcp") == "on"
 
+	// Only meaningful for "server"-termination tunnels (and the special-cased
+	// portal/sso domains) -- those are the only ones boringproxy ever parses
+	// HTTP for, so they're the only ones an OIDC redirect/cookie check can be
+	// enforced on. See oidc_auth.go's RequireAuth and its call site in
+	// boringproxy.go.
+	ssoProtect := params.Get("sso-protect") == "on"
+
 	passwordProtect := params.Get("password-protect") == "on"
 
 	var username string
@@ -425,6 +432,7 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		AuthUsername:     username,
 		AuthPassword:     password,
 		TlsTermination:   tlsTerm,
+		SsoProtected:     ssoProtect,
 		ServerAddress:    sshServerAddr,
 		ServerPort:       sshServerPort,
 	}

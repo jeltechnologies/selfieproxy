@@ -73,6 +73,7 @@ public class TunnelMapper {
 				null,
 				null,
 				tlsTermination,
+				app.canProtectWithSso() ? app.ssoProtected() : null,
 				null,
 				null);
 	}
@@ -86,7 +87,7 @@ public class TunnelMapper {
 
 		if ("passthrough".equals(tunnel.tlsTermination()) && tunnel.allowExternalTcp()) {
 			return new ExposedApp(subdomain, ownDomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
-					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null);
+					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null, false);
 		}
 
 		boolean https = tunnel.clientAddress() != null && tunnel.clientAddress().startsWith(HTTPS_PREFIX);
@@ -100,6 +101,7 @@ public class TunnelMapper {
 		};
 
 		return new ExposedApp(subdomain, ownDomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
-				https ? Protocol.HTTPS : Protocol.HTTP, host, tunnel.clientPort(), null, tlsMode);
+				https ? Protocol.HTTPS : Protocol.HTTP, host, tunnel.clientPort(), null, tlsMode,
+				tunnel.ssoProtected());
 	}
 }

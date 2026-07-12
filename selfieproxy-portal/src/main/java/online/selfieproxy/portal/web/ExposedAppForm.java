@@ -15,5 +15,6 @@ public record ExposedAppForm(
 		String host,
 		Integer port,
 		Integer exposedPort,
-		TlsMode tlsMode) {
+		TlsMode tlsMode,
+		Boolean ssoProtected) {
 }

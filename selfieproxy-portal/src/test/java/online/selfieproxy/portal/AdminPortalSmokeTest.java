@@ -31,14 +31,20 @@ import online.selfieproxy.portal.boringproxy.dto.TokenDataDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 
 /**
- * Exercises login -> dashboard -> add -> edit -> delete through real Spring MVC
+ * Exercises dashboard -> add -> edit -> delete through real Spring MVC
  * controllers + Thymeleaf templates, with BoringProxyClient mocked so no real
- * BoringProxy server is required.
+ * BoringProxy server is required. The portal itself no longer checks a
+ * password (boringproxy gates the domain via OIDC before a request ever
+ * reaches here, see SessionInterceptor) -- each flow starts by simulating
+ * that gate with the X-Selfieproxy-Sso-Verified header on a first request,
+ * then reuses the resulting HttpSession like a real browser would.
  */
-@SpringBootTest(properties = {"admin-portal.username=admin", "admin-portal.password=secret",
+@SpringBootTest(properties = {
 		"selfieproxy.exposed-apps-path=${java.io.tmpdir}/selfieproxy-smoke-test-exposed-apps.json"})
 @AutoConfigureMockMvc
 class AdminPortalSmokeTest {
+
+	private static final String SSO_VERIFIED_HEADER = "X-Selfieproxy-Sso-Verified";
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -46,21 +52,24 @@ class AdminPortalSmokeTest {
 	@MockitoBean
 	private BoringProxyClient boringProxyClient;
 
+	private MockHttpSession authenticatedSession() throws Exception {
+		MvcResult result = mockMvc.perform(get("/apps").header(SSO_VERIFIED_HEADER, "true"))
+				.andExpect(status().isOk())
+				.andReturn();
+		return (MockHttpSession) result.getRequest().getSession();
+	}
+
 	@Test
 	void loginDashboardAddEditAndDeleteFlow() throws Exception {
-		MvcResult loginResult = mockMvc.perform(post("/login").param("username", "admin").param("password", "secret"))
-				.andExpect(status().is3xxRedirection())
-				.andExpect(redirectedUrl("/"))
-				.andReturn();
-		MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
+		MockHttpSession session = authenticatedSession();
 
 		when(boringProxyClient.listAgents())
 				.thenReturn(Map.of("home", new AgentStatusDto(null), "office", new AgentStatusDto(null)));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", "admin", "home", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, "admin", "home", "", "");
 		TunnelDto netTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
-				51234, "", "127.0.0.1", 22, true, "passthrough", "admin", "home", "", "");
+				51234, "", "127.0.0.1", 22, true, "passthrough", false, "admin", "home", "", "");
 		when(boringProxyClient.listTunnels())
 				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", netTunnel));
 
@@ -79,6 +88,26 @@ class AdminPortalSmokeTest {
 		mockMvc.perform(get("/apps/music/edit").session(session))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("music")));
+
+		// SSO can only ever gate "Server HTTPS" (Web Application + HTTPS +
+		// TlsMode.MANAGED, boringproxy's own "server" TLS termination) --
+		// requesting it for a BYO_CERT app must be rejected, never silently
+		// dropped, since BYO_CERT/HOP_BY_HOP are HTTPS too and it'd be easy
+		// to assume they qualify.
+		mockMvc.perform(post("/apps")
+						.session(session)
+						.param("subdomain", "unprotectable")
+						.param("ownDomain", "false")
+						.param("homelabName", "home")
+						.param("type", "WEB_APPLICATION")
+						.param("protocol", "HTTPS")
+						.param("tlsMode", "BYO_CERT")
+						.param("ssoProtected", "true")
+						.param("host", "127.0.0.1")
+						.param("port", "443"))
+				.andExpect(status().isOk())
+				.andExpect(content().string(containsString(
+						"SSO protection requires Web Application, HTTPS, and the recommended End-to-end encrypted option.")));
 
 		when(boringProxyClient.createTunnel(any(CreateTunnelRequestDto.class))).thenReturn(webTunnel);
 
@@ -101,17 +130,14 @@ class AdminPortalSmokeTest {
 
 	@Test
 	void agentsListAddRegenerateAndDeleteFlow() throws Exception {
-		MvcResult loginResult = mockMvc.perform(post("/login").param("username", "admin").param("password", "secret"))
-				.andExpect(status().is3xxRedirection())
-				.andReturn();
-		MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
+		MockHttpSession session = authenticatedSession();
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("default", new AgentStatusDto(null)));
 		when(boringProxyClient.listTokens())
 				.thenReturn(Map.of("secret-abc", new TokenDataDto("admin", "default")));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", "admin", "default", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, "admin", "default", "", "");
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("music.example.com", webTunnel));
 
 		mockMvc.perform(get("/").session(session))
@@ -141,19 +167,16 @@ class AdminPortalSmokeTest {
 
 	@Test
 	void renamingAgentRetargetsSecretAndTunnelsInsteadOfMintingANewOneOrOrphaningApps() throws Exception {
-		MvcResult loginResult = mockMvc.perform(post("/login").param("username", "admin").param("password", "secret"))
-				.andExpect(status().is3xxRedirection())
-				.andReturn();
-		MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
+		MockHttpSession session = authenticatedSession();
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("default", new AgentStatusDto(null)));
 		when(boringProxyClient.listTokens())
 				.thenReturn(Map.of("secret-abc", new TokenDataDto("admin", "default")));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", "admin", "default", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, "admin", "default", "", "");
 		TunnelDto otherHomelabTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
-				51234, "", "127.0.0.1", 22, true, "passthrough", "admin", "office", "", "");
+				51234, "", "127.0.0.1", 22, true, "passthrough", false, "admin", "office", "", "");
 		when(boringProxyClient.listTunnels())
 				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", otherHomelabTunnel));
 

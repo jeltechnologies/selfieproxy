@@ -52,7 +52,7 @@ public class ExposedAppController {
 	public String newApp(Model model) {
 		List<String> homelabs = homelabs();
 		ExposedApp app = new ExposedApp("", false, null, homelabs.stream().findFirst().orElse(null),
-				ExposedAppType.WEB_APPLICATION, Protocol.HTTP, "127.0.0.1", 80, null, null);
+				ExposedAppType.WEB_APPLICATION, Protocol.HTTP, "127.0.0.1", 80, null, null, false);
 		model.addAttribute("app", app);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domain", properties.domain());
@@ -146,7 +146,8 @@ public class ExposedAppController {
 		boolean ownDomain = !networkService && form.ownDomain();
 		return new ExposedApp(subdomain, ownDomain, name, form.homelabName(), form.type(),
 				networkService ? null : form.protocol(),
-				form.host(), form.port() != null ? form.port() : 0, form.exposedPort(), form.tlsMode());
+				form.host(), form.port() != null ? form.port() : 0, form.exposedPort(), form.tlsMode(),
+				!networkService && Boolean.TRUE.equals(form.ssoProtected()));
 	}
 
 	/** Random internal subdomain for a Network Service, retried until it doesn't collide with an existing tunnel. */
@@ -175,6 +176,9 @@ public class ExposedAppController {
 		if (app.subdomain().equalsIgnoreCase(properties.portalSubdomain())) {
 			errors.add("\"" + app.subdomain() + "\" is reserved for the Selfie Proxy admin portal itself.");
 		}
+		if (app.subdomain().equalsIgnoreCase(properties.ssoSubdomain())) {
+			errors.add("\"" + app.subdomain() + "\" is reserved for Selfie Proxy's bundled SSO server itself.");
+		}
 
 		String fqdn = tunnelMapper.fqdn(app);
 		Map<String, TunnelDto> existing = boringProxyClient.listTunnels();
@@ -183,6 +187,10 @@ public class ExposedAppController {
 						&& (originalSubdomain == null || !domain.equalsIgnoreCase(currentFqdn(originalSubdomain))));
 		if (taken) {
 			errors.add((app.ownDomain() ? "Domain \"" : "Subdomain \"") + app.subdomain() + "\" is already in use.");
+		}
+
+		if (app.ssoProtected() && !app.canProtectWithSso()) {
+			errors.add("SSO protection requires Web Application, HTTPS, and the recommended End-to-end encrypted option.");
 		}
 
 		if (app.isNetworkService() && (app.name() == null || app.name().isBlank())) {

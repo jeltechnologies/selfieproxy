@@ -11,6 +11,7 @@ package online.selfieproxy.portal.domain;
  * @param exposedPort  only set when type is NETWORK_SERVICE
  * @param protocol     only meaningful when type is WEB_APPLICATION (Network Service is always TCP)
  * @param tlsMode      only set when type is WEB_APPLICATION and protocol is HTTPS
+ * @param ssoProtected whether boringproxy gates this app behind the configured OIDC issuer; only ever true when {@link #canProtectWithSso()} holds, since boringproxy only ever parses HTTP (and so can enforce SSO) for "server"-termination tunnels -- see TlsMode.MANAGED
  */
 public record ExposedApp(
 		String subdomain,
@@ -22,7 +23,8 @@ public record ExposedApp(
 		String host,
 		int port,
 		Integer exposedPort,
-		TlsMode tlsMode) {
+		TlsMode tlsMode,
+		boolean ssoProtected) {
 
 	public boolean isWebApplication() {
 		return type == ExposedAppType.WEB_APPLICATION;
@@ -38,5 +40,10 @@ public record ExposedApp(
 
 	public TlsMode effectiveTlsMode() {
 		return tlsMode != null ? tlsMode : TlsMode.MANAGED;
+	}
+
+	/** "Server HTTPS" only (boringproxy's own name for TlsMode.MANAGED, its "server" TLS-termination mode) -- BYO_CERT/HOP_BY_HOP are HTTPS too but never HTTP-parsed at the server, so SSO can't be enforced for them. */
+	public boolean canProtectWithSso() {
+		return isWebApplication() && protocol == Protocol.HTTPS && effectiveTlsMode() == TlsMode.MANAGED;
 	}
 }

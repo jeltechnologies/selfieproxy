@@ -98,6 +98,14 @@
 				achieved by using NGINX proxy in the homelab.
 			</div>
 
+			<div class="field" id="sso-protected-field">
+				<label>
+					<input type="checkbox" id="ssoProtected" name="ssoProtected" value="true"
+						   th:checked="${app.ssoProtected()}">
+					Protect with SSO
+				</label>
+			</div>
+
 			<button type="button" id="advanced-settings-toggle" class="link-button">Advanced settings</button>
 
 			<fieldset id="advanced-settings" class="advanced-settings">
