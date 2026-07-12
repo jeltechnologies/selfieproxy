@@ -29,7 +29,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * Local Websites: static sites Selfie Proxy hosts itself, entirely
  * independent of the Homelab/Exposed App concept -- no user-run address, no
  * protocol/TLS choice, just a domain. Every website's Tunnel points at the
- * shared selfieproxy-sites container through the hidden "This Server"
+ * shared selfieproxy-local-websites container through the hidden "This Server"
  * homelab (see ThisServerAgentProperties); this controller builds that
  * Tunnel request directly rather than going through ExposedApp/TunnelMapper,
  * which are exposed-app-specific abstractions this feature deliberately

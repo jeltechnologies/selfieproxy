@@ -11,9 +11,9 @@ import online.selfieproxy.portal.config.SitesWebserverProperties;
 /**
  * Provisions the on-disk pieces a LocalWebsite needs: a content directory the
  * user drops files into, and an NGINX server-block file picking it by domain
- * for the shared selfieproxy-sites container (see sites-webserver/). Pure
+ * for the shared selfieproxy-local-websites container (see sites-webserver/). Pure
  * filesystem I/O, same shape as ExposedAppStore -- selfieproxy-portal never
- * talks to that container directly, it just writes files selfieproxy-sites'
+ * talks to that container directly, it just writes files selfieproxy-local-websites'
  * own entrypoint watches and reloads on.
  */
 @Component

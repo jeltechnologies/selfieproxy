@@ -17,13 +17,13 @@ import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
 /**
  * Creates the "This Server" homelab (an ordinary Agent whose process happens
- * to run colocated in docker-compose-server.yaml, see the this-server-agent
+ * to run colocated in docker-compose-server.yaml, see the selfieproxy-local-agent
  * service) the first time the portal starts against a boringproxy server
  * that doesn't already know about it, and republishes its current secret to
  * secretPath on every startup -- so the colocated agent container never
  * needs a manual copy-paste from the Agents page, and stays in sync if the
  * secret is ever regenerated there. Mirrors AgentBootstrap's pattern for
- * AGENT_DEFAULT_NAME.
+ * DEFAULT_HOMELAB.
  */
 @Component
 public class ThisServerBootstrap {
@@ -65,10 +65,10 @@ public class ThisServerBootstrap {
 				.orElse(null);
 	}
 
-	/** A missing/blank secret (eg. a transient boringproxy hiccup) is logged, not fatal -- the colocated agent just waits and this-server-agent's own retry loop tries again on the next portal restart, rather than the whole portal refusing to start. */
+	/** A missing/blank secret (eg. a transient boringproxy hiccup) is logged, not fatal -- the colocated agent just waits and selfieproxy-local-agent's own retry loop tries again on the next portal restart, rather than the whole portal refusing to start. */
 	private void writeSecret(String secret) {
 		if (secret == null || secret.isBlank()) {
-			log.warn("Could not resolve a secret for 'This Server' homelab '{}'; this-server-agent will remain disconnected until the next successful portal startup.",
+			log.warn("Could not resolve a secret for 'This Server' homelab '{}'; selfieproxy-local-agent will remain disconnected until the next successful portal startup.",
 					properties.agentName());
 			return;
 		}

@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * domain/adminSubdomain/portalSubdomain come from the same .env boringproxy
- * itself uses (DOMAIN, BORING_PROXY_ADMIN_SUBDOMAIN, SELFIEPROXY_SUBDOMAIN)
+ * itself uses (DOMAIN, REVERSE_PROXY_LISTENER, SELFPROXY_ADMIN_DOMAIN)
  * -- see application.properties.
  */
 @ConfigurationProperties(prefix = "boringproxy")

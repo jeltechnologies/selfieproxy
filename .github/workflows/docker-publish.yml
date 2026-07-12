@@ -27,7 +27,7 @@ jobs:
             context: ./boringproxy
           - image: selfieproxy-portal
             context: ./selfieproxy-portal
-          - image: selfieproxy-sites
+          - image: selfieproxy-local-websites
             context: ./sites-webserver
     steps:
       - name: Checkout

@@ -2,7 +2,12 @@ package online.selfieproxy.portal.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/** AGENT_DEFAULT_NAME in .env -- the agent AgentBootstrap creates automatically on first boot. */
+/**
+ * DEFAULT_HOMELAB in .env -- the agent AgentBootstrap creates automatically on
+ * first boot. bootstrapMarkerPath tracks whether that one-time bootstrap
+ * already ran, so a default homelab the user later deletes is not recreated
+ * on a subsequent restart.
+ */
 @ConfigurationProperties(prefix = "agent")
-public record AgentDefaultsProperties(String defaultName) {
+public record AgentDefaultsProperties(String defaultName, String bootstrapMarkerPath) {
 }

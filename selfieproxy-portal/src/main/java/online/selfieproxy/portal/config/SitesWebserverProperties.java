@@ -3,7 +3,7 @@ package online.selfieproxy.portal.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Address and shared filesystem paths of the selfieproxy-sites NGINX
+ * Address and shared filesystem paths of the selfieproxy-local-websites NGINX
  * container that serves managed static sites -- see StaticSiteProvisioner.
  * host/port are what a managedStaticSite ExposedApp's Tunnel points at;
  * confPath/sitesPath are where selfieproxy-portal writes the per-domain
