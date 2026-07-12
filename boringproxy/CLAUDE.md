@@ -13,6 +13,10 @@ The root package `boringproxy` (module `github.com/boringproxy/boringproxy`) con
 
 ## Build
 
+Requires Go 1.25+ (bumped from 1.17 when the embedded OIDC Relying Party was added —
+`github.com/coreos/go-oidc/v3` and `golang.org/x/oauth2` both need a modern toolchain; see
+`Dockerfile`'s `golang:1.25-alpine` builder stage).
+
 ```bash
 # One-time: logo.png must exist at repo root (embedded via go:embed in ui_handler.go)
 ./scripts/generate_logo.sh   # requires inkscape; logo.png is already checked in, so usually not needed
@@ -38,7 +42,7 @@ There are no test files in this repo (`*_test.go` does not exist) and no lint co
 ./boringproxy tuntls -server example.com                                # raw TLS tunnel over stdin/stdout, ported from anderspitman/tuntls
 ```
 
-Key server flags: `-admin-domain`, `-portal-domain`/`-portal-port`, `-db-dir`, `-cert-dir`, `-http-port`/`-https-port`, `-allow-http`, `-acme-email`, `-acme-use-staging`, `-behind-proxy`.
+Key server flags: `-admin-domain`, `-portal-domain`/`-portal-port`, `-sso-domain`/`-sso-port`, `-oidc-issuer`/`-oidc-client-id`/`-oidc-client-secret`, `-db-dir`, `-cert-dir`, `-http-port`/`-https-port`, `-allow-http`, `-acme-email`, `-acme-use-staging`, `-behind-proxy`.
 
 Key agent flags: `-server`, `-secret`, `-agent-name`, `-user`, `-poll-interval-ms` (min 100ms, 0 disables polling), `-dns-server`, `-behind-proxy`.
 
@@ -74,7 +78,17 @@ Superseded by Selfie Proxy's own admin portal, this legacy UI is no longer wired
 
 ### Portal domain (`-portal-domain`/`-portal-port`, `boringproxy.go`)
 
-A second special-cased host, alongside the admin domain: any request whose Host matches `-portal-domain` is reverse-proxied directly to `localhost:<-portal-port>` (via the same `proxyRequest` used for ordinary tunnels, with a synthetic `Tunnel{Domain: portalDomain}` -- no Agent, no SSH bore, no DB Tunnel record). This exists specifically so Selfie Proxy's own admin portal is reachable immediately on server startup, before any agent has ever connected -- the portal itself is where you go to create the first agent and read off its secret, so it can't depend on one already existing. Cert acquisition for this domain happens the same way as the admin domain, via `certConfig.ManageSync` at startup (gated on `autoCerts`).
+A second special-cased host, alongside the admin domain: any request whose Host matches `-portal-domain` is reverse-proxied directly to `localhost:<-portal-port>` (via the same `proxyRequest` used for ordinary tunnels, with a synthetic `Tunnel{Domain: portalDomain}` -- no Agent, no SSH bore, no DB Tunnel record). This exists specifically so Selfie Proxy's own admin portal is reachable immediately on server startup, before any agent has ever connected -- the portal itself is where you go to create the first agent and read off its secret, so it can't depend on one already existing. Cert acquisition for this domain happens the same way as the admin domain, via `certConfig.ManageSync` at startup (gated on `autoCerts`). The portal domain is now always SSO-gated (see below) -- the portal itself has no login left.
+
+### SSO domain (`-sso-domain`/`-sso-port`, `boringproxy.go`)
+
+A third special-cased host, wired identically to the portal domain (same synthetic-tunnel proxy, same eager cert acquisition): reverse-proxies to `selfieproxy-sso-server`, the bundled OIDC Identity Provider. Never itself SSO-gated -- it's the IdP the gate calls out to.
+
+### Embedded OIDC Relying Party (`oidc_auth.go`)
+
+boringproxy embeds its own OIDC client (RP), built from `-oidc-issuer`/`-oidc-client-id`/`-oidc-client-secret` (the last blank for the bundled server, a PKCE-only public client -- see `oidc_auth.go`'s doc comments for the full design). `OidcAuthenticator.RequireAuth` is the single check called from `boringproxy.go`'s main dispatch handler, gating: (1) the portal domain, always, and (2) any ordinary tunnel with `Tunnel.SsoProtected == true` -- which is only ever settable for `"server"`-termination tunnels, the only ones this server HTTP-parses (see Connection flow above). Three token kinds, all stateless/self-verifying HMAC-SHA256 (`{payload}.{sig}`, signing key persisted next to `boringproxy_db.json`): a session cookie (`_selfieproxy_sso`, ~24h, scoped to the exact `Host` it was issued for), a short-lived relay token (`?sso_token=`, ~60s, used once to bounce the browser from the central `/oidc/callback` on the admin domain back to the original app's own domain before setting that domain's session cookie), and the OIDC `state` param itself (encodes `{domain, return_to, PKCE verifier}`, since there's no server-side session store between `/oidc/authorize` and `/oidc/callback`). `/oidc/authorize` and `/oidc/callback` are carve-outs on the admin domain, alongside `/api/`/`/rest/`.
+
+OIDC discovery against `-oidc-issuer` runs in a background goroutine with retry/backoff (`StartOidcAuth`), never synchronously at startup -- `oidcAuthHolder` (an `atomic.Pointer[OidcAuthenticator]`) starts nil and every dispatch-path caller treats nil as "SSO starting up" (503), not "SSO disabled". This matters because `selfieproxy-sso-server` only starts once boringproxy reports healthy (docker-compose-server.yaml), while boringproxy's own discovery call is an HTTP request that has to reach the SSO server *through boringproxy's own listener* (the `-sso-domain` carve-out above) -- doing discovery synchronously before that listener starts would deadlock the two containers on first boot.
 
 ### TakingNames.io / namedrop integration
 

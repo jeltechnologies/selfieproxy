@@ -22,8 +22,9 @@ Selfie Proxy is not suitable for enterprise users, because it does not support h
 - Paste the name and secret into the homelab's `.env` (`AGENT_NAME`, `AGENT_SECRET`), set `SELFIEPROXY_LISTENER` to the server's admin domain (`REVERSE_PROXY_LISTENER.DOMAIN`), and start the agent there: `docker compose -f docker-compose-agent.yaml up -d --build`.
 
 ### Login
-- The user logs in with an access token. This access token is used towards the REST service of BoringProxy
+- The portal has no login of its own: boringproxy gates the portal domain via OIDC before any request reaches the portal container, against `selfieproxy-sso-server` (a bundled single-user Identity Provider, using `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD`) unless `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` point it at an external IdP instead.
 - After successful login the user arrives at the exposed applications.
+- A Web Application exposed app can opt in to the same SSO gate ("Protect with SSO" on the Edit application page) -- only available for Server HTTPS (HTTPS + the recommended End-to-end encrypted TLS mode), the only connectivity option boringproxy can enforce it for.
 
 ### Homelabs
 - Selfie Proxie can only be used for one top domain. This domain is configured in .env and used by Docker Compose. For example example.com.
