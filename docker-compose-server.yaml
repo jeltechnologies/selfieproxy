@@ -20,7 +20,7 @@ services:
       - ./data/boringproxy/runtime:/runtime
       - /root/.ssh:/root/.ssh
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
-    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime"]
+    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${BORINGPROXY_DEBUG:-false}"]
     environment:
       USER: "root"
       HOME: "/root"

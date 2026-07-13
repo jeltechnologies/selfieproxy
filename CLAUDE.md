@@ -93,7 +93,10 @@ they're not read from a single source of truth): `REVERSE_PROXY_LISTENER` (defau
 agent under on first boot, see the Agents page). Separately, `OIDC_ISSUER_URL`/
 `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` (all blank by default) override the admin portal's OIDC
 issuer to an external IdP instead of the bundled server — see `selfieproxy-sso-server/` above
-and `boringproxy/CLAUDE.md`'s OIDC section. The colocated homelab's name is hardcoded to
+and `boringproxy/CLAUDE.md`'s OIDC section. `BORINGPROXY_DEBUG` (default `false`) turns on
+boringproxy's `-debug` per-request access log (timestamp, remote IP, method, host, path) to
+stdout — off by default since every agent poll and every Homelabs-page auto-refresh tick would
+otherwise log a line. The colocated homelab's name is hardcoded to
 `selfieproxy-internal-agent` on both sides (docker-compose-server.yaml's selfieproxy-local-agent service
 and selfieproxy-portal's `this-server.agent-name`) rather than even optionally env-configurable,
 since the two must always match. Each

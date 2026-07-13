@@ -67,6 +67,7 @@ func Listen() {
 	acmeUseStaging := flagSet.Bool("acme-use-staging", false, "Use ACME (ie Let's Encrypt) staging servers")
 	acceptCATerms := flagSet.Bool("accept-ca-terms", false, "Automatically accept CA terms")
 	acmeCa := flagSet.String("acme-certificate-authority", "", "URI for ACME Certificate Authority")
+	debug := flagSet.Bool("debug", false, "Log every request (timestamp, remote IP, method, host, path) to stdout")
 	err := flagSet.Parse(os.Args[2:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: parsing flags: %s\n", os.Args[0], err)
@@ -238,15 +239,16 @@ func Listen() {
 	tlsListener := tls.NewListener(httpListener, tlsConfig)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		timestamp := time.Now().Format(time.RFC3339)
-
 		remoteIp, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
 			w.WriteHeader(500)
 			io.WriteString(w, err.Error())
 			return
 		}
-		fmt.Println(fmt.Sprintf("%s %s %s %s %s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
+		if *debug {
+			timestamp := time.Now().Format(time.RFC3339)
+			fmt.Println(fmt.Sprintf("%s %s %s %s %s", timestamp, remoteIp, r.Method, r.Host, r.URL.Path))
+		}
 
 		hostParts := strings.Split(r.Host, ":")
 		hostDomain := hostParts[0]

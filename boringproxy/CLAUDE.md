@@ -42,7 +42,7 @@ There are no test files in this repo (`*_test.go` does not exist) and no lint co
 ./boringproxy tuntls -server example.com                                # raw TLS tunnel over stdin/stdout, ported from anderspitman/tuntls
 ```
 
-Key server flags: `-admin-domain`, `-portal-domain`/`-portal-port`, `-sso-domain`/`-sso-port`, `-oidc-issuer`/`-oidc-client-id`/`-oidc-client-secret`, `-db-dir`, `-cert-dir`, `-http-port`/`-https-port`, `-allow-http`, `-acme-email`, `-acme-use-staging`, `-behind-proxy`.
+Key server flags: `-admin-domain`, `-portal-domain`/`-portal-port`, `-sso-domain`/`-sso-port`, `-oidc-issuer`/`-oidc-client-id`/`-oidc-client-secret`, `-db-dir`, `-cert-dir`, `-http-port`/`-https-port`, `-allow-http`, `-acme-email`, `-acme-use-staging`, `-behind-proxy`, `-debug` (logs every request -- timestamp, remote IP, method, host, path -- to stdout; off by default since every agent poll and portal auto-refresh would otherwise log a line).
 
 Key agent flags: `-server`, `-secret`, `-agent-name`, `-user`, `-poll-interval-ms` (min 100ms, 0 disables polling), `-dns-server`, `-behind-proxy`.
 
