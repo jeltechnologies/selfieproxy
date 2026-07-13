@@ -31,6 +31,9 @@ runtime config/volumes they use:
   that serves every Local Website (see `selfieproxy.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
+- `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + `check-prerequisites.sh`
+  baked in via its own Dockerfile) that fails fast before anything else starts if `DOMAIN` and its
+  subdomains don't already resolve to the host's public IP. Run as the `dns-check` service.
 
 ## Layout
 
@@ -45,7 +48,7 @@ runtime config/volumes they use:
 │       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
-├── selfieproxy-check-prerequisites/ # DNS pre-flight check used by docker-compose.yaml (check-prerequisites.sh)
+├── selfieproxy-check-prerequisites/ # DNS pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
 ├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent (depends_on selfieproxy-reverseproxy)
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
@@ -60,6 +63,17 @@ Host requirement: Linux only (amd64 or 64-bit arm, e.g. a 64-bit Raspberry Pi OS
 ```bash
 docker compose -f docker-compose.yaml up -d --build       # selfieproxy server + admin portal
 ```
+
+Every service in `docker-compose.yaml` carries both `image:` (a published `ghcr.io/jeltechnologies/*`
+tag, built and pushed by `.github/workflows/docker-publish.yml` on every push to `main`/`v*.*.*` tag)
+and `build:` (a local Dockerfile context under this repo). Compose's default `pull_policy` tries
+the registry image first and only falls back to a local build if the pull fails — so a deployer
+who only has `docker-compose.yaml` and `.env` (no git checkout of this repo at all) can run
+`docker compose up -d` with no `--build` and no source directories present; `--build` is only
+needed by someone iterating on source in this checkout (see `feedback_rebuild_after_source_edit`
+in memory). This is why `selfieproxy-check-prerequisites/` has its own Dockerfile rather than
+being a bare `alpine` image with the script bind-mounted in — a bind mount would require the
+script file to exist on disk, defeating the self-contained deploy.
 
 This repo only runs the server side. Agent hosts are not provisioned or run from here — the
 admin portal's Agents page is the source of truth for connecting a homelab (it issues the
