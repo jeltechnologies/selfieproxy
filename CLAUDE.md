@@ -33,7 +33,7 @@ runtime config/volumes they use:
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
 - `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + `check-prerequisites.sh`
   baked in via its own Dockerfile) that fails fast before anything else starts if `DOMAIN` and its
-  subdomains don't already resolve to the host's public IP. Run as the `dns-check` service.
+  subdomains don't already resolve to the host's public IP. Run as the `check-prerequisites` service.
 
 ## Layout
 

@@ -1,5 +1,5 @@
 services:
-  dns-check:
+  check-prerequisites:
     image: ghcr.io/jeltechnologies/selfieproxy-check-prerequisites:latest
     build: ./selfieproxy-check-prerequisites
     env_file: .env
@@ -60,7 +60,7 @@ services:
     container_name: selfieproxy-identity-provider
     restart: unless-stopped
     depends_on:
-      dns-check:
+      check-prerequisites:
         condition: service_completed_successfully
     env_file: .env
     environment:
