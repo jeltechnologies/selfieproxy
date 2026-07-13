@@ -16,10 +16,10 @@ Selfie Proxy is not suitable for enterprise users, because it does not support h
 ## Portal
 
 ### Initial setup
-- Set `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` in `.env`, then start the server: `docker compose -f docker-compose-server.yaml up -d --build`.
+- Set `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` in `.env`, then start the server: `docker compose -f docker-compose.yaml up -d --build`.
 - The portal itself (`SELFPROXY_ADMIN_DOMAIN.DOMAIN`) is reachable immediately, before any agent is connected -- selfieproxy-reverseproxy reverse-proxies that domain directly to the admin portal container (`-portal-domain`/`-portal-port`), independent of the normal Agent/Tunnel mechanism, since the portal is where the first agent gets created.
 - Log in, open the Agents page, find the `my-homelab` agent created automatically on first boot, and copy its secret.
-- Paste the name and secret into the homelab's `.env` (`AGENT_NAME`, `AGENT_SECRET`), set `SELFIEPROXY_LISTENER` to the server's admin domain (`REVERSE_PROXY_LISTENER.DOMAIN`), and start the agent there: `docker compose -f docker-compose-agent.yaml up -d --build`.
+- Agent hosts are not part of this repo -- there's no compose file or `.env` template for them here. Connecting a homelab means taking the name/secret from the Agents page and running the agent process there by whatever means the portal guides the user through.
 
 ### Login
 - The portal has no login of its own: boringproxy gates the portal domain via OIDC before any request reaches the portal container, against `selfieproxy-identity-provider` (a bundled single-user Identity Provider, using `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD`) unless `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` point it at an external IdP instead.
@@ -38,7 +38,7 @@ Selfie Proxy is not suitable for enterprise users, because it does not support h
 - The Agents page lists all agents. For each agent the user can view/reveal its current secret, generate a new secret (invalidating the old one), rename the agent, or remove it.
 - A default agent (name "my-homelab" unless overridden via DEFAULT_HOMELAB) is created automatically the first time the admin portal starts, with a freshly generated secret.
 - The boringproxy server only accepts connections from agents that exist in this list — an agent's secret is a boringproxy access token scoped to that agent's name, so it can't be used to act as, or register, any other agent.
-- To deploy an agent, the user copies its name and secret from this page into the homelab's .env (AGENT_NAME, AGENT_SECRET, alongside SELFIEPROXY_LISTENER pointing at the server's admin domain) before starting docker-compose-agent.yaml there.
+- To deploy an agent, the user copies its name and secret from this page and uses them to run the agent process on the homelab host -- guidance for doing so comes from the portal itself, not from a compose file or `.env` template in this repo.
 
 ### Exposed applications
 - The top of the page contains a section to manage Homelabs. This section contains a drop down with the name of Homelabs in alphabetic order.
@@ -89,7 +89,7 @@ Local websites are static sites Selfie Proxy hosts itself, entirely independent 
 - Renaming one: type a new domain on the edit page. The tunnel is recreated under the new domain, and the site's files are moved to the new domain's folder (`data/selfieproxy/sites/<domain>/`) -- nothing is lost.
 - Removing one: takes it off the internet (the tunnel and NGINX config are deleted) but keeps its files on the server. Adding the same domain again later reuses them automatically, since provisioning only ever ensures the folder exists rather than clearing it.
 - Files are dropped into `data/selfieproxy/sites/<domain>/` on the server directly (created by selfieproxy-portal and owned by its container user -- copy files in as root, or via `docker exec selfieproxy-portal`).
-- Under the hood, every local website is served by "This Server": an ordinary BoringProxy Agent whose process runs colocated with the Selfie Proxy server itself (the selfieproxy-local-agent service in docker-compose-server.yaml), instead of a remote house/office network. It's created automatically the first time the portal starts, hardcoded to the agent name "selfieproxy-internal-agent", and its secret never needs manual copy-paste -- the portal republishes it to a file the selfieproxy-local-agent container reads directly on every startup.
+- Under the hood, every local website is served by "This Server": an ordinary BoringProxy Agent whose process runs colocated with the Selfie Proxy server itself (the selfieproxy-local-agent service in docker-compose.yaml), instead of a remote house/office network. It's created automatically the first time the portal starts, hardcoded to the agent name "selfieproxy-internal-agent", and its secret never needs manual copy-paste -- the portal republishes it to a file the selfieproxy-local-agent container reads directly on every startup.
 - "This Server" is deliberately hidden from the Homelabs page and the Exposed Applications homelab dropdown -- it is not a Homelab a user picks or manages, only an implementation detail of Local Websites.
 
 ## Mapping to boringproxy data model

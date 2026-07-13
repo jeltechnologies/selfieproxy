@@ -17,7 +17,7 @@ import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
 /**
  * Creates the "This Server" homelab (an ordinary Agent whose process happens
- * to run colocated in docker-compose-server.yaml, see the selfieproxy-local-agent
+ * to run colocated in docker-compose.yaml, see the selfieproxy-local-agent
  * service) the first time the portal starts against a boringproxy server
  * that doesn't already know about it, and republishes its current secret to
  * secretPath on every startup -- so the colocated agent container never

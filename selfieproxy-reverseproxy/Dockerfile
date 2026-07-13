@@ -12,7 +12,7 @@ RUN cd cmd/boringproxy && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
 	go build -ldflags "-X main.Version=${VERSION}" \
 	-o selfieproxy-reverseproxy
 RUN setcap cap_net_bind_service=+ep cmd/boringproxy/selfieproxy-reverseproxy
-# alpine rather than scratch: selfieproxy-local-agent (docker-compose-server.yaml)
+# alpine rather than scratch: selfieproxy-local-agent (docker-compose.yaml)
 # reuses this same image with a /bin/sh entrypoint wrapper that reads its
 # secret from a file before exec'ing the binary (boringproxy's own -secret
 # flag takes a literal value, not a file path).

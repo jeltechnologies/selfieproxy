@@ -75,7 +75,7 @@ type ssoStateClaims struct {
 // the SSO server, which boringproxy itself proxies to via -sso-domain --
 // so it can only succeed once boringproxy's own accept loop is running.
 // selfieproxy-sso-server boots concurrently with boringproxy (no
-// depends_on between them in docker-compose-server.yaml, precisely so it
+// depends_on between them in docker-compose.yaml, precisely so it
 // isn't serialized behind boringproxy's healthcheck), but if discovery
 // happened synchronously before Listen() starts, the two would still
 // deadlock waiting on each other. Discovery is retried with a short
@@ -84,7 +84,7 @@ type ssoStateClaims struct {
 // HandleCallback) treats a not-yet-ready OidcAuthenticator as a transient
 // 503, not a hard failure.
 // A blank issuer disables SSO entirely -- not expected to happen in the
-// Selfie Proxy deployment, where docker-compose-server.yaml always
+// Selfie Proxy deployment, where docker-compose.yaml always
 // computes a default pointing at the bundled server, but kept as an
 // escape hatch for anyone running the bare boringproxy binary directly.
 func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string) {

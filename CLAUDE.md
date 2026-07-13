@@ -36,7 +36,7 @@ runtime config/volumes they use:
 
 ```
 .
-├── .env                          # per-host config, copied from .env.server.example (server host) or .env.agent.example (agent host)
+├── .env                          # server config, copied from .env.server.example
 ├── data/                         # runtime volumes — not committed
 │   ├── boringproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
 │   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
@@ -45,9 +45,8 @@ runtime config/volumes they use:
 │       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
-├── check-dns.sh                  # DNS pre-flight check used by docker-compose-server.yaml
-├── docker-compose-server.yaml     # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-local-agent (depends_on selfieproxy-reverseproxy)
-├── docker-compose-agent.yaml      # builds and runs selfieproxy-agent, the connecting tunnel process (build context: ./selfieproxy-reverseproxy)
+├── check-dns.sh                  # DNS pre-flight check used by docker-compose.yaml
+├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-local-agent (depends_on selfieproxy-reverseproxy)
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
 ├── selfieproxy-identity-provider/ # bundled single-user OIDC Identity Provider — Java/Spring, same build template as selfieproxy-portal
@@ -57,19 +56,23 @@ runtime config/volumes they use:
 ## Running
 
 ```bash
-docker compose -f docker-compose-server.yaml up -d --build       # selfieproxy server + admin portal
-docker compose -f docker-compose-agent.yaml up -d --build        # selfieproxy-agent
+docker compose -f docker-compose.yaml up -d --build       # selfieproxy server + admin portal
 ```
 
+This repo only runs the server side. Agent hosts are not provisioned or run from here — the
+admin portal's Agents page is the source of truth for connecting a homelab (it issues the
+agent name/secret an operator needs), and guidance for running the agent process itself lives
+there, not in a compose file or `.env` template in this repo.
+
 The admin portal only runs alongside the server (it manages that server's tunnels via the
-boringproxy REST API), so it's defined as a second service in `docker-compose-server.yaml`
+boringproxy REST API), so it's defined as a second service in `docker-compose.yaml`
 rather than its own compose file, with `depends_on: selfieproxy-reverseproxy`. The
 `selfieproxy-reverseproxy` container's `-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`DOMAIN` and the
 selfieproxy-portal's published port, `8081`) make the portal reachable at startup by reverse-proxying
 that domain directly to selfieproxy-portal, without going through any Agent/Tunnel — this is what lets
 a fresh deployment reach the portal to create its first agent, before any agent exists.
 
-`docker-compose-server.yaml` also runs two more services, both existing solely to power the
+`docker-compose.yaml` also runs two more services, both existing solely to power the
 Local Websites feature (see `selfieproxy.md`): `selfieproxy-local-websites` (the `sites-webserver/`
 image, a shared NGINX serving every Local Website by `server_name`) and `selfieproxy-local-agent`
 (an ordinary boringproxy agent, `network_mode: host` like `boringproxy` itself, colocated with
@@ -84,7 +87,7 @@ The server host's `.env` (from `.env.server.example`) only needs `DOMAIN` and
 `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-identity-provider`
 (the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. Four more
 vars are optional, poweruser-only overrides with sensible defaults baked into
-application.properties/docker-compose-server.yaml/check-dns.sh (all four must agree, since
+application.properties/docker-compose.yaml/check-dns.sh (all four must agree, since
 they're not read from a single source of truth): `REVERSE_PROXY_LISTENER` (default
 `proxylistener`, the subdomain boringproxy's admin/tunnel-control plane listens on),
 `SELFPROXY_ADMIN_DOMAIN` (default `selfieproxy`, the portal's own subdomain),
@@ -97,18 +100,16 @@ and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `BORINGPROXY_DEBUG` (de
 boringproxy's `-debug` per-request access log (timestamp, remote IP, method, host, path) to
 stdout — off by default since every agent poll and every Homelabs-page auto-refresh tick would
 otherwise log a line. The colocated homelab's name is hardcoded to
-`selfieproxy-internal-agent` on both sides (docker-compose-server.yaml's selfieproxy-local-agent service
+`selfieproxy-internal-agent` on both sides (docker-compose.yaml's selfieproxy-local-agent service
 and selfieproxy-portal's `this-server.agent-name`) rather than even optionally env-configurable,
-since the two must always match. Each
-agent host's own `.env` (from `.env.agent.example`) is
-separate and much smaller: `SELFIEPROXY_LISTENER` (the boringproxy admin domain the agent connects
-to, i.e. `REVERSE_PROXY_LISTENER.DOMAIN` from the server's `.env` — a single value rather than two,
-since the agent has no other use for either half) and `AGENT_NAME`/`AGENT_SECRET`
-for the connecting `selfieproxy-agent` process in `docker-compose-agent.yaml` — that secret is
-server-generated and must be copied from the admin portal's Agents page into the agent host's
-`.env` after the server first starts. Neither compose file passes `-acme-email` to boringproxy —
-it's optional for ACME/Let's Encrypt (used only for expiry notices), so `-accept-ca-terms` alone
-is enough to issue certs unattended.
+since the two must always match. Agent hosts are out of scope for this repo entirely — there's
+no compose file or `.env` template for them here. An agent connects with just a name and a
+server-generated secret (`AGENT_NAME`/`AGENT_SECRET`) issued from the admin portal's Agents
+page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER.DOMAIN` from this
+server's `.env`); the portal itself is the source of guidance for running that agent process.
+`docker-compose.yaml` doesn't pass `-acme-email` to boringproxy — it's optional for
+ACME/Let's Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is enough to
+issue certs unattended.
 `data/boringproxy/storage` and `data/boringproxy/certmagic`/`this-server-certmagic` persist the
 boringproxy database and TLS certs (server's and selfieproxy-local-agent's, kept separate) across restarts;
 `data/selfieproxy` persists selfieproxy-portal's own exposed-app records (see ExposedAppStore in
