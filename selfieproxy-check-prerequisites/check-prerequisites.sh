@@ -10,8 +10,6 @@ echo "==========================================================================
 echo ""
 echo " S E L F I E P R O X Y - prerequisites check"
 echo ""
-echo "Check that the DNS records of ${DOMAIN} point to this server...."
-echo ""
 
 PUBLIC_IP=$(curl -fsS https://ifconfig.me)
 if [ -z "$PUBLIC_IP" ]; then
@@ -41,3 +39,4 @@ check_domain "$DOMAIN"
 check_domain "$WILDCARD_FQDN"
 
 echo "DNS check passed."
+echo "=============================================================================="
