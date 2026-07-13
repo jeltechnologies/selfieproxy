@@ -3,8 +3,8 @@ services:
     image: alpine:3.20
     env_file: .env
     volumes:
-      - ./selfieproxy-checkdns/check-dns.sh:/check-dns.sh:ro
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl bind-tools >/dev/null && /check-dns.sh"]
+      - ./selfieproxy-check-prerequisites/check-prerequisites.sh:/check-prerequisites.sh:ro
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl bind-tools >/dev/null && /check-prerequisites.sh"]
 
   selfieproxy-reverseproxy:
     image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
