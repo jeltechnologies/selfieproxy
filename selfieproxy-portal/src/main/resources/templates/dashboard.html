@@ -6,7 +6,10 @@
 
 	<main class="page">
 		<section class="page-header">
-			<h1>Applications</h1>
+			<div>
+				<h1>Applications</h1>
+				<p class="page-subtitle">Expose web applications and network services, running in your home lab, to the internet.</p>
+			</div>
 			<a class="button" th:if="${not #lists.isEmpty(homelabs)}" th:href="@{/apps/new}">Add application</a>
 		</section>
 
