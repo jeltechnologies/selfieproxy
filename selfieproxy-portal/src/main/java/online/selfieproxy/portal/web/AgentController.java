@@ -27,7 +27,7 @@ import online.selfieproxy.portal.config.ThisServerAgentProperties;
 @Controller
 public class AgentController {
 
-	/** Selfie Proxy has exactly one boringproxy user; see selfieproxy.md. */
+	/** Selfie Proxy has exactly one boringproxy user; see selfieproxy-portal/CLAUDE.md. */
 	private static final String OWNER = "admin";
 
 	/**

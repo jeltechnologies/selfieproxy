@@ -3,7 +3,7 @@ package online.selfieproxy.portal.domain;
 /**
  * Selfie Proxy's own model of a published app, mapped to/from a BoringProxy
  * "Tunnel" by {@link TunnelMapper}. Deliberately avoids BoringProxy's own
- * vocabulary (Client/Tunnel) in field names, per selfieproxy.md.
+ * vocabulary (Client/Tunnel) in field names, per selfieproxy-portal/CLAUDE.md.
  *
  * @param subdomain    the app's Selfie Proxy identifier -- the label suffixed with the shared DOMAIN
  * @param name         only meaningful when type is NETWORK_SERVICE -- a free-text label; not unique, not part of the domain

@@ -9,8 +9,8 @@ import online.selfieproxy.portal.config.BoringProxyProperties;
 /**
  * Translates between Selfie Proxy's ExposedApp/Homelab model and
  * BoringProxy's Tunnel/CreateTunnelRequest, per the TLS-termination mapping
- * table in the project plan (derived from selfieproxy.md's own parenthetical
- * BoringProxy-mode hints).
+ * table in the project plan (derived from selfieproxy-portal/CLAUDE.md's own
+ * parenthetical BoringProxy-mode hints).
  */
 @Component
 public class TunnelMapper {

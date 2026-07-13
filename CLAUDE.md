@@ -15,8 +15,8 @@ runtime config/volumes they use:
   flow, tunnel lifecycle, DB schema, auth model, web UI, OIDC). Read `selfieproxy-reverseproxy/CLAUDE.md`
   before working on anything under that directory.
 - `selfieproxy-portal/` — the Selfie Proxy admin portal (Java/Spring), the product-facing UI
-  that manages `boringproxy` tunnels/clients through its REST API. See `selfieproxy.md`
-  for the product spec (login flow, homelabs, exposed apps, tunnel mapping). No login of its
+  that manages `boringproxy` tunnels/clients through its REST API. Has its own `CLAUDE.md` with
+  the full product spec (login flow, homelabs, exposed apps, tunnel mapping). No login of its
   own anymore — see `selfieproxy-identity-provider/` below.
 - `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, single-user OIDC Identity Provider
   (Java/Spring, same Maven/Dockerfile template as `selfieproxy-portal/`). Used by default to
@@ -28,7 +28,7 @@ runtime config/volumes they use:
   pattern. Reached via the same before-any-agent-exists domain carve-out as the portal (see
   `-sso-domain`/`-sso-port` in `selfieproxy-reverseproxy/CLAUDE.md`).
 - `selfieproxy-localsites-webserver/` — a small self-reloading NGINX image (see its own Dockerfile/entrypoint.sh)
-  that serves every Local Website (see `selfieproxy.md`) — one shared container, one
+  that serves every Local Website (see `selfieproxy-portal/CLAUDE.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
 - `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + `check-prerequisites.sh`
@@ -92,7 +92,7 @@ that domain directly to selfieproxy-portal, without going through any Agent/Tunn
 a fresh deployment reach the portal to create its first agent, before any agent exists.
 
 `docker-compose.yaml` also runs two more services, both existing solely to power the
-Local Websites feature (see `selfieproxy.md`): `selfieproxy-local-websites` (the `selfieproxy-localsites-webserver/`
+Local Websites feature (see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-local-websites` (the `selfieproxy-localsites-webserver/`
 image, a shared NGINX serving every Local Website by `server_name`) and `selfieproxy-localsites-agent`
 (an ordinary boringproxy agent, `network_mode: host` like `boringproxy` itself, colocated with
 the server instead of a remote network — the "This Server" homelab, deliberately hidden from
@@ -172,6 +172,6 @@ directories `selfieproxy-local-websites` also mounts.
   JSON API, the web UI templates) belong in `selfieproxy-reverseproxy/` — see
   `selfieproxy-reverseproxy/CLAUDE.md`.
 - Changes to the admin-facing product (login, exposed-app management, homelab
-  selection) belong in `selfieproxy-portal/` — see `selfieproxy.md` for the intended behavior.
+  selection) belong in `selfieproxy-portal/` — see `selfieproxy-portal/CLAUDE.md` for the intended behavior.
 - Changes to how the pieces are deployed together (compose files, `.env` shape, volume
   layout) belong at this root level.
