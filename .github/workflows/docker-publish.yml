@@ -8,7 +8,7 @@ on:
       - "selfieproxy-reverseproxy/**"
       - "selfieproxy-portal/**"
       - "selfieproxy-identity-provider/**"
-      - "sites-webserver/**"
+      - "selfieproxy-localsites-webserver/**"
       - "selfieproxy-check-prerequisites/**"
       - ".github/workflows/docker-publish.yml"
   workflow_dispatch: {}
@@ -32,7 +32,7 @@ jobs:
           - image: selfieproxy-identity-provider
             context: ./selfieproxy-identity-provider
           - image: selfieproxy-local-websites
-            context: ./sites-webserver
+            context: ./selfieproxy-localsites-webserver
           - image: selfieproxy-check-prerequisites
             context: ./selfieproxy-check-prerequisites
     steps:

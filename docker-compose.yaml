@@ -81,7 +81,7 @@ services:
 
   selfieproxy-local-websites:
     image: ghcr.io/jeltechnologies/selfieproxy-local-websites:latest
-    build: ./sites-webserver
+    build: ./selfieproxy-localsites-webserver
     container_name: selfieproxy-local-websites
     restart: unless-stopped
     depends_on:

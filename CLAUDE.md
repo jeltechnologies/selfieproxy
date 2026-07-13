@@ -27,7 +27,7 @@ runtime config/volumes they use:
   `data/selfieproxy/sso-signing-key.pem` on first boot, mirroring `ThisServerBootstrap`'s
   pattern. Reached via the same before-any-agent-exists domain carve-out as the portal (see
   `-sso-domain`/`-sso-port` in `selfieproxy-reverseproxy/CLAUDE.md`).
-- `sites-webserver/` — a small self-reloading NGINX image (see its own Dockerfile/entrypoint.sh)
+- `selfieproxy-localsites-webserver/` — a small self-reloading NGINX image (see its own Dockerfile/entrypoint.sh)
   that serves every Local Website (see `selfieproxy.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
@@ -56,7 +56,7 @@ runtime config/volumes they use:
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
 ├── selfieproxy-identity-provider/ # bundled single-user OIDC Identity Provider — Java/Spring, same build template as selfieproxy-portal
-└── sites-webserver/               # self-reloading NGINX image for "Selfie Proxy hosts this" static sites
+└── selfieproxy-localsites-webserver/ # self-reloading NGINX image for "Selfie Proxy hosts this" static sites
 ```
 
 ## Running
@@ -92,7 +92,7 @@ that domain directly to selfieproxy-portal, without going through any Agent/Tunn
 a fresh deployment reach the portal to create its first agent, before any agent exists.
 
 `docker-compose.yaml` also runs two more services, both existing solely to power the
-Local Websites feature (see `selfieproxy.md`): `selfieproxy-local-websites` (the `sites-webserver/`
+Local Websites feature (see `selfieproxy.md`): `selfieproxy-local-websites` (the `selfieproxy-localsites-webserver/`
 image, a shared NGINX serving every Local Website by `server_name`) and `selfieproxy-localsites-agent`
 (an ordinary boringproxy agent, `network_mode: host` like `boringproxy` itself, colocated with
 the server instead of a remote network — the "This Server" homelab, deliberately hidden from
