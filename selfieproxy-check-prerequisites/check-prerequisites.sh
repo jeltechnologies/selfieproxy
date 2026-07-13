@@ -4,12 +4,7 @@ set -eu
 # Requires: curl, dig
 
 DOMAIN="${DOMAIN:?DOMAIN not set}"
-REVERSE_PROXY_LISTENER="${REVERSE_PROXY_LISTENER:-proxylistener}"
-SELFPROXY_ADMIN_DOMAIN="${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}"
-SELFPROXY_AUTH_DOMAIN="${SELFPROXY_AUTH_DOMAIN:-auth}"
-ADMIN_FQDN="${REVERSE_PROXY_LISTENER}.${DOMAIN}"
-SELFIEPROXY_FQDN="${SELFPROXY_ADMIN_DOMAIN}.${DOMAIN}"
-AUTH_FQDN="${SELFPROXY_AUTH_DOMAIN}.${DOMAIN}"
+WILDCARD_FQDN="*.${DOMAIN}"
 
 echo "=============================================================================="
 echo ""
@@ -43,8 +38,6 @@ check_domain() {
 }
 
 check_domain "$DOMAIN"
-check_domain "$ADMIN_FQDN"
-check_domain "$SELFIEPROXY_FQDN"
-check_domain "$AUTH_FQDN"
+check_domain "$WILDCARD_FQDN"
 
 echo "DNS check passed."

@@ -32,8 +32,11 @@ runtime config/volumes they use:
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
 - `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + `check-prerequisites.sh`
-  baked in via its own Dockerfile) that fails fast before anything else starts if `DOMAIN` and its
-  subdomains don't already resolve to the host's public IP. Run as the `check-prerequisites` service.
+  baked in via its own Dockerfile) that fails fast before anything else starts if `DOMAIN` and a
+  `*.DOMAIN` wildcard record don't already resolve to the host's public IP (checked as the literal
+  DNS owner names `DOMAIN` and `*.DOMAIN`, covering every current and future subdomain — the fixed
+  `proxylistener`/`selfieproxy`/`auth` subdomains and any exposed-app/tunnel subdomain created later
+  — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites` service.
 
 ## Layout
 
@@ -107,8 +110,8 @@ The server host's `.env` (from `.env.example`) only needs `DOMAIN` and
 `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-identity-provider`
 (the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. Four more
 vars are optional, poweruser-only overrides with sensible defaults baked into
-application.properties/docker-compose.yaml/selfieproxy-check-prerequisites/check-prerequisites.sh (all four must agree, since
-they're not read from a single source of truth): `REVERSE_PROXY_LISTENER` (default
+application.properties/docker-compose.yaml (both must agree, since they're not read from a
+single source of truth): `REVERSE_PROXY_LISTENER` (default
 `proxylistener`, the subdomain boringproxy's admin/tunnel-control plane listens on),
 `SELFPROXY_ADMIN_DOMAIN` (default `selfieproxy`, the portal's own subdomain),
 `SELFPROXY_AUTH_DOMAIN` (default `auth`, `selfieproxy-identity-provider`'s own subdomain), and
