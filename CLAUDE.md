@@ -97,7 +97,11 @@ the Homelabs page and the Exposed Applications homelab dropdown, since it's not 
 user picks or manages directly). Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
 copy-pasted into `.env` — its entrypoint blocks on `data/selfieproxy/selfieproxy-localsites-agent-secret`
 existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on every startup, so
-it self-provisions.
+it self-provisions. `selfieproxy-local-websites` is deliberately the last service to start in
+the stack — its `depends_on` waits on both `check-prerequisites` (`service_completed_successfully`)
+and `selfieproxy-localsites-agent` (`service_started`, the last service in every other service's
+dependency chain), so the shared NGINX only comes up once everything upstream of it — DNS
+preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
 
 The server host's `.env` (from `.env.example`) only needs `DOMAIN` and
 `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-identity-provider`

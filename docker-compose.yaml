@@ -84,6 +84,11 @@ services:
     build: ./sites-webserver
     container_name: selfieproxy-local-websites
     restart: unless-stopped
+    depends_on:
+      check-prerequisites:
+        condition: service_completed_successfully
+      selfieproxy-localsites-agent:
+        condition: service_started
     volumes:
       - ./data/selfieproxy/sites-conf:/etc/nginx/conf.d
       - ./data/selfieproxy/sites:/sites:ro
