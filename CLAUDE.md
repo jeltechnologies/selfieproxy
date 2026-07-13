@@ -107,11 +107,16 @@ dependency chain), so the shared NGINX only comes up once everything upstream of
 preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
 
 The server host's `.env` (from `.env.example`) only needs `DOMAIN` and
-`ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-identity-provider`
-(the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. Four more
+`ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_BOOTSTRAP_PASSWORD` — now consumed by `selfieproxy-identity-provider`
+(the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left.
+`ADMIN_PORTAL_BOOTSTRAP_PASSWORD` is a one-time seed, not a live credential: `AdminUserStore`
+bcrypt-hashes it into a persisted admin record (`data/selfieproxy/admin-user.json`) only on first
+boot, when no record exists yet, and the first login is forced through a change-password screen
+before the admin's OIDC session is issued — after that, the `.env` value is permanently ignored
+and the real password only lives in that hashed record. Four more
 vars are optional, poweruser-only overrides with sensible defaults baked into
 application.properties/docker-compose.yaml (both must agree, since they're not read from a
-single source of truth): `REVERSE_PROXY_LISTENER` (default
+single source of truth): `REVERSE_PROXY_LISTENER_SUBDOMAIN` (default
 `proxylistener`, the subdomain boringproxy's admin/tunnel-control plane listens on),
 `SELFPROXY_ADMIN_DOMAIN` (default `selfieproxy`, the portal's own subdomain),
 `SELFPROXY_AUTH_DOMAIN` (default `auth`, `selfieproxy-identity-provider`'s own subdomain), and
@@ -119,20 +124,23 @@ single source of truth): `REVERSE_PROXY_LISTENER` (default
 agent under on first boot, see the Agents page). Separately, `OIDC_ISSUER_URL`/
 `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` (all blank by default) override the admin portal's OIDC
 issuer to an external IdP instead of the bundled server — see `selfieproxy-identity-provider/` above
-and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `BORINGPROXY_DEBUG` (default `false`) turns on
+and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `DEBUG_MODE` (default `false`) turns on
 boringproxy's `-debug` per-request access log (timestamp, remote IP, method, host, path) to
 stdout — off by default since every agent poll and every Homelabs-page auto-refresh tick would
-otherwise log a line. The colocated homelab's name is hardcoded to
+otherwise log a line. `LETSENCRYPT_EMAIL` (blank by default) is passed through as `-acme-email`
+to boringproxy — see below. The colocated homelab's name is hardcoded to
 `selfieproxy-internal-agent` on both sides (docker-compose.yaml's selfieproxy-localsites-agent service
 and selfieproxy-portal's `this-server.agent-name`) rather than even optionally env-configurable,
 since the two must always match. Agent hosts are out of scope for this repo entirely — there's
 no compose file or `.env` template for them here. An agent connects with just a name and a
 server-generated secret (`AGENT_NAME`/`AGENT_SECRET`) issued from the admin portal's Agents
-page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER.DOMAIN` from this
+page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER_SUBDOMAIN.DOMAIN` from this
 server's `.env`); the portal itself is the source of guidance for running that agent process.
-`docker-compose.yaml` doesn't pass `-acme-email` to boringproxy — it's optional for
-ACME/Let's Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is enough to
-issue certs unattended.
+`docker-compose.yaml` passes `-acme-email "${LETSENCRYPT_EMAIL:-}"` to both boringproxy
+invocations (the main server and the colocated `selfieproxy-localsites-agent`, which does its
+own independent certmagic issuance into `this-server-certmagic`) — it's optional for ACME/Let's
+Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is already enough to issue
+certs unattended, and leaving `LETSENCRYPT_EMAIL` unset in `.env` is fine.
 `data/boringproxy/storage` and `data/boringproxy/certmagic`/`this-server-certmagic` persist the
 boringproxy database and TLS certs (server's and selfieproxy-localsites-agent's, kept separate) across restarts;
 `data/selfieproxy` persists selfieproxy-portal's own exposed-app records (see ExposedAppStore in

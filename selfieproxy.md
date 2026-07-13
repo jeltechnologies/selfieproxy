@@ -16,13 +16,13 @@ Selfie Proxy is not suitable for enterprise users, because it does not support h
 ## Portal
 
 ### Initial setup
-- Set `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` in `.env`, then start the server: `docker compose -f docker-compose.yaml up -d --build`.
+- Set `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_BOOTSTRAP_PASSWORD` in `.env`, then start the server: `docker compose -f docker-compose.yaml up -d --build`. The bootstrap password is a one-time seed -- first login forces choosing a new password before the portal becomes reachable.
 - The portal itself (`SELFPROXY_ADMIN_DOMAIN.DOMAIN`) is reachable immediately, before any agent is connected -- selfieproxy-reverseproxy reverse-proxies that domain directly to the admin portal container (`-portal-domain`/`-portal-port`), independent of the normal Agent/Tunnel mechanism, since the portal is where the first agent gets created.
 - Log in, open the Agents page, find the `my-homelab` agent created automatically on first boot, and copy its secret.
 - Agent hosts are not part of this repo -- there's no compose file or `.env` template for them here. Connecting a homelab means taking the name/secret from the Agents page and running the agent process there by whatever means the portal guides the user through.
 
 ### Login
-- The portal has no login of its own: boringproxy gates the portal domain via OIDC before any request reaches the portal container, against `selfieproxy-identity-provider` (a bundled single-user Identity Provider, using `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD`) unless `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` point it at an external IdP instead.
+- The portal has no login of its own: boringproxy gates the portal domain via OIDC before any request reaches the portal container, against `selfieproxy-identity-provider` (a bundled single-user Identity Provider, using `ADMIN_PORTAL_USERNAME` and a bcrypt-hashed password persisted in `data/selfieproxy/admin-user.json`, itself seeded once from `ADMIN_PORTAL_BOOTSTRAP_PASSWORD`) unless `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` point it at an external IdP instead.
 - After successful login the user arrives at the exposed applications.
 - A Web Application exposed app can opt in to the same SSO gate ("Protect with SSO" on the Edit application page) -- only available for Server HTTPS (HTTPS + the recommended End-to-end encrypted TLS mode), the only connectivity option boringproxy can enforce it for.
 - The "Logout" button in the portal's topbar ends the portal's own session and clears boringproxy's SSO cookie for the portal domain, landing on a confirmation page served by `selfieproxy-identity-provider` with a link back into the portal -- which immediately requires logging in again, since both session and cookie are gone.
@@ -74,7 +74,7 @@ Below this we find a button panel with following buttons:
 - OK (in case of add or update)
 - Remove (in case of edit) - This button is red background with white text.
 
-Before adding a new exposed app, we check if the domain is already taken (each subdomain can only be used by one app, case-insensitive). This also applies to the internal subdomain generated for a Network Service: it is regenerated until it does not collide with an existing tunnel. Special care must be taken for the `proxylistener` and `selfieproxy` subdomains (REVERSE_PROXY_LISTENER/SELFPROXY_ADMIN_DOMAIN unless overridden in .env): a user cannot use these subdomains for their own exposed apps, since they are reserved for the boringproxy admin portal and the Selfie Proxy admin portal itself.
+Before adding a new exposed app, we check if the domain is already taken (each subdomain can only be used by one app, case-insensitive). This also applies to the internal subdomain generated for a Network Service: it is regenerated until it does not collide with an existing tunnel. Special care must be taken for the `proxylistener` and `selfieproxy` subdomains (REVERSE_PROXY_LISTENER_SUBDOMAIN/SELFPROXY_ADMIN_DOMAIN unless overridden in .env): a user cannot use these subdomains for their own exposed apps, since they are reserved for the boringproxy admin portal and the Selfie Proxy admin portal itself.
 Before removing a tunnel, we ask user for conformation in a overlay.
 When changing a exposed app, we will have to remove the boringproxy tunnel, wait 2 seconds, and recreate them using the new values.
 
