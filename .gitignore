@@ -26,4 +26,5 @@ replay_pid*
 .env
 data/
 selfieproxy-portal/target
+selfieproxy-identity-provider/target
 

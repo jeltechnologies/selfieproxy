@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Selfie Proxy Logout</title>
+	<link rel="stylesheet" th:href="@{/css/style.css}">
+
+	<link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+	<link rel="icon" type="image/png" sizes="16x16" th:href="@{/img/favicon/favicon-16x16.png}">
+	<link rel="icon" type="image/png" sizes="32x32" th:href="@{/img/favicon/favicon-32x32.png}">
+	<link rel="apple-touch-icon" sizes="180x180" th:href="@{/img/favicon/apple-touch-icon.png}">
+	<link rel="manifest" th:href="@{/site.webmanifest}">
+	<meta name="theme-color" content="#ffffff">
+</head>
+<body class="login-body">
+	<main class="login-card">
+		<h1>Selfie Proxy</h1>
+
+		<p>You have been logged out.</p>
+
+		<div class="button-panel" th:if="${returnTo != null}">
+			<a th:href="${returnTo}" class="button">Log in again</a>
+		</div>
+	</main>
+</body>
+</html>

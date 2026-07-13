@@ -8,7 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * The portal no longer checks a password itself -- boringproxy gates every
  * request to the portal domain against the configured OIDC issuer (bundled
- * selfieproxy-sso-server by default) before it ever reaches this container,
+ * selfieproxy-identity-provider by default) before it ever reaches this container,
  * setting X-Selfieproxy-Sso-Verified on the proxied request once it does.
  * Trustworthy because boringproxy is the one adding it right before
  * proxying, the same trust boundary already relied on for X-Forwarded-*

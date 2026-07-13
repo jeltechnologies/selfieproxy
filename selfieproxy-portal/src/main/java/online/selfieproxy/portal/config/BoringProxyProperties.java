@@ -3,13 +3,13 @@ package online.selfieproxy.portal.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * domain/adminSubdomain/portalSubdomain/ssoSubdomain come from the same .env
+ * domain/adminSubdomain/portalSubdomain/authSubdomain come from the same .env
  * boringproxy itself uses (DOMAIN, REVERSE_PROXY_LISTENER,
- * SELFPROXY_ADMIN_DOMAIN, SELFPROXY_SSO_DOMAIN) -- see application.properties.
+ * SELFPROXY_ADMIN_DOMAIN, SELFPROXY_AUTH_DOMAIN) -- see application.properties.
  */
 @ConfigurationProperties(prefix = "boringproxy")
 public record BoringProxyProperties(String domain, String adminSubdomain, String portalSubdomain,
-		String ssoSubdomain) {
+		String authSubdomain) {
 
 	public String adminDomain() {
 		return adminSubdomain + "." + domain;

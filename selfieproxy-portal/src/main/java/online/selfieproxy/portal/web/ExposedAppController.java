@@ -176,8 +176,8 @@ public class ExposedAppController {
 		if (app.subdomain().equalsIgnoreCase(properties.portalSubdomain())) {
 			errors.add("\"" + app.subdomain() + "\" is reserved for the Selfie Proxy admin portal itself.");
 		}
-		if (app.subdomain().equalsIgnoreCase(properties.ssoSubdomain())) {
-			errors.add("\"" + app.subdomain() + "\" is reserved for Selfie Proxy's bundled SSO server itself.");
+		if (app.subdomain().equalsIgnoreCase(properties.authSubdomain())) {
+			errors.add("\"" + app.subdomain() + "\" is reserved for Selfie Proxy's bundled identity provider itself.");
 		}
 
 		String fqdn = tunnelMapper.fqdn(app);

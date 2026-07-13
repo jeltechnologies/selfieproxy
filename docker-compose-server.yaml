@@ -6,10 +6,10 @@ services:
       - ./check-dns.sh:/check-dns.sh:ro
     entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl bind-tools >/dev/null && /check-dns.sh"]
 
-  boringproxy:
-    image: ghcr.io/jeltechnologies/boringproxy:latest
-    build: ./boringproxy
-    container_name: boringproxy-server
+  selfieproxy-reverseproxy:
+    image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
+    build: ./selfieproxy-reverseproxy
+    container_name: selfieproxy-reverseproxy
     restart: unless-stopped
     depends_on:
       dns-check:
@@ -20,7 +20,7 @@ services:
       - ./data/boringproxy/runtime:/runtime
       - /root/.ssh:/root/.ssh
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
-    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${BORINGPROXY_DEBUG:-false}"]
+    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-accept-ca-terms", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${BORINGPROXY_DEBUG:-false}"]
     environment:
       USER: "root"
       HOME: "/root"
@@ -38,7 +38,7 @@ services:
     container_name: selfieproxy-portal
     restart: unless-stopped
     depends_on:
-      boringproxy:
+      selfieproxy-reverseproxy:
         condition: service_healthy
     env_file: .env
     volumes:
@@ -49,17 +49,17 @@ services:
     ports:
       - "127.0.0.1:8081:8080"
 
-  selfieproxy-sso-server:
-    image: ghcr.io/jeltechnologies/selfieproxy-sso-server:latest
-    build: ./selfieproxy-sso-server
-    container_name: selfieproxy-sso-server
+  selfieproxy-identity-provider:
+    image: ghcr.io/jeltechnologies/selfieproxy-identity-provider:latest
+    build: ./selfieproxy-identity-provider
+    container_name: selfieproxy-identity-provider
     restart: unless-stopped
     depends_on:
       dns-check:
         condition: service_completed_successfully
     env_file: .env
     environment:
-      SSO_ISSUER_URL: "https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}"
+      SSO_ISSUER_URL: "https://${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}"
       SSO_CLIENT_REDIRECT_URI: "https://${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}/oidc/callback"
       SSO_SIGNING_KEY_PATH: "/data/sso-signing-key.pem"
     volumes:
@@ -79,8 +79,8 @@ services:
       - "127.0.0.1:8090:80"
 
   selfieproxy-local-agent:
-    image: ghcr.io/jeltechnologies/boringproxy:latest
-    build: ./boringproxy
+    image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
+    build: ./selfieproxy-reverseproxy
     container_name: selfieproxy-local-agent
     restart: unless-stopped
     depends_on:
@@ -91,7 +91,7 @@ services:
     command:
       - >
         until [ -s /selfieproxy-data/selfieproxy-local-agent-secret ]; do sleep 1; done;
-        exec /boringproxy agent
+        exec /selfieproxy-reverseproxy agent
         -server ${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}
         -secret "$$(cat /selfieproxy-data/selfieproxy-local-agent-secret)"
         -agent-name selfieproxy-internal-agent

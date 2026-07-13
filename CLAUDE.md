@@ -8,17 +8,17 @@ This is the **selfieproxy** project root. It does not contain application source
 it only orchestrates two independent subprojects via Docker Compose, plus the shared
 runtime config/volumes they use:
 
-- `boringproxy/` — a forked `github.com/boringproxy/boringproxy` reverse tunnel/proxy
+- `selfieproxy-reverseproxy/` — a forked `github.com/boringproxy/boringproxy` reverse tunnel/proxy
   engine (Go), embedding the OIDC Relying Party too (see `oidc_auth.go`). Despite the fork
   origin, this checkout keeps it as a plain subdirectory of the root repo, not a separate git
   repository or submodule. Has its own `CLAUDE.md` with full architecture docs (connection
-  flow, tunnel lifecycle, DB schema, auth model, web UI, OIDC). Read `boringproxy/CLAUDE.md`
+  flow, tunnel lifecycle, DB schema, auth model, web UI, OIDC). Read `selfieproxy-reverseproxy/CLAUDE.md`
   before working on anything under that directory.
 - `selfieproxy-portal/` — the Selfie Proxy admin portal (Java/Spring), the product-facing UI
   that manages `boringproxy` tunnels/clients through its REST API. See `selfieproxy.md`
   for the product spec (login flow, homelabs, exposed apps, tunnel mapping). No login of its
-  own anymore — see `selfieproxy-sso-server/` below.
-- `selfieproxy-sso-server/` — Selfie Proxy's own bundled, single-user OIDC Identity Provider
+  own anymore — see `selfieproxy-identity-provider/` below.
+- `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, single-user OIDC Identity Provider
   (Java/Spring, same Maven/Dockerfile template as `selfieproxy-portal/`). Used by default to
   authenticate the admin portal and any exposed app with "Protect with SSO" enabled; a BYO
   external IdP (Keycloak, Authentik, etc.) can be swapped in instead via
@@ -26,7 +26,7 @@ runtime config/volumes they use:
   client only ever speaks generic OIDC. Self-provisions its RSA signing keypair into
   `data/selfieproxy/sso-signing-key.pem` on first boot, mirroring `ThisServerBootstrap`'s
   pattern. Reached via the same before-any-agent-exists domain carve-out as the portal (see
-  `-sso-domain`/`-sso-port` in `boringproxy/CLAUDE.md`).
+  `-sso-domain`/`-sso-port` in `selfieproxy-reverseproxy/CLAUDE.md`).
 - `sites-webserver/` — a small self-reloading NGINX image (see its own Dockerfile/entrypoint.sh)
   that serves every Local Website (see `selfieproxy.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
@@ -42,15 +42,15 @@ runtime config/volumes they use:
 │   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
 │       │                            # local-websites.json (LocalWebsiteStore), selfieproxy-local-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
-│       │                            # sso-signing-key.pem (selfieproxy-sso-server's self-provisioned RSA key)
+│       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
 ├── check-dns.sh                  # DNS pre-flight check used by docker-compose-server.yaml
-├── docker-compose-server.yaml     # builds and runs selfieproxy server + selfieproxy-portal + selfieproxy-sso-server + selfieproxy-local-websites + selfieproxy-local-agent (depends_on boringproxy)
-├── docker-compose-agent.yaml      # builds and runs selfieproxy-agent, the connecting tunnel process (build context: ./boringproxy)
-├── boringproxy/                  # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
-├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-sso-server)
-├── selfieproxy-sso-server/       # bundled single-user OIDC Identity Provider — Java/Spring, same build template as selfieproxy-portal
+├── docker-compose-server.yaml     # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-local-agent (depends_on selfieproxy-reverseproxy)
+├── docker-compose-agent.yaml      # builds and runs selfieproxy-agent, the connecting tunnel process (build context: ./selfieproxy-reverseproxy)
+├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
+├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
+├── selfieproxy-identity-provider/ # bundled single-user OIDC Identity Provider — Java/Spring, same build template as selfieproxy-portal
 └── sites-webserver/               # self-reloading NGINX image for "Selfie Proxy hosts this" static sites
 ```
 
@@ -63,8 +63,8 @@ docker compose -f docker-compose-agent.yaml up -d --build        # selfieproxy-a
 
 The admin portal only runs alongside the server (it manages that server's tunnels via the
 boringproxy REST API), so it's defined as a second service in `docker-compose-server.yaml`
-rather than its own compose file, with `depends_on: boringproxy`. `boringproxy-server`'s
-`-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`DOMAIN` and the
+rather than its own compose file, with `depends_on: selfieproxy-reverseproxy`. The
+`selfieproxy-reverseproxy` container's `-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`DOMAIN` and the
 selfieproxy-portal's published port, `8081`) make the portal reachable at startup by reverse-proxying
 that domain directly to selfieproxy-portal, without going through any Agent/Tunnel — this is what lets
 a fresh deployment reach the portal to create its first agent, before any agent exists.
@@ -81,19 +81,19 @@ existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on eve
 it self-provisions.
 
 The server host's `.env` (from `.env.server.example`) only needs `DOMAIN` and
-`ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-sso-server`
+`ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-identity-provider`
 (the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. Four more
 vars are optional, poweruser-only overrides with sensible defaults baked into
 application.properties/docker-compose-server.yaml/check-dns.sh (all four must agree, since
 they're not read from a single source of truth): `REVERSE_PROXY_LISTENER` (default
 `proxylistener`, the subdomain boringproxy's admin/tunnel-control plane listens on),
 `SELFPROXY_ADMIN_DOMAIN` (default `selfieproxy`, the portal's own subdomain),
-`SELFPROXY_SSO_DOMAIN` (default `sso`, `selfieproxy-sso-server`'s own subdomain), and
+`SELFPROXY_AUTH_DOMAIN` (default `auth`, `selfieproxy-identity-provider`'s own subdomain), and
 `DEFAULT_HOMELAB` (default `my-homelab`, the name selfieproxy-portal bootstraps a default
 agent under on first boot, see the Agents page). Separately, `OIDC_ISSUER_URL`/
 `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` (all blank by default) override the admin portal's OIDC
-issuer to an external IdP instead of the bundled server — see `selfieproxy-sso-server/` above
-and `boringproxy/CLAUDE.md`'s OIDC section. `BORINGPROXY_DEBUG` (default `false`) turns on
+issuer to an external IdP instead of the bundled server — see `selfieproxy-identity-provider/` above
+and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `BORINGPROXY_DEBUG` (default `false`) turns on
 boringproxy's `-debug` per-request access log (timestamp, remote IP, method, host, path) to
 stdout — off by default since every agent poll and every Homelabs-page auto-refresh tick would
 otherwise log a line. The colocated homelab's name is hardcoded to
@@ -121,7 +121,8 @@ directories `selfieproxy-local-websites` also mounts.
 ## Working on this repo
 
 - Changes to the reverse-tunnel engine itself (tunnel lifecycle, TLS termination, the
-  JSON API, the web UI templates) belong in `boringproxy/` — see `boringproxy/CLAUDE.md`.
+  JSON API, the web UI templates) belong in `selfieproxy-reverseproxy/` — see
+  `selfieproxy-reverseproxy/CLAUDE.md`.
 - Changes to the admin-facing product (login, exposed-app management, homelab
   selection) belong in `selfieproxy-portal/` — see `selfieproxy.md` for the intended behavior.
 - Changes to how the pieces are deployed together (compose files, `.env` shape, volume

@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
+import online.selfieproxy.portal.boringproxy.BoringProxyException;
 import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
@@ -37,6 +40,8 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 @Controller
 public class LocalWebsiteController {
+
+	private static final Logger log = LoggerFactory.getLogger(LocalWebsiteController.class);
 
 	private static final String OWNER = "admin";
 
@@ -119,7 +124,7 @@ public class LocalWebsiteController {
 		}
 
 		PortalSession session = PortalSessions.get(request.getSession(false));
-		boringProxyClient.deleteTunnel(domain);
+		deleteTunnelIgnoringMissing(domain);
 		Thread.sleep(2000);
 		boringProxyClient.createTunnel(toCreateTunnelRequest(newDomain, session.owner()));
 		staticSiteProvisioner.rename(domain, newDomain);
@@ -131,10 +136,22 @@ public class LocalWebsiteController {
 	/** Disables routing (deletes the Tunnel and the NGINX server block) but leaves the site's content directory untouched, so re-adding the same domain later picks up where it left off. */
 	@PostMapping("/local-websites/{domain}/delete")
 	public String delete(@PathVariable String domain) {
-		boringProxyClient.deleteTunnel(domain);
+		deleteTunnelIgnoringMissing(domain);
 		localWebsiteStore.delete(domain);
 		staticSiteProvisioner.deprovision(domain);
 		return "redirect:/local-websites";
+	}
+
+	/** The Tunnel record can go stale (eg. already removed from boringproxy some other way) while the LocalWebsite record remains; don't let that block cleanup of the rest. */
+	private void deleteTunnelIgnoringMissing(String domain) {
+		try {
+			boringProxyClient.deleteTunnel(domain);
+		} catch (BoringProxyException e) {
+			if (!"Tunnel doesn't exist".equals(e.getMessage())) {
+				throw e;
+			}
+			log.warn("Tunnel for local website {} was already gone from boringproxy; continuing cleanup", domain);
+		}
 	}
 
 	private String normalize(String domain) {

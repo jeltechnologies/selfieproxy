@@ -5,7 +5,7 @@
 	<header th:replace="~{fragments/layout :: topbar(active='apps')}"></header>
 
 	<main class="page">
-		<h1 th:text="${isNew} ? 'Add application' : 'Edit application'"></h1>
+		<h1 th:text="${isNew} ? 'Add application' : (${app.isNetworkService()} ? (${#strings.isEmpty(app.name())} ? 'Edit TCP ' + ${app.exposedPort()} : 'Edit ' + ${app.name()}) : 'Edit ' + ${app.subdomain()})"></h1>
 
 		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
 			<li th:each="e : ${errors}" th:text="${e}"></li>
@@ -145,5 +145,7 @@
 		};
 	</script>
 	<script th:src="@{/js/edit-app.js}"></script>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
 </html>

@@ -1,7 +1,7 @@
 services:
   selfieproxy-agent:
-    image: ghcr.io/jeltechnologies/boringproxy:latest
-    build: ./boringproxy
+    image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
+    build: ./selfieproxy-reverseproxy
     container_name: selfieproxy-agent
     restart: unless-stopped
     env_file: .env

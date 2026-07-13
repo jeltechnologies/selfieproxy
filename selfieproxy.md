@@ -17,14 +17,15 @@ Selfie Proxy is not suitable for enterprise users, because it does not support h
 
 ### Initial setup
 - Set `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` in `.env`, then start the server: `docker compose -f docker-compose-server.yaml up -d --build`.
-- The portal itself (`SELFPROXY_ADMIN_DOMAIN.DOMAIN`) is reachable immediately, before any agent is connected -- boringproxy-server reverse-proxies that domain directly to the admin portal container (`-portal-domain`/`-portal-port`), independent of the normal Agent/Tunnel mechanism, since the portal is where the first agent gets created.
+- The portal itself (`SELFPROXY_ADMIN_DOMAIN.DOMAIN`) is reachable immediately, before any agent is connected -- selfieproxy-reverseproxy reverse-proxies that domain directly to the admin portal container (`-portal-domain`/`-portal-port`), independent of the normal Agent/Tunnel mechanism, since the portal is where the first agent gets created.
 - Log in, open the Agents page, find the `my-homelab` agent created automatically on first boot, and copy its secret.
 - Paste the name and secret into the homelab's `.env` (`AGENT_NAME`, `AGENT_SECRET`), set `SELFIEPROXY_LISTENER` to the server's admin domain (`REVERSE_PROXY_LISTENER.DOMAIN`), and start the agent there: `docker compose -f docker-compose-agent.yaml up -d --build`.
 
 ### Login
-- The portal has no login of its own: boringproxy gates the portal domain via OIDC before any request reaches the portal container, against `selfieproxy-sso-server` (a bundled single-user Identity Provider, using `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD`) unless `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` point it at an external IdP instead.
+- The portal has no login of its own: boringproxy gates the portal domain via OIDC before any request reaches the portal container, against `selfieproxy-identity-provider` (a bundled single-user Identity Provider, using `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD`) unless `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` point it at an external IdP instead.
 - After successful login the user arrives at the exposed applications.
 - A Web Application exposed app can opt in to the same SSO gate ("Protect with SSO" on the Edit application page) -- only available for Server HTTPS (HTTPS + the recommended End-to-end encrypted TLS mode), the only connectivity option boringproxy can enforce it for.
+- The "Logout" button in the portal's topbar ends the portal's own session and clears boringproxy's SSO cookie for the portal domain, landing on a confirmation page served by `selfieproxy-identity-provider` with a link back into the portal -- which immediately requires logging in again, since both session and cookie are gone.
 
 ### Homelabs
 - Selfie Proxie can only be used for one top domain. This domain is configured in .env and used by Docker Compose. For example example.com.

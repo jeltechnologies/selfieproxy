@@ -5,7 +5,7 @@ on:
     branches: [main]
     tags: ["v*.*.*"]
     paths:
-      - "boringproxy/**"
+      - "selfieproxy-reverseproxy/**"
       - "selfieproxy-portal/**"
       - "sites-webserver/**"
       - ".github/workflows/docker-publish.yml"
@@ -23,8 +23,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: boringproxy
-            context: ./boringproxy
+          - image: selfieproxy-reverseproxy
+            context: ./selfieproxy-reverseproxy
           - image: selfieproxy-portal
             context: ./selfieproxy-portal
           - image: selfieproxy-local-websites
