@@ -11,26 +11,31 @@ ADMIN_FQDN="${REVERSE_PROXY_LISTENER}.${DOMAIN}"
 SELFIEPROXY_FQDN="${SELFPROXY_ADMIN_DOMAIN}.${DOMAIN}"
 AUTH_FQDN="${SELFPROXY_AUTH_DOMAIN}.${DOMAIN}"
 
-echo "Checking DNS for ${DOMAIN}, ${ADMIN_FQDN}, ${SELFIEPROXY_FQDN} and ${AUTH_FQDN}..."
+echo "=============================================================================="
+echo ""
+echo " S E L F I E P R O X Y - prerequisites check"
+echo ""
+echo "Check that the DNS records of ${DOMAIN} point to this server...."
+echo ""
 
 PUBLIC_IP=$(curl -fsS https://ifconfig.me)
 if [ -z "$PUBLIC_IP" ]; then
     echo "ERROR: could not determine public IP"
     exit 1
 fi
-echo "Public IP: ${PUBLIC_IP}"
+echo "Selfieproxy is accessible from the internet at: ${PUBLIC_IP}, which must match the DNS records of '*.${DOMAIN}'"
 
 check_domain() {
     name="$1"
     resolved_ip=$(dig +short "$name" | tail -n1)
 
     if [ -z "$resolved_ip" ]; then
-        echo "ERROR: ${name} does not resolve to any IP. You must fix your DNS records before starting boringproxy."
+        echo "ERROR: ${name} does not resolve to ${PUBLIC_IP}. Please fix the DNS records of ${DOMAIN} before starting Selfieproxy."
         exit 1
     fi
 
     if [ "$resolved_ip" != "$PUBLIC_IP" ]; then
-        echo "ERROR: ${name} resolves to ${resolved_ip}, expected ${PUBLIC_IP}. You must fix your DNS records before starting boringproxy."
+        echo "ERROR: ${name} resolves to ${resolved_ip}, expected ${PUBLIC_IP}. Please fix the DNS records of ${DOMAIN} before starting Selfieproxy."
         exit 1
     fi
 
