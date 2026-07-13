@@ -14,9 +14,22 @@
 		<form id="website-form" method="post"
 			  th:action="${isNew} ? @{/local-websites} : @{/local-websites/{domain}(domain=${website.domain()})}">
 
-			<div class="field">
-				<label for="domain">Domain</label>
-				<input type="text" id="domain" name="domain" th:value="${website.domain()}" placeholder="www.example.com" required>
+			<div class="field" id="domain-mode-field">
+				<label>Domain</label>
+				<label><input type="radio" name="ownDomain" value="false" th:checked="${!website.ownDomain()}"> Subdomain</label>
+				<label><input type="radio" name="ownDomain" value="true" th:checked="${website.ownDomain()}"> Own domain</label>
+			</div>
+
+			<div class="field-row">
+				<div class="field" id="domain-field">
+					<label for="domain">Subdomain</label>
+					<input type="text" id="domain" name="domain" th:value="${website.domain()}" required>
+				</div>
+
+				<div class="field">
+					<label>Fully qualified domain name</label>
+					<p id="result" class="result-text"></p>
+				</div>
 			</div>
 
 			<p class="muted" th:unless="${isNew}">
@@ -43,6 +56,11 @@
 		</div>
 	</div>
 
+	<script th:inline="javascript">
+		window.selfieProxy = {
+			domain: /*[[${domain}]]*/ 'example.com'
+		};
+	</script>
 	<script th:src="@{/js/local-websites.js}"></script>
 
 	<footer th:replace="~{fragments/layout :: footer}"></footer>

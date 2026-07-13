@@ -32,12 +32,6 @@
 				<input type="text" id="name" name="name" th:value="${app.name()}">
 			</div>
 
-			<div class="field" id="domain-mode-field">
-				<label>Domain</label>
-				<label><input type="radio" name="ownDomain" value="false" th:checked="${!app.ownDomain()}"> Subdomain</label>
-				<label><input type="radio" name="ownDomain" value="true" th:checked="${app.ownDomain()}"> Own domain</label>
-			</div>
-
 			<div class="field-row">
 				<div class="field" id="exposed-port-field">
 					<label for="exposedPort">Exposed port to the internet</label>
@@ -53,6 +47,14 @@
 					<label>Fully qualified domain name</label>
 					<p id="result" class="result-text"></p>
 				</div>
+			</div>
+
+			<div class="field" id="sso-protected-field">
+				<label>
+					<input type="checkbox" id="ssoProtected" name="ssoProtected" value="true"
+						   th:checked="${app.ssoProtected()}">
+					Protect by forcing authentication through Selfieproxy login
+				</label>
 			</div>
 
 			<fieldset class="local-address">
@@ -98,14 +100,6 @@
 				achieved by using NGINX proxy in the homelab.
 			</div>
 
-			<div class="field" id="sso-protected-field">
-				<label>
-					<input type="checkbox" id="ssoProtected" name="ssoProtected" value="true"
-						   th:checked="${app.ssoProtected()}">
-					Protect with SSO
-				</label>
-			</div>
-
 			<button type="button" id="advanced-settings-toggle" class="link-button">Advanced settings</button>
 
 			<fieldset id="advanced-settings" class="advanced-settings">
@@ -141,7 +135,8 @@
 
 	<script th:inline="javascript">
 		window.selfieProxy = {
-			domain: /*[[${domain}]]*/ 'example.com'
+			domain: /*[[${domain}]]*/ 'example.com',
+			isNew: /*[[${isNew}]]*/ false
 		};
 	</script>
 	<script th:src="@{/js/edit-app.js}"></script>

@@ -32,7 +32,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class ExposedAppStore {
 
 	private final Path filePath;
-	// New boolean fields (eg. ownDomain, managedStaticSite) are absent -- not
+	// New boolean fields (eg. managedStaticSite) are absent -- not
 	// merely null -- in exposed-apps.json entries written before they existed;
 	// without this, Jackson's default record deserialization treats an absent
 	// primitive-boolean property as an explicit null and throws instead of
@@ -83,7 +83,7 @@ public class ExposedAppStore {
 				writeAll(all);
 				return fromBoringProxy;
 			}
-			return new ExposedApp(fromBoringProxy.subdomain(), fromBoringProxy.ownDomain(), stored.name(),
+			return new ExposedApp(fromBoringProxy.subdomain(), stored.name(),
 					fromBoringProxy.homelabName(), fromBoringProxy.type(), stored.protocol(), fromBoringProxy.host(),
 					fromBoringProxy.port(), fromBoringProxy.exposedPort(), stored.tlsMode(), stored.ssoProtected());
 		}

@@ -25,9 +25,10 @@
 				</tr>
 			</thead>
 			<tbody>
-				<tr th:each="website : ${websites}">
+				<tr th:each="website : ${websites}"
+					th:with="fqdn=${website.ownDomain() ? website.domain() : boringProxyProperties.fqdn(website.domain())}">
 					<td>
-						<a th:href="'https://' + ${website.domain()}" target="_blank" rel="noopener" th:text="${website.domain()}"></a>
+						<a th:href="'https://' + ${fqdn}" target="_blank" rel="noopener" th:text="${fqdn}"></a>
 					</td>
 					<td>
 						<a class="button-small" th:href="@{/local-websites/{domain}/edit(domain=${website.domain()})}">Edit</a>

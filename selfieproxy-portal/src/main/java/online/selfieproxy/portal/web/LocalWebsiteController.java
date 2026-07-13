@@ -66,13 +66,15 @@ public class LocalWebsiteController {
 	@GetMapping("/local-websites")
 	public String list(Model model) {
 		model.addAttribute("websites", localWebsiteStore.list());
+		model.addAttribute("boringProxyProperties", boringProxyProperties);
 		return "local-websites";
 	}
 
 	@GetMapping("/local-websites/new")
 	public String newWebsite(Model model) {
-		model.addAttribute("website", new LocalWebsite(""));
+		model.addAttribute("website", new LocalWebsite("", false));
 		model.addAttribute("isNew", true);
+		model.addAttribute("domain", boringProxyProperties.domain());
 		return "edit-local-website";
 	}
 
@@ -84,61 +86,72 @@ public class LocalWebsiteController {
 		}
 		model.addAttribute("website", website);
 		model.addAttribute("isNew", false);
+		model.addAttribute("domain", boringProxyProperties.domain());
 		return "edit-local-website";
 	}
 
 	@PostMapping("/local-websites")
 	public String create(@ModelAttribute LocalWebsiteForm form, HttpServletRequest request, Model model) {
-		String domain = normalize(form.domain());
+		LocalWebsite website = toLocalWebsite(form);
 
-		List<String> errors = validate(domain, null);
+		List<String> errors = validate(website, null);
 		if (!errors.isEmpty()) {
-			model.addAttribute("website", new LocalWebsite(domain));
+			model.addAttribute("website", website);
 			model.addAttribute("isNew", true);
 			model.addAttribute("errors", errors);
+			model.addAttribute("domain", boringProxyProperties.domain());
 			return "edit-local-website";
 		}
 
 		PortalSession session = PortalSessions.get(request.getSession(false));
-		boringProxyClient.createTunnel(toCreateTunnelRequest(domain, session.owner()));
-		staticSiteProvisioner.provision(domain);
-		localWebsiteStore.save(new LocalWebsite(domain));
+		String fqdn = fqdn(website);
+		boringProxyClient.createTunnel(toCreateTunnelRequest(fqdn, session.owner()));
+		staticSiteProvisioner.provision(fqdn);
+		localWebsiteStore.save(website);
 		return "redirect:/local-websites";
 	}
 
 	@PostMapping("/local-websites/{domain}")
 	public String update(@PathVariable String domain, @ModelAttribute LocalWebsiteForm form,
 			HttpServletRequest request, Model model) throws InterruptedException {
-		String newDomain = normalize(form.domain());
+		LocalWebsite website = toLocalWebsite(form);
 
-		if (newDomain.equals(domain)) {
+		LocalWebsite old = localWebsiteStore.find(domain);
+		boolean unchanged = old != null && old.domain().equals(website.domain()) && old.ownDomain() == website.ownDomain();
+		if (unchanged) {
 			return "redirect:/local-websites";
 		}
 
-		List<String> errors = validate(newDomain, domain);
+		List<String> errors = validate(website, domain);
 		if (!errors.isEmpty()) {
-			model.addAttribute("website", new LocalWebsite(newDomain));
+			model.addAttribute("website", website);
 			model.addAttribute("isNew", false);
 			model.addAttribute("errors", errors);
+			model.addAttribute("domain", boringProxyProperties.domain());
 			return "edit-local-website";
 		}
 
 		PortalSession session = PortalSessions.get(request.getSession(false));
-		deleteTunnelIgnoringMissing(domain);
+		String oldFqdn = currentFqdn(domain);
+		String newFqdn = fqdn(website);
+		deleteTunnelIgnoringMissing(oldFqdn);
 		Thread.sleep(2000);
-		boringProxyClient.createTunnel(toCreateTunnelRequest(newDomain, session.owner()));
-		staticSiteProvisioner.rename(domain, newDomain);
-		localWebsiteStore.delete(domain);
-		localWebsiteStore.save(new LocalWebsite(newDomain));
+		boringProxyClient.createTunnel(toCreateTunnelRequest(newFqdn, session.owner()));
+		staticSiteProvisioner.rename(oldFqdn, newFqdn);
+		if (!domain.equals(website.domain())) {
+			localWebsiteStore.delete(domain);
+		}
+		localWebsiteStore.save(website);
 		return "redirect:/local-websites";
 	}
 
 	/** Disables routing (deletes the Tunnel and the NGINX server block) but leaves the site's content directory untouched, so re-adding the same domain later picks up where it left off. */
 	@PostMapping("/local-websites/{domain}/delete")
 	public String delete(@PathVariable String domain) {
-		deleteTunnelIgnoringMissing(domain);
+		String fqdn = currentFqdn(domain);
+		deleteTunnelIgnoringMissing(fqdn);
 		localWebsiteStore.delete(domain);
-		staticSiteProvisioner.deprovision(domain);
+		staticSiteProvisioner.deprovision(fqdn);
 		return "redirect:/local-websites";
 	}
 
@@ -156,6 +169,20 @@ public class LocalWebsiteController {
 
 	private String normalize(String domain) {
 		return domain == null ? "" : domain.trim().toLowerCase();
+	}
+
+	private LocalWebsite toLocalWebsite(LocalWebsiteForm form) {
+		return new LocalWebsite(normalize(form.domain()), form.ownDomain());
+	}
+
+	private String fqdn(LocalWebsite website) {
+		return website.ownDomain() ? website.domain() : boringProxyProperties.fqdn(website.domain());
+	}
+
+	/** The tunnel domain for rawDomain (the LocalWebsiteStore key) as it exists right now (mode-aware via the stored record), or the default label.DOMAIN composition if we have no record for it yet. */
+	private String currentFqdn(String rawDomain) {
+		LocalWebsite stored = localWebsiteStore.find(rawDomain);
+		return stored != null ? fqdn(stored) : boringProxyProperties.fqdn(rawDomain);
 	}
 
 	private CreateTunnelRequestDto toCreateTunnelRequest(String domain, String owner) {
@@ -176,26 +203,28 @@ public class LocalWebsiteController {
 				null);
 	}
 
-	/** originalDomain is null when adding, and the domain being edited when renaming (excluded from the collision check). */
-	private List<String> validate(String domain, String originalDomain) {
+	/** originalDomain is null when adding, and the LocalWebsiteStore key being edited when renaming (excluded from the collision check). */
+	private List<String> validate(LocalWebsite website, String originalDomain) {
 		List<String> errors = new ArrayList<>();
 
-		if (domain == null || domain.isBlank()) {
-			errors.add("Domain is required.");
+		if (website.domain() == null || website.domain().isBlank()) {
+			errors.add(website.ownDomain() ? "Domain is required." : "Subdomain is required.");
 			return errors;
 		}
-		if (domain.equalsIgnoreCase(boringProxyProperties.adminDomain())
-				|| domain.equalsIgnoreCase(boringProxyProperties.portalDomain())) {
-			errors.add("\"" + domain + "\" is reserved for the BoringProxy/Selfie Proxy admin portal itself.");
+
+		String fqdn = fqdn(website);
+		if (fqdn.equalsIgnoreCase(boringProxyProperties.adminDomain())
+				|| fqdn.equalsIgnoreCase(boringProxyProperties.portalDomain())) {
+			errors.add("\"" + website.domain() + "\" is reserved for the BoringProxy/Selfie Proxy admin portal itself.");
 			return errors;
 		}
 
 		Map<String, TunnelDto> existing = boringProxyClient.listTunnels();
 		boolean taken = existing.keySet().stream()
-				.anyMatch(d -> d.equalsIgnoreCase(domain)
-						&& (originalDomain == null || !d.equalsIgnoreCase(originalDomain)));
+				.anyMatch(d -> d.equalsIgnoreCase(fqdn)
+						&& (originalDomain == null || !d.equalsIgnoreCase(currentFqdn(originalDomain))));
 		if (taken) {
-			errors.add("\"" + domain + "\" is already in use.");
+			errors.add((website.ownDomain() ? "Domain \"" : "Subdomain \"") + website.domain() + "\" is already in use.");
 		}
 
 		return errors;

@@ -39,6 +39,7 @@ Selfie Proxy is not suitable for enterprise users, because it does not support h
 - A default agent (name "my-homelab" unless overridden via DEFAULT_HOMELAB) is created automatically the first time the admin portal starts, with a freshly generated secret.
 - The boringproxy server only accepts connections from agents that exist in this list — an agent's secret is a boringproxy access token scoped to that agent's name, so it can't be used to act as, or register, any other agent.
 - To deploy an agent, the user copies its name and secret from this page and uses them to run the agent process on the homelab host -- guidance for doing so comes from the portal itself, not from a compose file or `.env` template in this repo.
+- Agent host requirement: a Docker host (Linux, macOS, or Windows) on amd64 or 64-bit arm (e.g. a 64-bit Raspberry Pi OS on Pi 3/4/5) with outbound internet access.
 
 ### Exposed applications
 - The top of the page contains a section to manage Homelabs. This section contains a drop down with the name of Homelabs in alphabetic order.
@@ -53,9 +54,7 @@ The edit exposed app page is used for adding, editing and deleting exposed app. 
 1. Type: which is Web application (default) or Network service. When the user selects Network service a warning is displayed on the page like Use this at your own risk. Anyone on the internet who scans your domain can see that port is open and attempt to connect to it.
 2. Exposed port to the internet (only visible when the type is Network service). Ports 1-1023 are reserved for system services (eg. SSH on 22, HTTPS on 443) and cannot be exposed. A port can only be exposed by one app at a time.
 2b. Name (only visible when type is Network service, required). This is just a label shown in the exposed applications list and does not become part of the domain -- it is not unique. The actual subdomain used towards BoringProxy for a Network service is a generated internal svc- value that is never shown to the user.
-2. Domain (only visible when type is Web application): Subdomain (default) or Own domain.
--- Subdomain composes the FQDN as `<subdomain>.DOMAIN`, same as always.
--- Own domain is for a domain you already own and separately control DNS for (eg. `www.jeltechnologies.com`) -- you type the complete domain instead of a subdomain, and Selfie Proxy uses it verbatim as the FQDN, with no `.DOMAIN` suffix.
+2. Domain (only visible when type is Web application): Subdomain -- composes the FQDN as `<subdomain>.DOMAIN`, same as always.
 3. The fully qualified domain name which is a label, not a text field. It is displayed immidiately after the subdomain or exposed port. It is the URL in case Type is Web application, and for Network service the Proxy domain + ":" + exposed port. This is not a hyperlink. It is automatically updated when the user changes the data on the page. 
 4. Section with the address in the homelab. Protocol, host or IP address and port are all displayed on the same line:
 -- Protocol. When the Type is Web application then the user chooses in drop down between HTTP and HTTPS. When the Type is Network service the protocol is always TCP.
@@ -85,11 +84,11 @@ Local websites are static sites Selfie Proxy hosts itself, entirely independent 
 
 - The nav has a "Local websites" tab next to Applications.
 - The list page shows every local website's domain (a link that opens in a new tab) and an Edit button.
-- Adding one: type a domain -- either a subdomain of the shared DOMAIN (eg. `www.example.com`) or a domain you own and separately control DNS for (eg. `www.jeltechnologies.com`). Selfie Proxy uses it verbatim, no composition. Behind the scenes this creates a BoringProxy tunnel pointed at Selfie Proxy's own shared static webserver, and provisions the site's content folder and NGINX config.
+- Adding one: choose Subdomain (default) or Own domain. Subdomain composes the FQDN as `<subdomain>.DOMAIN`, same as an exposed app. Own domain is for a domain you already own and separately control DNS for (eg. `www.jeltechnologies.com`) -- you type the complete domain instead of a subdomain, and Selfie Proxy uses it verbatim as the FQDN, with no `.DOMAIN` suffix. Behind the scenes this creates a BoringProxy tunnel pointed at Selfie Proxy's own shared static webserver, and provisions the site's content folder and NGINX config.
 - Renaming one: type a new domain on the edit page. The tunnel is recreated under the new domain, and the site's files are moved to the new domain's folder (`data/selfieproxy/sites/<domain>/`) -- nothing is lost.
 - Removing one: takes it off the internet (the tunnel and NGINX config are deleted) but keeps its files on the server. Adding the same domain again later reuses them automatically, since provisioning only ever ensures the folder exists rather than clearing it.
 - Files are dropped into `data/selfieproxy/sites/<domain>/` on the server directly (created by selfieproxy-portal and owned by its container user -- copy files in as root, or via `docker exec selfieproxy-portal`).
-- Under the hood, every local website is served by "This Server": an ordinary BoringProxy Agent whose process runs colocated with the Selfie Proxy server itself (the selfieproxy-local-agent service in docker-compose.yaml), instead of a remote house/office network. It's created automatically the first time the portal starts, hardcoded to the agent name "selfieproxy-internal-agent", and its secret never needs manual copy-paste -- the portal republishes it to a file the selfieproxy-local-agent container reads directly on every startup.
+- Under the hood, every local website is served by "This Server": an ordinary BoringProxy Agent whose process runs colocated with the Selfie Proxy server itself (the selfieproxy-localsites-agent service in docker-compose.yaml), instead of a remote house/office network. It's created automatically the first time the portal starts, hardcoded to the agent name "selfieproxy-internal-agent", and its secret never needs manual copy-paste -- the portal republishes it to a file the selfieproxy-localsites-agent container reads directly on every startup.
 - "This Server" is deliberately hidden from the Homelabs page and the Exposed Applications homelab dropdown -- it is not a Homelab a user picks or manages, only an implementation detail of Local Websites.
 
 ## Mapping to boringproxy data model

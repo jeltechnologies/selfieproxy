@@ -24,7 +24,7 @@ public class TunnelMapper {
 	}
 
 	public String fqdn(ExposedApp app) {
-		return app.ownDomain() ? app.subdomain() : properties.fqdn(app.subdomain());
+		return properties.fqdn(app.subdomain());
 	}
 
 	/** The doc's "Result" field: the URL for a Web Application, or "domain:port" for a Network Service. */
@@ -80,13 +80,10 @@ public class TunnelMapper {
 
 	public ExposedApp toExposedApp(TunnelDto tunnel) {
 		String suffix = "." + properties.domain();
-		boolean ownDomain = !tunnel.domain().endsWith(suffix);
-		String subdomain = ownDomain
-				? tunnel.domain()
-				: tunnel.domain().substring(0, tunnel.domain().length() - suffix.length());
+		String subdomain = tunnel.domain().substring(0, tunnel.domain().length() - suffix.length());
 
 		if ("passthrough".equals(tunnel.tlsTermination()) && tunnel.allowExternalTcp()) {
-			return new ExposedApp(subdomain, ownDomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
+			return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
 					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null, false);
 		}
 
@@ -100,7 +97,7 @@ public class TunnelMapper {
 			default -> null;
 		};
 
-		return new ExposedApp(subdomain, ownDomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
+		return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
 				https ? Protocol.HTTPS : Protocol.HTTP, host, tunnel.clientPort(), null, tlsMode,
 				tunnel.ssoProtected());
 	}

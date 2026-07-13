@@ -11,8 +11,10 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Selfie Proxy's own complete record of every LocalWebsite, keyed by domain.
@@ -26,7 +28,13 @@ import tools.jackson.databind.ObjectMapper;
 public class LocalWebsiteStore {
 
 	private final Path filePath;
-	private final ObjectMapper objectMapper = new ObjectMapper();
+	// ownDomain is absent -- not merely null -- in local-websites.json entries
+	// written before it existed; without this, Jackson's default record
+	// deserialization treats an absent primitive-boolean property as an
+	// explicit null and throws instead of defaulting to false.
+	private final ObjectMapper objectMapper = JsonMapper.builder()
+			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+			.build();
 	private final Object lock = new Object();
 
 	public LocalWebsiteStore(@Value("${selfieproxy.local-websites-path}") String path) {

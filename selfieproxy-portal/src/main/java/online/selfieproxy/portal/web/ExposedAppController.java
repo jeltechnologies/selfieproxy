@@ -51,7 +51,7 @@ public class ExposedAppController {
 	@GetMapping("/apps/new")
 	public String newApp(Model model) {
 		List<String> homelabs = homelabs();
-		ExposedApp app = new ExposedApp("", false, null, homelabs.stream().findFirst().orElse(null),
+		ExposedApp app = new ExposedApp("", null, homelabs.stream().findFirst().orElse(null),
 				ExposedAppType.WEB_APPLICATION, Protocol.HTTP, "127.0.0.1", 80, null, null, false);
 		model.addAttribute("app", app);
 		model.addAttribute("isNew", true);
@@ -143,8 +143,7 @@ public class ExposedAppController {
 				? generateUniqueSubdomain()
 				: form.subdomain() == null ? null : form.subdomain().trim().toLowerCase();
 		String name = networkService && form.name() != null && !form.name().isBlank() ? form.name().trim() : null;
-		boolean ownDomain = !networkService && form.ownDomain();
-		return new ExposedApp(subdomain, ownDomain, name, form.homelabName(), form.type(),
+		return new ExposedApp(subdomain, name, form.homelabName(), form.type(),
 				networkService ? null : form.protocol(),
 				form.host(), form.port() != null ? form.port() : 0, form.exposedPort(), form.tlsMode(),
 				!networkService && Boolean.TRUE.equals(form.ssoProtected()));
@@ -167,7 +166,7 @@ public class ExposedAppController {
 		List<String> errors = new ArrayList<>();
 
 		if (app.subdomain() == null || app.subdomain().isBlank()) {
-			errors.add(app.ownDomain() ? "Domain is required." : "Subdomain is required.");
+			errors.add("Subdomain is required.");
 			return errors;
 		}
 		if (app.subdomain().equalsIgnoreCase(properties.adminSubdomain())) {
@@ -186,7 +185,7 @@ public class ExposedAppController {
 				.anyMatch(domain -> domain.equalsIgnoreCase(fqdn)
 						&& (originalSubdomain == null || !domain.equalsIgnoreCase(currentFqdn(originalSubdomain))));
 		if (taken) {
-			errors.add((app.ownDomain() ? "Domain \"" : "Subdomain \"") + app.subdomain() + "\" is already in use.");
+			errors.add("Subdomain \"" + app.subdomain() + "\" is already in use.");
 		}
 
 		if (app.ssoProtected() && !app.canProtectWithSso()) {
