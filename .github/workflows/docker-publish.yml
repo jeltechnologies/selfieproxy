@@ -7,6 +7,7 @@ on:
     paths:
       - "selfieproxy-reverseproxy/**"
       - "selfieproxy-portal/**"
+      - "selfieproxy-identity-provider/**"
       - "sites-webserver/**"
       - ".github/workflows/docker-publish.yml"
   workflow_dispatch: {}
@@ -27,6 +28,8 @@ jobs:
             context: ./selfieproxy-reverseproxy
           - image: selfieproxy-portal
             context: ./selfieproxy-portal
+          - image: selfieproxy-identity-provider
+            context: ./selfieproxy-identity-provider
           - image: selfieproxy-local-websites
             context: ./sites-webserver
     steps:
