@@ -44,7 +44,7 @@ runtime config/volumes they use:
 .
 ├── .env                          # server config, copied from .env.example
 ├── data/                         # runtime volumes — not committed
-│   ├── boringproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
+│   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
 │   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
 │       │                            # local-websites.json (LocalWebsiteStore), selfieproxy-localsites-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
@@ -124,11 +124,27 @@ single source of truth): `REVERSE_PROXY_LISTENER_SUBDOMAIN` (default
 agent under on first boot, see the Agents page). Separately, `OIDC_ISSUER_URL`/
 `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` (all blank by default) override the admin portal's OIDC
 issuer to an external IdP instead of the bundled server — see `selfieproxy-identity-provider/` above
-and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `DEBUG_MODE` (default `false`) turns on
+and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `selfieproxy-portal` also reads
+`OIDC_ISSUER_URL` directly (`OidcProperties`, `application.properties`'s `oidc.issuer-url`) to
+decide whether to show the topbar user menu's "Change username / password" link at all — the
+bundled `selfieproxy-identity-provider`'s self-service `/account` page is meaningless once an
+external IdP is doing the real authentication, so the link is hidden (`GlobalModelAttributes`)
+whenever `OIDC_ISSUER_URL` is set; Logout is unaffected since it always goes through
+boringproxy's generic `/oidc/logout` carve-out regardless of issuer.
+`selfieproxy-identity-provider` also reads `OIDC_ISSUER_URL` itself (its own
+`OidcProperties`/`oidc.issuer-url`, not to be confused with `sso.issuer-url`, this server's own
+issuer identity) so `AdminUserStore` can skip bootstrapping the admin password record entirely
+when it's set — that record would otherwise seed a live admin account (from
+`ADMIN_PORTAL_BOOTSTRAP_PASSWORD`, blank by default) that no external-IdP deployment would ever
+legitimately need or check. `DEBUG_MODE` (default `false`) turns on
 boringproxy's `-debug` per-request access log (timestamp, remote IP, method, host, path) to
 stdout — off by default since every agent poll and every Homelabs-page auto-refresh tick would
 otherwise log a line. `LETSENCRYPT_EMAIL` (blank by default) is passed through as `-acme-email`
-to boringproxy — see below. The colocated homelab's name is hardcoded to
+to boringproxy — see below. `SSO_SESSION_IDLE_MINUTES`/`SSO_SESSION_MAX_MINUTES` (default `30`/
+`600`, i.e. 30 minutes idle / 10 hours absolute, matching Keycloak's own SSO Session Idle/Max
+defaults) become boringproxy's `-sso-idle-minutes`/`-sso-max-minutes`, governing the `_selfieproxy_sso`
+cookie's sliding idle deadline and absolute cap — see `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC
+section. The colocated homelab's name is hardcoded to
 `selfieproxy-internal-agent` on both sides (docker-compose.yaml's selfieproxy-localsites-agent service
 and selfieproxy-portal's `this-server.agent-name`) rather than even optionally env-configurable,
 since the two must always match. Agent hosts are out of scope for this repo entirely — there's
@@ -141,7 +157,7 @@ invocations (the main server and the colocated `selfieproxy-localsites-agent`, w
 own independent certmagic issuance into `this-server-certmagic`) — it's optional for ACME/Let's
 Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is already enough to issue
 certs unattended, and leaving `LETSENCRYPT_EMAIL` unset in `.env` is fine.
-`data/boringproxy/storage` and `data/boringproxy/certmagic`/`this-server-certmagic` persist the
+`data/reverseproxy/storage` and `data/reverseproxy/certmagic`/`this-server-certmagic` persist the
 boringproxy database and TLS certs (server's and selfieproxy-localsites-agent's, kept separate) across restarts;
 `data/selfieproxy` persists selfieproxy-portal's own exposed-app records (see ExposedAppStore in
 `selfieproxy-portal/CLAUDE.md`-adjacent code — boringproxy's own Tunnel schema can't represent

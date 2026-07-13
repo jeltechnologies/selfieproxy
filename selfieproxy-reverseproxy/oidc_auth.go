@@ -22,7 +22,6 @@ import (
 
 const (
 	ssoSessionCookieName = "_selfieproxy_sso"
-	ssoSessionTTL        = 24 * time.Hour
 	ssoRelayTokenTTL     = 60 * time.Second
 	ssoStateTTL          = 10 * time.Minute
 	ssoSigningKeyFile    = "selfieproxy_sso_signing_key"
@@ -41,21 +40,32 @@ var oidcAuthHolder atomic.Pointer[OidcAuthenticator]
 // instance, built once discovery against the configured issuer succeeds,
 // shared across every "server"-termination tunnel request and the portal
 // domain. RequireAuth is the single check called from the dispatch path.
+// idleTTL/maxTTL come from -sso-idle-minutes/-sso-max-minutes (defaults 30
+// and 600 minutes, matching Keycloak's own SSO Session Idle/Max defaults --
+// see setSessionCookie).
 type OidcAuthenticator struct {
 	verifier     *oidc.IDTokenVerifier
 	oauth2Config oauth2.Config
 	adminDomain  string
 	signingKey   []byte
+	idleTTL      time.Duration
+	maxTTL       time.Duration
 }
 
 // ssoClaims backs both the session cookie and the relay token -- both are
-// stateless, self-verifying HMAC-signed {domain, exp} pairs, deliberately
-// not sharing a name with ssoStateClaims even though the shape overlaps,
-// since the two are signed with the same key but must never be
+// stateless, self-verifying HMAC-signed {domain, exp, max_exp} triples,
+// deliberately not sharing a name with ssoStateClaims even though the shape
+// overlaps, since the two are signed with the same key but must never be
 // interchangeable (a relay token must not be replayable as a state value).
+// Exp is the sliding idle deadline (refreshed on every valid request, see
+// setSessionCookie); MaxExp is the absolute cap set once at login and never
+// extended. The relay token also uses this struct but only ever checks Exp
+// (MaxExp is left zero there -- it's single-use and 60s-lived, an absolute
+// cap adds nothing).
 type ssoClaims struct {
 	Domain string `json:"domain"`
 	Exp    int64  `json:"exp"`
+	MaxExp int64  `json:"max_exp"`
 }
 
 // ssoStateClaims is the "state" param round-tripped through the IdP. It
@@ -87,7 +97,7 @@ type ssoStateClaims struct {
 // Selfie Proxy deployment, where docker-compose.yaml always
 // computes a default pointing at the bundled server, but kept as an
 // escape hatch for anyone running the bare boringproxy binary directly.
-func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string) {
+func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string, idleTTL, maxTTL time.Duration) {
 	if issuer == "" {
 		log.Println("SSO disabled (-oidc-issuer not set)")
 		return
@@ -117,6 +127,8 @@ func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string) {
 					},
 					adminDomain: adminDomain,
 					signingKey:  signingKey,
+					idleTTL:     idleTTL,
+					maxTTL:      maxTTL,
 				})
 				log.Printf("OIDC SSO ready (issuer %s)\n", issuer)
 				return
@@ -174,11 +186,14 @@ func requireSsoIfNeeded(w http.ResponseWriter, r *http.Request, domain string, p
 }
 
 // RequireAuth is the single SSO check: valid session cookie for this exact
-// domain proceeds; a valid relay token (?sso_token=) for this domain sets
-// that cookie and strips the token from the URL; anything else starts a
-// fresh authorization round trip via the admin domain.
+// domain proceeds, sliding its idle deadline forward (capped at its
+// existing, unextended absolute MaxExp); a valid relay token (?sso_token=)
+// for this domain sets a fresh cookie (a new absolute MaxExp, since this is
+// the moment of actual login) and strips the token from the URL; anything
+// else starts a fresh authorization round trip via the admin domain.
 func (a *OidcAuthenticator) RequireAuth(w http.ResponseWriter, r *http.Request, domain string) bool {
-	if a.validSessionCookie(r, domain) {
+	if claims, ok := a.validSessionCookie(r, domain); ok {
+		a.setSessionCookie(w, domain, claims.MaxExp)
 		return true
 	}
 
@@ -187,7 +202,7 @@ func (a *OidcAuthenticator) RequireAuth(w http.ResponseWriter, r *http.Request, 
 		if payload, ok := a.verifyToken(ssoToken); ok && json.Unmarshal(payload, &claims) == nil &&
 			claims.Domain == domain && time.Now().Unix() <= claims.Exp {
 
-			a.setSessionCookie(w, domain)
+			a.setSessionCookie(w, domain, time.Now().Add(a.maxTTL).Unix())
 
 			q := r.URL.Query()
 			q.Del("sso_token")
@@ -331,10 +346,21 @@ func HandleLogout(w http.ResponseWriter, r *http.Request, ssoDomain string) {
 	http.Redirect(w, r, loggedOutUrl, http.StatusFound)
 }
 
-func (a *OidcAuthenticator) setSessionCookie(w http.ResponseWriter, domain string) {
+// setSessionCookie issues (or slides) the session cookie for domain. maxExp
+// is the absolute cutoff: pass a freshly computed one at login, or the
+// existing claims' MaxExp unchanged when sliding an already-valid session,
+// so the absolute cap is never itself extended by activity. The idle
+// deadline (Exp) is capped at maxExp so a session nearing its absolute cutoff
+// isn't idle-extended past it.
+func (a *OidcAuthenticator) setSessionCookie(w http.ResponseWriter, domain string, maxExp int64) {
+	idleExp := time.Now().Add(a.idleTTL).Unix()
+	if idleExp > maxExp {
+		idleExp = maxExp
+	}
 	token := a.signToken(ssoClaims{
 		Domain: domain,
-		Exp:    time.Now().Add(ssoSessionTTL).Unix(),
+		Exp:    idleExp,
+		MaxExp: maxExp,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     ssoSessionCookieName,
@@ -346,23 +372,33 @@ func (a *OidcAuthenticator) setSessionCookie(w http.ResponseWriter, domain strin
 	})
 }
 
-func (a *OidcAuthenticator) validSessionCookie(r *http.Request, domain string) bool {
+// validSessionCookie also returns the parsed claims so RequireAuth can carry
+// MaxExp forward unchanged when sliding the idle deadline. A cookie signed
+// before MaxExp existed unmarshals with MaxExp == 0, which fails the
+// "not past its absolute cap" check below -- a graceful one-time forced
+// re-login on rollout, not a crash.
+func (a *OidcAuthenticator) validSessionCookie(r *http.Request, domain string) (ssoClaims, bool) {
 	cookie, err := r.Cookie(ssoSessionCookieName)
 	if err != nil {
-		return false
+		return ssoClaims{}, false
 	}
 
 	payload, ok := a.verifyToken(cookie.Value)
 	if !ok {
-		return false
+		return ssoClaims{}, false
 	}
 
 	var claims ssoClaims
 	if err := json.Unmarshal(payload, &claims); err != nil {
-		return false
+		return ssoClaims{}, false
 	}
 
-	return claims.Domain == domain && time.Now().Unix() <= claims.Exp
+	now := time.Now().Unix()
+	if claims.Domain != domain || now > claims.Exp || now > claims.MaxExp {
+		return ssoClaims{}, false
+	}
+
+	return claims, true
 }
 
 // signToken/verifyToken implement the stateless, self-verifying token

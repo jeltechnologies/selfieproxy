@@ -1,6 +1,7 @@
 package online.selfieproxy.identityprovider.web;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
@@ -14,58 +15,60 @@ import jakarta.servlet.http.HttpServletResponse;
 import online.selfieproxy.identityprovider.domain.AdminUser;
 import online.selfieproxy.identityprovider.domain.AdminUserStore;
 import online.selfieproxy.identityprovider.domain.AuthorizationService;
+import online.selfieproxy.identityprovider.domain.PasswordPolicy;
 
 /**
- * Selfie Proxy's own end-user login: username and password both checked
- * against the persisted AdminUser record in AdminUserStore (itself seeded
- * once from ADMIN_PORTAL_USERNAME/ADMIN_PORTAL_BOOTSTRAP_PASSWORD on first
- * boot -- see AdminAuthProperties). A successful login with
- * AdminUser.mustChangePassword() still set is redirected into
- * ChangePasswordController instead of being authorized, given a pending
- * authorization request (authz_id, see AuthorizationService) to complete
- * instead of a servlet session.
+ * Forces a password change before completing login when
+ * AdminUser.mustChangePassword() is set -- reached only via LoginController's
+ * redirect, never authorizes a request on its own otherwise. Strength is
+ * enforced via PasswordPolicy (shared with AccountController's self-service
+ * change).
  */
 @Controller
-public class LoginController {
+public class ChangePasswordController {
 
 	private final AuthorizationService authorizationService;
 	private final AdminUserStore adminUserStore;
 	private final PasswordEncoder passwordEncoder;
+	private final PasswordPolicy passwordPolicy;
 
-	public LoginController(AuthorizationService authorizationService,
-			AdminUserStore adminUserStore, PasswordEncoder passwordEncoder) {
+	public ChangePasswordController(AuthorizationService authorizationService, AdminUserStore adminUserStore,
+			PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy) {
 		this.authorizationService = authorizationService;
 		this.adminUserStore = adminUserStore;
 		this.passwordEncoder = passwordEncoder;
+		this.passwordPolicy = passwordPolicy;
 	}
 
-	@GetMapping("/login")
-	public String loginPage(@RequestParam("authz_id") String authzId, Model model, HttpServletResponse response) throws IOException {
+	@GetMapping("/change-password")
+	public String changePasswordPage(@RequestParam("authz_id") String authzId, Model model,
+			HttpServletResponse response) throws IOException {
 		if (authorizationService.get(authzId) == null) {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unknown or expired authorization request.");
 			return null;
 		}
 		model.addAttribute("authzId", authzId);
-		return "login";
+		return "change-password";
 	}
 
-	@PostMapping("/login")
-	public String login(@RequestParam String username, @RequestParam String password,
+	@PostMapping("/change-password")
+	public String changePassword(@RequestParam String newPassword, @RequestParam String confirmNewPassword,
 			@RequestParam("authz_id") String authzId, Model model, HttpServletResponse response) throws IOException {
 		if (authorizationService.get(authzId) == null) {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unknown or expired authorization request.");
 			return null;
 		}
-		AdminUser adminUser = adminUserStore.load();
-		if (username.equals(adminUser.username()) && passwordEncoder.matches(password, adminUser.passwordHash())) {
-			if (adminUser.mustChangePassword()) {
-				return "redirect:/change-password?authz_id=" + authzId;
-			}
-			authorizationService.markAuthenticated(authzId);
-			return "redirect:/authorize?authz_id=" + authzId;
-		}
-		model.addAttribute("error", "Invalid username or password.");
 		model.addAttribute("authzId", authzId);
-		return "login";
+
+		AdminUser adminUser = adminUserStore.load();
+		List<String> errors = passwordPolicy.validate(newPassword, confirmNewPassword, adminUser);
+		if (!errors.isEmpty()) {
+			model.addAttribute("errors", errors);
+			return "change-password";
+		}
+
+		adminUserStore.save(new AdminUser(adminUser.username(), passwordEncoder.encode(newPassword), false));
+		authorizationService.markAuthenticated(authzId);
+		return "redirect:/authorize?authz_id=" + authzId;
 	}
 }

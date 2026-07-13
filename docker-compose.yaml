@@ -14,11 +14,11 @@ services:
         condition: service_healthy
     network_mode: host
     volumes:
-      - ./data/boringproxy/storage:/storage/
-      - ./data/boringproxy/runtime:/runtime
+      - ./data/reverseproxy/storage:/storage/
+      - ./data/reverseproxy/runtime:/runtime
       - /root/.ssh:/root/.ssh
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
-    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-accept-ca-terms", "-acme-email", "${LETSENCRYPT_EMAIL:-}", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${DEBUG_MODE:-false}"]
+    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-sso-idle-minutes", "${SSO_SESSION_IDLE_MINUTES:-30}", "-sso-max-minutes", "${SSO_SESSION_MAX_MINUTES:-600}", "-accept-ca-terms", "-acme-email", "${LETSENCRYPT_EMAIL:-}", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${DEBUG_MODE:-false}"]
     environment:
       USER: "root"
       HOME: "/root"
@@ -40,7 +40,7 @@ services:
         condition: service_healthy
     env_file: .env
     volumes:
-      - ./data/boringproxy/runtime:/runtime:ro
+      - ./data/reverseproxy/runtime:/runtime:ro
       - ./data/selfieproxy:/data
       - ./data/selfieproxy/sites-conf:/sites-conf
       - ./data/selfieproxy/sites:/sites
@@ -119,5 +119,5 @@ services:
         -cert-dir /certmagic
     volumes:
       - ./data/selfieproxy:/selfieproxy-data:ro
-      - ./data/boringproxy/this-server-certmagic:/certmagic
+      - ./data/reverseproxy/this-server-certmagic:/certmagic
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
