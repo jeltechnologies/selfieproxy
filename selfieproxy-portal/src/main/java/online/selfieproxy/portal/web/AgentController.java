@@ -32,10 +32,11 @@ public class AgentController {
 	/**
 	 * An agent polls GET /api/tunnels every -poll-interval-ms (2000ms by
 	 * default) and boringproxy records that as its last-seen heartbeat.
-	 * Anything older than this is considered offline -- generous enough to
-	 * absorb normal jitter/latency without flapping.
+	 * Anything older than this is considered offline -- 2.5x the poll
+	 * interval, enough to absorb one missed poll plus jitter/latency
+	 * without flapping, while still surfacing a real disconnect quickly.
 	 */
-	private static final Duration ONLINE_THRESHOLD = Duration.ofSeconds(10);
+	private static final Duration ONLINE_THRESHOLD = Duration.ofSeconds(5);
 
 	private final BoringProxyClient boringProxyClient;
 	private final ThisServerAgentProperties thisServerAgentProperties;
@@ -51,7 +52,7 @@ public class AgentController {
 		return "agents";
 	}
 
-	/** Polled every 60s by agents.js to refresh the connected/disconnected dot without a full page reload. */
+	/** Polled every 2s by agents.js to refresh the connected/disconnected dot and app count without a full page reload. */
 	@GetMapping(value = "/agents/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public List<AgentListItem> status() {

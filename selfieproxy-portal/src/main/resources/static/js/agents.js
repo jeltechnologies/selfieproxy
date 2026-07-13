@@ -66,6 +66,7 @@
 						dot.classList.toggle("status-dot-online", agent.online);
 						dot.classList.toggle("status-dot-offline", !agent.online);
 						text.textContent = agent.online ? "Connected" : "Disconnected";
+						row.querySelector(".app-count").textContent = agent.app_count;
 					});
 				})
 				.catch(function () {
@@ -73,6 +74,6 @@
 				});
 		};
 
-		setInterval(refreshStatus, 60000);
+		setInterval(refreshStatus, 2000);
 	}
 })();

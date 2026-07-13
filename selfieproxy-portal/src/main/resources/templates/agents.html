@@ -32,7 +32,7 @@
 							<span class="status-text" th:text="${agent.online()} ? 'Connected' : 'Disconnected'"></span>
 						</span>
 					</td>
-					<td th:text="${agent.appCount()}"></td>
+					<td class="app-count" th:text="${agent.appCount()}"></td>
 					<td>
 						<a class="button-small" th:href="@{/agents/{name}/edit(name=${agent.name()})}">Edit</a>
 					</td>
