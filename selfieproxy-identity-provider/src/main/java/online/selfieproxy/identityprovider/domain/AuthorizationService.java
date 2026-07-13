@@ -10,10 +10,12 @@ import org.springframework.stereotype.Component;
 
 /**
  * In-memory-only (no DB) tracking of pending and completed OIDC
- * authorization requests, keyed by a random authz_id. No server-side user
- * session beyond this pending-code map -- the relying party's own session
- * cookie is what avoids re-prompting on every request, so this service
- * itself stays stateless aside from these short-lived maps.
+ * authorization requests, keyed by a random authz_id. Each authz_id is its
+ * own short-lived flow, marked authenticated once (by LoginController or
+ * ChangePasswordController) and then consumed exactly once by issueCode --
+ * it does not by itself remember the user across requests. Cross-request
+ * "am I already logged in" recognition is IdpSessionService's job (this
+ * IdP's own login session cookie), not this class's.
  */
 @Component
 public class AuthorizationService {

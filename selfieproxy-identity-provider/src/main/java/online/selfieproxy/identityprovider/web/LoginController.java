@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import online.selfieproxy.identityprovider.domain.AdminUser;
 import online.selfieproxy.identityprovider.domain.AdminUserStore;
 import online.selfieproxy.identityprovider.domain.AuthorizationService;
+import online.selfieproxy.identityprovider.domain.IdpSessionService;
 
 /**
  * Selfie Proxy's own end-user login: username and password both checked
@@ -23,7 +24,9 @@ import online.selfieproxy.identityprovider.domain.AuthorizationService;
  * AdminUser.mustChangePassword() still set is redirected into
  * ChangePasswordController instead of being authorized, given a pending
  * authorization request (authz_id, see AuthorizationService) to complete
- * instead of a servlet session.
+ * instead of a servlet session. A successful login also starts this IdP's
+ * own login session (IdpSessionService), so any other SSO-protected
+ * domain's authorization round trip is silent from here on.
  */
 @Controller
 public class LoginController {
@@ -31,12 +34,14 @@ public class LoginController {
 	private final AuthorizationService authorizationService;
 	private final AdminUserStore adminUserStore;
 	private final PasswordEncoder passwordEncoder;
+	private final IdpSessionService idpSessionService;
 
 	public LoginController(AuthorizationService authorizationService,
-			AdminUserStore adminUserStore, PasswordEncoder passwordEncoder) {
+			AdminUserStore adminUserStore, PasswordEncoder passwordEncoder, IdpSessionService idpSessionService) {
 		this.authorizationService = authorizationService;
 		this.adminUserStore = adminUserStore;
 		this.passwordEncoder = passwordEncoder;
+		this.idpSessionService = idpSessionService;
 	}
 
 	@GetMapping("/login")
@@ -61,6 +66,7 @@ public class LoginController {
 			if (adminUser.mustChangePassword()) {
 				return "redirect:/change-password?authz_id=" + authzId;
 			}
+			idpSessionService.startSession(response);
 			authorizationService.markAuthenticated(authzId);
 			return "redirect:/authorize?authz_id=" + authzId;
 		}

@@ -9,8 +9,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * discovery document. clientRedirectUri: the single hardcoded public
  * client's (client_id=selfieproxy) redirect URI -- no dynamic client
  * registration, any /authorize request with a different redirect_uri is
- * rejected.
+ * rejected. sessionIdleMinutes/sessionMaxMinutes: this IdP's own login
+ * session (see IdpSessionService) -- the same SSO_SESSION_IDLE_MINUTES/
+ * SSO_SESSION_MAX_MINUTES env vars that size boringproxy's per-app RP
+ * cookie also size this session, since both represent the same "how long
+ * am I logged in for" concept.
  */
 @ConfigurationProperties(prefix = "sso")
-public record SsoProperties(String signingKeyPath, String issuerUrl, String clientRedirectUri) {
+public record SsoProperties(String signingKeyPath, String issuerUrl, String clientRedirectUri,
+		long sessionIdleMinutes, long sessionMaxMinutes) {
 }

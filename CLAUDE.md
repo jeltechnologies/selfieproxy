@@ -143,8 +143,11 @@ otherwise log a line. `LETSENCRYPT_EMAIL` (blank by default) is passed through a
 to boringproxy — see below. `SSO_SESSION_IDLE_MINUTES`/`SSO_SESSION_MAX_MINUTES` (default `30`/
 `600`, i.e. 30 minutes idle / 10 hours absolute, matching Keycloak's own SSO Session Idle/Max
 defaults) become boringproxy's `-sso-idle-minutes`/`-sso-max-minutes`, governing the `_selfieproxy_sso`
-cookie's sliding idle deadline and absolute cap — see `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC
-section. The colocated homelab's name is hardcoded to
+cookie's sliding idle deadline and absolute cap, and also size `selfieproxy-identity-provider`'s own
+login session (`sso.session-idle-minutes`/`sso.session-max-minutes`, `IdpSessionService`) — the
+session that makes sign-on actually silent between domains, since a valid one lets a second
+SSO-protected domain's authorization round trip skip the login form entirely — see
+`selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. The colocated homelab's name is hardcoded to
 `selfieproxy-internal-agent` on both sides (docker-compose.yaml's selfieproxy-localsites-agent service
 and selfieproxy-portal's `this-server.agent-name`) rather than even optionally env-configurable,
 since the two must always match. Agent hosts are out of scope for this repo entirely — there's

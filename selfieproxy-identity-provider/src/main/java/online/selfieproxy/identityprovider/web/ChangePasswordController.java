@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import online.selfieproxy.identityprovider.domain.AdminUser;
 import online.selfieproxy.identityprovider.domain.AdminUserStore;
 import online.selfieproxy.identityprovider.domain.AuthorizationService;
+import online.selfieproxy.identityprovider.domain.IdpSessionService;
 import online.selfieproxy.identityprovider.domain.PasswordPolicy;
 
 /**
@@ -22,7 +23,8 @@ import online.selfieproxy.identityprovider.domain.PasswordPolicy;
  * AdminUser.mustChangePassword() is set -- reached only via LoginController's
  * redirect, never authorizes a request on its own otherwise. Strength is
  * enforced via PasswordPolicy (shared with AccountController's self-service
- * change).
+ * change). A successful change completes the login, so it also starts this
+ * IdP's own login session (IdpSessionService) -- see LoginController.
  */
 @Controller
 public class ChangePasswordController {
@@ -31,13 +33,15 @@ public class ChangePasswordController {
 	private final AdminUserStore adminUserStore;
 	private final PasswordEncoder passwordEncoder;
 	private final PasswordPolicy passwordPolicy;
+	private final IdpSessionService idpSessionService;
 
 	public ChangePasswordController(AuthorizationService authorizationService, AdminUserStore adminUserStore,
-			PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy) {
+			PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy, IdpSessionService idpSessionService) {
 		this.authorizationService = authorizationService;
 		this.adminUserStore = adminUserStore;
 		this.passwordEncoder = passwordEncoder;
 		this.passwordPolicy = passwordPolicy;
+		this.idpSessionService = idpSessionService;
 	}
 
 	@GetMapping("/change-password")
@@ -68,6 +72,7 @@ public class ChangePasswordController {
 		}
 
 		adminUserStore.save(new AdminUser(adminUser.username(), passwordEncoder.encode(newPassword), false));
+		idpSessionService.startSession(response);
 		authorizationService.markAuthenticated(authzId);
 		return "redirect:/authorize?authz_id=" + authzId;
 	}
