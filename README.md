@@ -44,7 +44,7 @@ properly supported commercial product instead.
 
 ## Why we built this
 
-Selfie Proxy is a fork from [boringproxy](https://github.com/boringproxy/boringproxy)
+Selfie Proxy is a fork from <a href="https://github.com/boringproxy/boringproxy" target="_blank" rel="noopener noreferrer">boringproxy</a>
 by Anders Pitman — a small, elegant tunneling tool that solves exactly this problem, and
 solves it well. Unfortunately, boringproxy is no longer actively maintained, does not work for many modern web portals, and its
 interface was built by and for people who are already comfortable with networking
@@ -64,7 +64,7 @@ Our thanks to Anders for the excellent foundation. On top of it, we added:
 
 ## What you need
 
-- A domain name you control the DNS for
+- An internet domain name.
 - A small virtual server (VPS) from any cloud provider — the cheapest tier is enough
   (around $5/month, 1 GB memory, 1 vCPU). This you can source from vendors like Hetzner, Vultr and DigitalOcean.
   The VPS must have a public IPv4 address.
@@ -94,8 +94,8 @@ Our thanks to Anders for the excellent foundation. On top of it, we added:
    curl -o .env https://raw.githubusercontent.com/jeltechnologies/selfieproxy/main/.env.example
    ```
 
-   (Browsable on GitHub: [docker-compose.yaml](https://github.com/jeltechnologies/selfieproxy/blob/main/docker-compose.yaml),
-   [.env.example](https://github.com/jeltechnologies/selfieproxy/blob/main/.env.example))
+   (Browsable on GitHub: <a href="https://github.com/jeltechnologies/selfieproxy/blob/main/docker-compose.yaml" target="_blank" rel="noopener noreferrer">docker-compose.yaml</a>,
+   <a href="https://github.com/jeltechnologies/selfieproxy/blob/main/.env.example" target="_blank" rel="noopener noreferrer">.env.example</a>)
 
 3. Open `.env` and fill in at least your domain and admin bootstrap credentials. After logging in you will have to change your password, and can then discard the ADMIN_PORTAL_BOOTSTRAP_PASSWORD.
 
