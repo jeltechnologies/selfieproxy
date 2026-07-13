@@ -48,6 +48,43 @@
 		});
 	}
 
+	var connectInfo = document.getElementById("connect-info");
+	if (connectInfo) {
+		var adminDomain = connectInfo.getAttribute("data-admin-domain");
+		var nameInput = document.getElementById("name");
+		var dockerRun = document.getElementById("connect-docker-run");
+		var dockerCompose = document.getElementById("connect-docker-compose");
+
+		var renderConnectInfo = function () {
+			var name = (nameInput.value || "").trim() || "your-homelab-name";
+
+			dockerRun.textContent =
+				"docker run -d --name selfieproxy-reverseproxy --restart unless-stopped \\\n" +
+				"  ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest agent \\\n" +
+				"  -server " + adminDomain + " \\\n" +
+				"  -secret \"***your_secret***\" \\\n" +
+				"  -agent-name " + name;
+
+			dockerCompose.textContent =
+				"services:\n" +
+				"  selfieproxy-reverseproxy:\n" +
+				"    image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest\n" +
+				"    container_name: selfieproxy-reverseproxy\n" +
+				"    restart: unless-stopped\n" +
+				"    command:\n" +
+				"      - agent\n" +
+				"      - -server\n" +
+				"      - " + adminDomain + "\n" +
+				"      - -secret\n" +
+				"      - \"***your_secret***\"\n" +
+				"      - -agent-name\n" +
+				"      - " + name;
+		};
+
+		renderConnectInfo();
+		nameInput.addEventListener("input", renderConnectInfo);
+	}
+
 	var statusRows = document.querySelectorAll("tr[data-agent-name]");
 	if (statusRows.length > 0) {
 		var refreshStatus = function () {

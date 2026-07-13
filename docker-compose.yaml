@@ -78,10 +78,10 @@ services:
     ports:
       - "127.0.0.1:8090:80"
 
-  selfieproxy-local-agent:
+  selfieproxy-localsites-agent:
     image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
     build: ./selfieproxy-reverseproxy
-    container_name: selfieproxy-local-agent
+    container_name: selfieproxy-localsites-agent
     restart: unless-stopped
     depends_on:
       - selfieproxy-portal
@@ -90,10 +90,10 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
-        until [ -s /selfieproxy-data/selfieproxy-local-agent-secret ]; do sleep 1; done;
+        until [ -s /selfieproxy-data/selfieproxy-localsites-agent-secret ]; do sleep 1; done;
         exec /selfieproxy-reverseproxy agent
         -server ${REVERSE_PROXY_LISTENER:-proxylistener}.${DOMAIN}
-        -secret "$$(cat /selfieproxy-data/selfieproxy-local-agent-secret)"
+        -secret "$$(cat /selfieproxy-data/selfieproxy-localsites-agent-secret)"
         -agent-name selfieproxy-internal-agent
         -user admin
         -poll-interval-ms 300000

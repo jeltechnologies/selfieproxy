@@ -21,6 +21,7 @@ import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.AgentStatusDto;
 import online.selfieproxy.portal.boringproxy.dto.TokenDataDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
+import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
 @Controller
@@ -40,10 +41,19 @@ public class AgentController {
 
 	private final BoringProxyClient boringProxyClient;
 	private final ThisServerAgentProperties thisServerAgentProperties;
+	private final BoringProxyProperties boringProxyProperties;
 
-	public AgentController(BoringProxyClient boringProxyClient, ThisServerAgentProperties thisServerAgentProperties) {
+	public AgentController(BoringProxyClient boringProxyClient, ThisServerAgentProperties thisServerAgentProperties,
+			BoringProxyProperties boringProxyProperties) {
 		this.boringProxyClient = boringProxyClient;
 		this.thisServerAgentProperties = thisServerAgentProperties;
+		this.boringProxyProperties = boringProxyProperties;
+	}
+
+	/** Shown alongside the connect-this-homelab instructions on the add/edit homelab page. */
+	@ModelAttribute("adminDomain")
+	public String adminDomain() {
+		return boringProxyProperties.adminDomain();
 	}
 
 	@GetMapping("/")

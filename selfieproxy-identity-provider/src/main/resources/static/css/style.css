@@ -121,7 +121,8 @@ body {
 	border: 1px solid var(--border);
 	border-radius: 10px;
 	padding: 2rem;
-	width: 380px;
+	width: 440px;
+	max-width: 90vw;
 }
 
 .login-card h1 { display: flex; align-items: center; gap: 0.4em; }

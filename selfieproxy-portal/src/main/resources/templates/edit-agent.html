@@ -48,6 +48,18 @@
 		<form id="delete-form" method="post" th:unless="${isNew}"
 			  th:action="@{/agents/{name}/delete(name=${agent.name()})}">
 		</form>
+
+		<fieldset id="connect-info" th:attr="data-admin-domain=${adminDomain}">
+			<legend>How to connect</legend>
+			<p>The connection to Selfie Proxy is made by an agent that runs inside your home network.</p>
+			<p>Agents run in Docker on Linux, macOS, or Windows and 64-bit Raspberry Pi OS.</p>
+
+			<p>1. Run this command inside your homelab:</p>
+			<pre class="code-block" id="connect-docker-run"></pre>
+
+			<p>2. Or with Docker Compose:</p>
+			<pre class="code-block" id="connect-docker-compose"></pre>
+		</fieldset>
 	</main>
 
 	<div id="confirm-overlay" class="overlay">
