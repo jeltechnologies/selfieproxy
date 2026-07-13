@@ -55,8 +55,8 @@ services:
     container_name: selfieproxy-sso-server
     restart: unless-stopped
     depends_on:
-      boringproxy:
-        condition: service_healthy
+      dns-check:
+        condition: service_completed_successfully
     env_file: .env
     environment:
       SSO_ISSUER_URL: "https://${SELFPROXY_SSO_DOMAIN:-sso}.${DOMAIN}"

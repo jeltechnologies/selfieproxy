@@ -27,7 +27,8 @@ const (
 	ssoStateTTL          = 10 * time.Minute
 	ssoSigningKeyFile    = "selfieproxy_sso_signing_key"
 	ssoDiscoveryTimeout  = 5 * time.Second
-	ssoDiscoveryMaxWait  = 30 * time.Second
+	ssoDiscoveryMinWait  = 250 * time.Millisecond
+	ssoDiscoveryMaxWait  = 3 * time.Second
 )
 
 // oidcAuthHolder is populated asynchronously by StartOidcAuth -- see its
@@ -70,16 +71,18 @@ type ssoStateClaims struct {
 
 // StartOidcAuth kicks off asynchronous OIDC discovery against issuer and
 // returns immediately; it never blocks Listen()'s startup. This matters
-// because of a bootstrap ordering problem: docker-compose-server.yaml only
-// starts selfieproxy-sso-server once boringproxy itself is healthy, and
-// boringproxy's healthcheck only starts succeeding once its own accept
-// loop is running -- so if discovery (an HTTP call to the SSO server,
-// which boringproxy itself proxies to via -sso-domain) happened
-// synchronously before that loop starts, the two containers would
-// deadlock waiting on each other. Discovery is retried with backoff in
-// the background instead, and every dispatch-path caller (RequireAuth's
-// callers in boringproxy.go, HandleAuthorize, HandleCallback) treats a
-// not-yet-ready OidcAuthenticator as a transient 503, not a hard failure.
+// because of a bootstrap ordering problem: discovery is an HTTP call to
+// the SSO server, which boringproxy itself proxies to via -sso-domain --
+// so it can only succeed once boringproxy's own accept loop is running.
+// selfieproxy-sso-server boots concurrently with boringproxy (no
+// depends_on between them in docker-compose-server.yaml, precisely so it
+// isn't serialized behind boringproxy's healthcheck), but if discovery
+// happened synchronously before Listen() starts, the two would still
+// deadlock waiting on each other. Discovery is retried with a short
+// backoff in the background instead, and every dispatch-path caller
+// (RequireAuth's callers in boringproxy.go, HandleAuthorize,
+// HandleCallback) treats a not-yet-ready OidcAuthenticator as a transient
+// 503, not a hard failure.
 // A blank issuer disables SSO entirely -- not expected to happen in the
 // Selfie Proxy deployment, where docker-compose-server.yaml always
 // computes a default pointing at the bundled server, but kept as an
@@ -96,7 +99,7 @@ func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string) {
 	}
 
 	go func() {
-		backoff := time.Second
+		backoff := ssoDiscoveryMinWait
 		for {
 			ctx, cancel := context.WithTimeout(context.Background(), ssoDiscoveryTimeout)
 			provider, err := oidc.NewProvider(ctx, issuer)
