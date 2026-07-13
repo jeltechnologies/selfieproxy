@@ -36,7 +36,7 @@ runtime config/volumes they use:
 
 ```
 .
-├── .env                          # server config, copied from .env.server.example
+├── .env                          # server config, copied from .env.example
 ├── data/                         # runtime volumes — not committed
 │   ├── boringproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
 │   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
@@ -83,7 +83,7 @@ copy-pasted into `.env` — its entrypoint blocks on `data/selfieproxy/selfiepro
 existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on every startup, so
 it self-provisions.
 
-The server host's `.env` (from `.env.server.example`) only needs `DOMAIN` and
+The server host's `.env` (from `.env.example`) only needs `DOMAIN` and
 `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_PASSWORD` — now consumed by `selfieproxy-identity-provider`
 (the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. Four more
 vars are optional, poweruser-only overrides with sensible defaults baked into
