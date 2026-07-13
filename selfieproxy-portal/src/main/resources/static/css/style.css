@@ -29,6 +29,9 @@
 
 body {
 	margin: 0;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	background: var(--bg);
 	color: var(--text);
@@ -105,6 +108,8 @@ body {
 #name { max-width: 24rem; }
 
 .page {
+	flex: 1 0 auto;
+	width: 100%;
 	max-width: 900px;
 	margin: 2rem auto;
 	padding: 0 1.5rem 3rem;
@@ -128,10 +133,8 @@ body {
 .muted { color: var(--muted); }
 
 .app-footer {
-	position: fixed;
-	bottom: 1rem;
-	left: 0;
-	right: 0;
+	flex-shrink: 0;
+	padding: 1rem 0;
 	text-align: center;
 	font-size: 0.75rem;
 }
@@ -207,6 +210,18 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	font-size: 0.85rem;
 }
 
+.code-block {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 0.75rem 1rem;
+	font-family: monospace;
+	font-size: 0.85rem;
+	overflow-x: auto;
+	white-space: pre;
+	margin: 0 0 1rem;
+}
+
 .button.button-danger, button.button-danger {
 	background: var(--danger);
 	border-color: var(--danger);
@@ -233,6 +248,14 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	display: flex;
 	gap: 0.75rem;
 	margin-top: 1.5rem;
+}
+
+#connect-info {
+	margin-top: 2rem;
+}
+
+#connect-info p {
+	font-size: 0.9rem;
 }
 
 .button-panel .button {
