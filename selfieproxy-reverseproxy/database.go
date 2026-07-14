@@ -65,6 +65,7 @@ type Tunnel struct {
 	AllowExternalTcp bool   `json:"allow_external_tcp"`
 	TlsTermination   string `json:"tls_termination"`
 	SsoProtected     bool   `json:"sso_protected"`
+	CertPending      bool   `json:"cert_pending"`
 
 	// TODO: These are not used by agents and possibly shouldn't be
 	// returned in API calls.

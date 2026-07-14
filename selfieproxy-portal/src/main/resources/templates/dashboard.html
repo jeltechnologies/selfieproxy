@@ -22,6 +22,13 @@
 			them to a working homelab.
 		</p>
 
+		<p class="warning" th:if="${hasPendingCerts}">
+			One or more applications are temporarily using a self-signed certificate -- browsers will show a
+			security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can
+			happen after creating many applications in a short time; Selfie Proxy retries automatically in
+			the background.
+		</p>
+
 		<table class="apps-table" th:if="${not #lists.isEmpty(exposedApps)}">
 			<thead>
 				<tr>
@@ -43,6 +50,9 @@
 						<a th:if="${tunnelMapper.resultIsLink(app)}" th:href="${tunnelMapper.result(app)}"
 						   target="_blank" rel="noopener" th:text="${tunnelMapper.result(app)}"></a>
 						<span th:unless="${tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
+						<span th:if="${certPendingByDomain.get(tunnelMapper.fqdn(app))}"
+							  class="cert-pending-badge"
+							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
 					</td>
 					<td th:text="${app.homelabName()}"></td>
 					<td th:text="${app.host()} + ':' + ${app.port()}"></td>

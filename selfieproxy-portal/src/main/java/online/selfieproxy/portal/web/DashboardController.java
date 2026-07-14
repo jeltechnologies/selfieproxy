@@ -3,6 +3,7 @@ package online.selfieproxy.portal.web;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -58,9 +59,18 @@ public class DashboardController {
 		boolean hasOrphanedApps = exposedApps.stream()
 				.anyMatch(app -> !homelabs.contains(app.homelabName()));
 
+		// Domains still waiting on a Let's Encrypt certificate (e.g. after hitting a rate limit) --
+		// boringproxy serves those over a temporary self-signed certificate in the meantime and
+		// keeps retrying in the background, see selfieproxy-reverseproxy's TunnelManager.
+		Map<String, Boolean> certPendingByDomain = tunnels.values().stream()
+				.collect(Collectors.toMap(TunnelDto::domain, TunnelDto::certPending));
+		boolean hasPendingCerts = tunnels.values().stream().anyMatch(TunnelDto::certPending);
+
 		model.addAttribute("homelabs", homelabs);
 		model.addAttribute("exposedApps", exposedApps);
 		model.addAttribute("hasOrphanedApps", hasOrphanedApps);
+		model.addAttribute("certPendingByDomain", certPendingByDomain);
+		model.addAttribute("hasPendingCerts", hasPendingCerts);
 		model.addAttribute("tunnelMapper", tunnelMapper);
 		return "dashboard";
 	}

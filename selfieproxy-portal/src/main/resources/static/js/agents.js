@@ -60,10 +60,12 @@
 
 			dockerRun.textContent =
 				"docker run -d --name selfieproxy-reverseproxy --restart unless-stopped \\\n" +
+				"  -v selfieproxy-agent-certs:/certs \\\n" +
 				"  ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest agent \\\n" +
 				"  -server " + adminDomain + " \\\n" +
 				"  -secret \"***your_secret***\" \\\n" +
-				"  -agent-name " + name;
+				"  -agent-name " + name + " \\\n" +
+				"  -cert-dir /certs";
 
 			dockerCompose.textContent =
 				"services:\n" +
@@ -71,6 +73,8 @@
 				"    image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest\n" +
 				"    container_name: selfieproxy-reverseproxy\n" +
 				"    restart: unless-stopped\n" +
+				"    volumes:\n" +
+				"      - selfieproxy-agent-certs:/certs\n" +
 				"    command:\n" +
 				"      - agent\n" +
 				"      - -server\n" +
@@ -78,7 +82,11 @@
 				"      - -secret\n" +
 				"      - \"***your_secret***\"\n" +
 				"      - -agent-name\n" +
-				"      - " + name;
+				"      - " + name + "\n" +
+				"      - -cert-dir\n" +
+				"      - /certs\n" +
+				"volumes:\n" +
+				"  selfieproxy-agent-certs:\n";
 		};
 
 		renderConnectInfo();

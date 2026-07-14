@@ -15,17 +15,29 @@ import (
 	"os/user"
 	"strings"
 	"sync"
+	"time"
 )
 
-type TunnelManager struct {
-	config     *Config
-	db         *Database
-	mutex      *sync.Mutex
-	certConfig *certmagic.Config
-	user       *user.User
+const (
+	certRetryBaseInterval  = 1 * time.Hour
+	certRetryMaxInterval   = 24 * time.Hour
+	certRetryCheckInterval = 5 * time.Minute
+)
+
+func isManagedTlsTermination(tlsTermination string) bool {
+	return tlsTermination == "server" || tlsTermination == "server-tls"
 }
 
-func NewTunnelManager(config *Config, db *Database, certConfig *certmagic.Config) *TunnelManager {
+type TunnelManager struct {
+	config          *Config
+	db              *Database
+	mutex           *sync.Mutex
+	certConfig      *certmagic.Config
+	user            *user.User
+	selfSignedCerts *SelfSignedCertProvider
+}
+
+func NewTunnelManager(config *Config, db *Database, certConfig *certmagic.Config, selfSignedCerts *SelfSignedCertProvider) *TunnelManager {
 
 	user, err := user.Current()
 	if err != nil {
@@ -34,18 +46,97 @@ func NewTunnelManager(config *Config, db *Database, certConfig *certmagic.Config
 
 	if config.autoCerts {
 		for domainName, tun := range db.GetTunnels() {
-			if tun.TlsTermination == "server" || tun.TlsTermination == "server-tls" {
+			if isManagedTlsTermination(tun.TlsTermination) {
 				err = certConfig.ManageSync(context.Background(), []string{domainName})
+				tun.CertPending = err != nil
 				if err != nil {
-					log.Println("CertMagic error at startup")
+					log.Println("CertMagic error at startup, will keep retrying in the background")
 					log.Println(err)
 				}
+				db.SetTunnel(domainName, tun)
 			}
 		}
 	}
 
 	mutex := &sync.Mutex{}
-	return &TunnelManager{config, db, mutex, certConfig, user}
+	tunMan := &TunnelManager{config, db, mutex, certConfig, user, selfSignedCerts}
+
+	if config.autoCerts {
+		go tunMan.startCertRetryLoop()
+	}
+
+	return tunMan
+}
+
+// IsCertPending reports whether domain currently has a managed-TLS tunnel
+// waiting on certificate issuance (used to decide whether to serve a
+// temporary self-signed certificate for it).
+func (m *TunnelManager) IsCertPending(domain string) bool {
+	tunnel, exists := m.db.GetTunnel(domain)
+	return exists && tunnel.CertPending && isManagedTlsTermination(tunnel.TlsTermination)
+}
+
+// startCertRetryLoop periodically retries certificate issuance for tunnels
+// stuck with CertPending, e.g. after hitting a Let's Encrypt rate limit.
+// Each domain backs off exponentially (capped) on repeated failure, since
+// certmagic itself has no memory of Let's Encrypt's own rate-limit windows
+// (which run hours to days) -- retrying too eagerly would just keep hitting
+// the same limit.
+func (m *TunnelManager) startCertRetryLoop() {
+	backoff := map[string]time.Duration{}
+	nextRetry := map[string]time.Time{}
+
+	ticker := time.NewTicker(certRetryCheckInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+
+		for domain, tun := range m.db.GetTunnels() {
+			if !tun.CertPending || !isManagedTlsTermination(tun.TlsTermination) {
+				delete(backoff, domain)
+				delete(nextRetry, domain)
+				continue
+			}
+
+			due, scheduled := nextRetry[domain]
+			if !scheduled {
+				// First time this loop has seen the domain pending -- it already
+				// failed once (at creation or at startup), so don't retry again
+				// this tick, just schedule the first background attempt.
+				nextRetry[domain] = now.Add(certRetryBaseInterval)
+				continue
+			}
+
+			if now.Before(due) {
+				continue
+			}
+
+			err := m.certConfig.ManageSync(context.Background(), []string{domain})
+			if err == nil {
+				tun.CertPending = false
+				m.db.SetTunnel(domain, tun)
+				delete(backoff, domain)
+				delete(nextRetry, domain)
+				if m.selfSignedCerts != nil {
+					m.selfSignedCerts.Forget(domain)
+				}
+				log.Printf("CertMagic: successfully obtained certificate for %s after retrying\n", domain)
+				continue
+			}
+
+			next := backoff[domain] * 2
+			if next == 0 {
+				next = certRetryBaseInterval
+			}
+			if next > certRetryMaxInterval {
+				next = certRetryMaxInterval
+			}
+			backoff[domain] = next
+			nextRetry[domain] = now.Add(next)
+			log.Printf("CertMagic: retry failed for %s, next attempt in %s\n", domain, next)
+		}
+	}
 }
 
 func (m *TunnelManager) GetTunnels() map[string]Tunnel {
@@ -62,11 +153,13 @@ func (m *TunnelManager) RequestCreateTunnel(tunReq Tunnel) (Tunnel, error) {
 		return Tunnel{}, errors.New("Owner required")
 	}
 
-	if tunReq.TlsTermination == "server" || tunReq.TlsTermination == "server-tls" {
+	if isManagedTlsTermination(tunReq.TlsTermination) {
 		if m.config.autoCerts {
 			err := m.certConfig.ManageSync(context.Background(), []string{tunReq.Domain})
+			tunReq.CertPending = err != nil
 			if err != nil {
-				return Tunnel{}, errors.New("Failed to get cert")
+				log.Printf("CertMagic error creating tunnel for %s, will keep retrying in the background\n", tunReq.Domain)
+				log.Println(err)
 			}
 		}
 	}

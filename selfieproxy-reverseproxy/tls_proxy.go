@@ -9,15 +9,13 @@ import (
 	"net"
 	"strings"
 	"sync"
-
-	"github.com/caddyserver/certmagic"
 )
 
-func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, certConfig *certmagic.Config) error {
+func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
 
 	if useTls {
 		tlsConfig := &tls.Config{
-			GetCertificate: certConfig.GetCertificate,
+			GetCertificate: getCertificate,
 		}
 
 		tlsConfig.NextProtos = append([]string{"http/1.1", "h2", "acme-tls/1"}, tlsConfig.NextProtos...)

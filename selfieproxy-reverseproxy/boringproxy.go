@@ -204,7 +204,8 @@ func Listen() {
 		autoCerts:      autoCerts,
 	}
 
-	tunMan := NewTunnelManager(config, db, certConfig)
+	selfSignedCerts := NewSelfSignedCertProvider()
+	tunMan := NewTunnelManager(config, db, certConfig, selfSignedCerts)
 
 	auth := NewAuth(db)
 
@@ -235,8 +236,10 @@ func Listen() {
 
 	p := &Server{db, tunMan, httpClient, httpListener}
 
+	getCertificate := withSelfSignedFallback(certConfig, tunMan.IsCertPending, selfSignedCerts)
+
 	tlsConfig := &tls.Config{
-		GetCertificate: certConfig.GetCertificate,
+		GetCertificate: getCertificate,
 		NextProtos:     []string{"h2", "acme-tls/1"},
 	}
 	tlsListener := tls.NewListener(httpListener, tlsConfig)
@@ -439,11 +442,11 @@ func Listen() {
 			continue
 		}
 
-		go p.handleConnection(conn, certConfig)
+		go p.handleConnection(conn, getCertificate)
 	}
 }
 
-func (p *Server) handleConnection(clientConn net.Conn, certConfig *certmagic.Config) {
+func (p *Server) handleConnection(clientConn net.Conn, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) {
 
 	clientHello, clientReader, err := peekClientHello(clientConn)
 	if err != nil {
@@ -459,7 +462,7 @@ func (p *Server) handleConnection(clientConn net.Conn, certConfig *certmagic.Con
 		p.passthroughRequest(passConn, tunnel)
 	} else if exists && tunnel.TlsTermination == "server-tls" {
 		useTls := true
-		err := ProxyTcp(passConn, "127.0.0.1", tunnel.TunnelPort, useTls, certConfig)
+		err := ProxyTcp(passConn, "127.0.0.1", tunnel.TunnelPort, useTls, getCertificate)
 		if err != nil {
 			log.Println(err.Error())
 			return

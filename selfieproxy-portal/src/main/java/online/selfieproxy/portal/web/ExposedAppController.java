@@ -67,6 +67,7 @@ public class ExposedAppController {
 		model.addAttribute("isNew", false);
 		model.addAttribute("domain", properties.domain());
 		model.addAttribute("homelabs", homelabs());
+		model.addAttribute("certPending", tunnel.certPending());
 		return "edit-app";
 	}
 

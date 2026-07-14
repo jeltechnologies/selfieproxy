@@ -316,6 +316,17 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	cursor: help;
 }
 
+.cert-pending-badge {
+	display: inline-block;
+	margin-left: 0.5rem;
+	padding: 0.1rem 0.5rem;
+	background: var(--warning-bg);
+	border: 1px solid var(--warning-border);
+	border-radius: 999px;
+	font-size: 0.75rem;
+	cursor: help;
+}
+
 .error { color: var(--danger); }
 
 .errors {

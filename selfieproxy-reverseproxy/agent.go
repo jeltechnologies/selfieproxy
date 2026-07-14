@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/caddyserver/certmagic"
@@ -28,6 +29,7 @@ type Agent struct {
 	cancelFuncs      map[string]context.CancelFunc
 	cancelFuncsMutex *sync.Mutex
 	certConfig       *certmagic.Config
+	selfSignedCerts  *SelfSignedCertProvider
 	behindProxy      bool
 	pollInterval     int
 }
@@ -122,6 +124,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		cancelFuncs:      cancelFuncs,
 		cancelFuncsMutex: cancelFuncsMutex,
 		certConfig:       certConfig,
+		selfSignedCerts:  NewSelfSignedCertProvider(),
 		behindProxy:      config.BehindProxy,
 		pollInterval:     config.PollInterval,
 	}, nil
@@ -327,10 +330,18 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	}
 	defer listener.Close()
 
+	// certPending tracks whether this tunnel's own Let's Encrypt certificate (obtained below) is
+	// still outstanding, so getCertificate can serve a temporary self-signed certificate in the
+	// meantime instead of failing the TLS handshake outright -- same mechanism the server uses,
+	// just backed by a per-tunnel flag here since the agent has no shared tunnel DB to query.
+	certPending := &atomic.Bool{}
+	getCertificate := withSelfSignedFallback(c.certConfig,
+		func(string) bool { return certPending.Load() }, c.selfSignedCerts)
+
 	if tunnel.TlsTermination == "client" {
 
 		tlsConfig := &tls.Config{
-			GetCertificate: c.certConfig.GetCertificate,
+			GetCertificate: getCertificate,
 			NextProtos:     []string{"h2", "acme-tls/1"},
 		}
 		tlsListener := tls.NewListener(listener, tlsConfig)
@@ -373,24 +384,56 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 					useTls = false
 				}
 
-				go ProxyTcp(conn, tunnel.ClientAddress, tunnel.ClientPort, useTls, c.certConfig)
+				go ProxyTcp(conn, tunnel.ClientAddress, tunnel.ClientPort, useTls, getCertificate)
 			}
 		}()
 	}
 
 	if tunnel.TlsTermination == "client" || tunnel.TlsTermination == "client-tls" {
-		// TODO: There's still quite a bit of duplication with what the server does. Could we
-		// encapsulate it into a type?
 		err = c.certConfig.ManageSync(ctx, []string{tunnel.Domain})
+		certPending.Store(err != nil)
 		if err != nil {
-			log.Println("CertMagic error at startup")
+			log.Printf("CertMagic error for %s, will keep retrying in the background\n", tunnel.Domain)
 			log.Println(err)
+			go c.retryCertUntilSuccess(ctx, tunnel.Domain, certPending)
 		}
 	}
 
 	<-ctx.Done()
 
 	return nil
+}
+
+// retryCertUntilSuccess retries certificate issuance for domain with the same exponential
+// backoff the server uses (certRetryBaseInterval/certRetryMaxInterval, tunnel_manager.go),
+// since certmagic itself has no memory of Let's Encrypt's own rate-limit windows. Stops as soon
+// as ctx is cancelled, i.e. when BoreTunnel's tunnel is removed or changed.
+func (c *Agent) retryCertUntilSuccess(ctx context.Context, domain string, pending *atomic.Bool) {
+	backoff := certRetryBaseInterval
+	timer := time.NewTimer(backoff)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+
+		if err := c.certConfig.ManageSync(context.Background(), []string{domain}); err == nil {
+			pending.Store(false)
+			c.selfSignedCerts.Forget(domain)
+			log.Printf("CertMagic: successfully obtained certificate for %s after retrying\n", domain)
+			return
+		}
+
+		backoff *= 2
+		if backoff > certRetryMaxInterval {
+			backoff = certRetryMaxInterval
+		}
+		log.Printf("CertMagic: retry failed for %s, next attempt in %s\n", domain, backoff)
+		timer.Reset(backoff)
+	}
 }
 
 func printJson(data interface{}) {

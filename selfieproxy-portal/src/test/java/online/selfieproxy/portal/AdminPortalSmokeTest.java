@@ -67,9 +67,9 @@ class AdminPortalSmokeTest {
 				.thenReturn(Map.of("home", new AgentStatusDto(null), "office", new AgentStatusDto(null)));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", false, "admin", "home", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "home", "", "");
 		TunnelDto netTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
-				51234, "", "127.0.0.1", 22, true, "passthrough", false, "admin", "home", "", "");
+				51234, "", "127.0.0.1", 22, true, "passthrough", false, false, "admin", "home", "", "");
 		when(boringProxyClient.listTunnels())
 				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", netTunnel));
 
@@ -135,7 +135,7 @@ class AdminPortalSmokeTest {
 				.thenReturn(Map.of("secret-abc", new TokenDataDto("admin", "default")));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", false, "admin", "default", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "default", "", "");
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("music.example.com", webTunnel));
 
 		mockMvc.perform(get("/").session(session))
@@ -172,9 +172,9 @@ class AdminPortalSmokeTest {
 				.thenReturn(Map.of("secret-abc", new TokenDataDto("admin", "default")));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", false, "admin", "default", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "default", "", "");
 		TunnelDto otherHomelabTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
-				51234, "", "127.0.0.1", 22, true, "passthrough", false, "admin", "office", "", "");
+				51234, "", "127.0.0.1", 22, true, "passthrough", false, false, "admin", "office", "", "");
 		when(boringProxyClient.listTunnels())
 				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", otherHomelabTunnel));
 

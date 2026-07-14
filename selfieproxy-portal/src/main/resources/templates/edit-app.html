@@ -11,6 +11,12 @@
 			<li th:each="e : ${errors}" th:text="${e}"></li>
 		</ul>
 
+		<p class="warning" th:if="${certPending}">
+			This application is temporarily using a self-signed certificate -- browsers will show a security
+			warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can happen after
+			creating many applications in a short time; Selfie Proxy retries automatically in the background.
+		</p>
+
 		<form id="app-form" method="post"
 			  th:action="${isNew} ? @{/apps} : @{/apps/{subdomain}(subdomain=${app.subdomain()})}">
 
