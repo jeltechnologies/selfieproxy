@@ -68,7 +68,7 @@ Our thanks to Anders for the excellent foundation. On top of it, we added:
 - An internet domain name.
 - A small virtual server (VPS) from any cloud provider — the cheapest tier is enough
   (around $5/month, 1 GB memory, 1 vCPU). You can source this from vendors like Hetzner, Vultr and DigitalOcean.
-  The VPS must have a public IPv4 address.
+-  The VPS must have a public IPv4 address.
 - A machine at home — physical or virtual — capable of running Docker, to connect your homelab to Selfie Proxy.
 
 ## Installation
@@ -158,6 +158,14 @@ straight to the application lets Selfie Proxy manage certificates for you automa
 and also lets you protect the application with authentication through the admin portal
 login, neither of which is available if Selfie Proxy is only forwarding to another
 reverse proxy.
+
+**Is this secure?**
+
+Yes. Traffic between your homelab and the server always travels through an encrypted
+tunnel, to a server that's entirely under your own control rather than a third party's. Every
+exposed app also gets HTTPS automatically, and the admin portal (and optionally any app) is
+protected by a built-in login screen. It's also open source, so the code is there for anyone
+to check.
 
 ## License
 
