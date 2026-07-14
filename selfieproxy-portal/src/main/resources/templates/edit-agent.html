@@ -52,7 +52,9 @@
 		<fieldset id="connect-info" th:attr="data-admin-domain=${adminDomain}">
 			<legend>How to connect</legend>
 			<p>The connection to Selfie Proxy is made by an agent that runs inside your home network.</p>
-			<p>Agents run in Docker on Linux, macOS, or Windows and 64-bit Raspberry Pi OS.</p>
+			<p>Agents run in Docker on Linux (including 64-bit Raspberry Pi OS) -- host networking is
+			required so the agent can resolve your homelab's local hostnames, which macOS and
+			Windows Docker Desktop don't support.</p>
 
 			<p>1. Run this command inside your homelab:</p>
 			<pre class="code-block" id="connect-docker-run"></pre>

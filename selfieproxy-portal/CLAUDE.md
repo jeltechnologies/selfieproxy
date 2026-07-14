@@ -60,8 +60,13 @@ container. After a successful login the user lands on the exposed applications p
   or register, any other agent.
 - To deploy an agent, the user copies its name and secret from this page and runs the agent
   process on the homelab host — guidance for doing so comes from the portal itself, not from a
-  compose file or `.env` template in this repo. Agent host requirement: a Docker host (Linux,
-  macOS, or Windows) on amd64 or 64-bit arm, with outbound internet access.
+  compose file or `.env` template in this repo. Agent host requirement: Linux only (amd64 or
+  64-bit arm), with outbound internet access — the generated connect snippet (`agents.js`'s
+  `renderConnectInfo`) runs the agent container with `network_mode: host`/`--network host` so it
+  inherits the homelab host's own `/etc/resolv.conf` and can resolve the homelab's local-DNS
+  hostnames (same pattern as `selfieproxy-localsites-agent` in root `CLAUDE.md`'s "Running"
+  section); this rules out Docker Desktop (macOS/Windows), same as the server's own host
+  requirement.
 
 ## Exposed applications
 
