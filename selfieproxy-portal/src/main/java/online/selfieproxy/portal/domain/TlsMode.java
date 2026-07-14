@@ -8,11 +8,11 @@ public enum TlsMode {
 
 	/** Default & recommended. BoringProxy tls-termination "server". */
 	MANAGED("End-to-end encrypted (recommended)",
-			"Selfie Proxy automatically creates and renews a signed certificate for you."),
+			"Selfie Proxy automatically creates and renews a signed certificate, and can protect your web application by forcing authentication through Selfieproxy login."),
 
 	/** BoringProxy tls-termination "client-tls". */
 	BYO_CERT("End-to-end encrypted (you provide the certificate)",
-			"You provide the certificate on the web application in the homelab."),
+			"Not supported behind a reverse proxy (e.g. NGINX) in your homelab -- the agent must connect directly to the web application, which provides its own certificate and handles authentication itself."),
 
 	/** BoringProxy tls-termination "server-tls". */
 	HOP_BY_HOP("Hop-by-hop encryption (compatibility mode)",

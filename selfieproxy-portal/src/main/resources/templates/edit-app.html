@@ -103,8 +103,10 @@
 			</fieldset>
 
 			<div id="https-warning" class="warning" style="display:none">
-				Your web application must provide a valid signed certificate from LetsEncrypt. This is typically
-				achieved by using NGINX proxy in the homelab.
+				<strong>A reverse proxy (such as NGINX) in front of your web application is not supported for
+				this option.</strong> The agent must connect directly to your web application, which must
+				provide its own valid signed certificate from Let's Encrypt and handle any authentication
+				itself -- Selfie Proxy does not protect this connection.
 			</div>
 
 			<button type="button" id="advanced-settings-toggle" class="link-button">Advanced settings</button>

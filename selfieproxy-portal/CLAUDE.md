@@ -100,10 +100,20 @@ When HTTPS is selected as the homelab-side protocol, an "Advanced settings" butt
 Connectivity options between Selfie Proxy and the homelab:
 
 1. **End-to-end encrypted** (default, recommended, "Server HTTPS") — Selfie Proxy automatically
-   creates and renews a signed certificate.
-2. **End-to-end encrypted, self-provided** ("Client Raw TLS") — the homelab's own app provides the
-   certificate. Shows a warning: "Your web application must provide a valid signed certificate
-   from Let's Encrypt. This is typically achieved by using NGINX proxy in the homelab."
+   creates and renews a signed certificate, and is the only HTTPS connectivity option that can
+   also be protected with SSO (see `ExposedApp.canProtectWithSso()` and the "Protect by forcing
+   authentication through Selfieproxy login" checkbox above).
+2. **End-to-end encrypted, self-provided** ("Client Raw TLS") — **not supported behind a reverse
+   proxy** (e.g. NGINX) in the homelab: the agent must connect directly to the web application,
+   which provides its own certificate and handles authentication itself. This isn't a soft
+   recommendation -- Selfie Proxy sends the tunnel's public domain as the TLS SNI straight to
+   whatever the agent dials (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Agent tunnel lifecycle"
+   section), and a reverse proxy in between would need to itself recognize that same SNI to route
+   the connection, which isn't a topology Selfie Proxy supports. Shows a warning: "A reverse proxy
+   (such as NGINX) in front of your web application is not supported for this option. The agent
+   must connect directly to your web application, which must provide its own valid signed
+   certificate from Let's Encrypt and handle any authentication itself -- Selfie Proxy does not
+   protect this connection."
 3. **Hop-by-hop encryption** ("Server Raw TLS", compatibility mode) — Selfie Proxy automatically
    creates and renews a signed certificate; use when a web application breaks on normal HTTPS.
 
