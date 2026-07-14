@@ -462,7 +462,7 @@ func (p *Server) handleConnection(clientConn net.Conn, getCertificate func(*tls.
 		p.passthroughRequest(passConn, tunnel)
 	} else if exists && tunnel.TlsTermination == "server-tls" {
 		useTls := true
-		err := ProxyTcp(passConn, "127.0.0.1", tunnel.TunnelPort, useTls, getCertificate)
+		err := ProxyTcp(passConn, "127.0.0.1", tunnel.TunnelPort, useTls, getCertificate, tunnel.Domain)
 		if err != nil {
 			log.Println(err.Error())
 			return

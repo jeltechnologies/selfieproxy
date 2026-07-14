@@ -384,7 +384,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 					useTls = false
 				}
 
-				go ProxyTcp(conn, tunnel.ClientAddress, tunnel.ClientPort, useTls, getCertificate)
+				go ProxyTcp(conn, tunnel.ClientAddress, tunnel.ClientPort, useTls, getCertificate, tunnel.Domain)
 			}
 		}()
 	}

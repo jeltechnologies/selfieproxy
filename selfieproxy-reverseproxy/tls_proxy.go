@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
+func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error), sni string) error {
 
 	if useTls {
 		tlsConfig := &tls.Config{
@@ -28,15 +28,15 @@ func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, getCertificate 
 			return nil
 		}
 
-		go handleConnection(tlsConn, addr, port)
+		go handleConnection(tlsConn, addr, port, sni)
 	} else {
-		go handleConnection(conn, addr, port)
+		go handleConnection(conn, addr, port, sni)
 	}
 
 	return nil
 }
 
-func handleConnection(conn net.Conn, upstreamAddr string, port int) {
+func handleConnection(conn net.Conn, upstreamAddr string, port int, sni string) {
 
 	defer conn.Close()
 
@@ -53,6 +53,7 @@ func handleConnection(conn net.Conn, upstreamAddr string, port int) {
 
 	if useTls {
 		tlsConfig := &tls.Config{
+			ServerName:         sni,
 			InsecureSkipVerify: true,
 		}
 		upstreamConn, err = tls.Dial("tcp", fmt.Sprintf("%s:%d", addr, port), tlsConfig)
