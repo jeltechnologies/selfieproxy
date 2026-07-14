@@ -170,6 +170,9 @@ public class ExposedAppController {
 			errors.add("Subdomain is required.");
 			return errors;
 		}
+		if (app.subdomain().contains(".")) {
+			errors.add("Subdomain cannot contain a dot (\".\").");
+		}
 		if (app.subdomain().equalsIgnoreCase(properties.adminSubdomain())) {
 			errors.add("\"" + app.subdomain() + "\" is reserved for the BoringProxy admin portal itself.");
 		}
