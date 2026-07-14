@@ -4,6 +4,11 @@
 	var domain = (window.selfieProxy && window.selfieProxy.domain) || "";
 	var isNew = !!(window.selfieProxy && window.selfieProxy.isNew);
 	var ssoUserTouched = false;
+	// null until the first updateVisibility() run, then tracks whether SSO protection was
+	// available on the *previous* run -- so we can tell "just became available" (default it
+	// back on) apart from "was already available at page load" (leave the saved/checked
+	// state alone, e.g. an existing app someone deliberately left unprotected).
+	var ssoWasEligible = null;
 
 	var typeSelect = document.getElementById("type");
 	var protocolSelect = document.getElementById("protocol");
@@ -75,9 +80,14 @@
 		ssoProtectedField.style.display = canProtectWithSso ? "" : "none";
 		if (!canProtectWithSso) {
 			ssoProtectedCheckbox.checked = false;
-		} else if (isNew && !ssoUserTouched) {
+		} else if (!ssoUserTouched && (isNew || ssoWasEligible === false)) {
+			// Default protection back on for a new app, or whenever a protocol/connectivity
+			// change just made an existing app eligible again (e.g. switching HTTP -> HTTPS) --
+			// unless the user has explicitly toggled the checkbox themselves this session. An
+			// app that was already eligible when the page loaded keeps its saved value untouched.
 			ssoProtectedCheckbox.checked = true;
 		}
+		ssoWasEligible = canProtectWithSso;
 	}
 
 	function updateResult() {
