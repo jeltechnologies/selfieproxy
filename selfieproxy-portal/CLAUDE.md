@@ -24,8 +24,11 @@ OIDC/env-var picture) — boringproxy gates the portal domain before any request
 container. After a successful login the user lands on the exposed applications page.
 
 - A Web Application exposed app can opt in to the same SSO gate ("Protect with SSO" on its edit
-  page) — only available for Server HTTPS (the recommended end-to-end encrypted TLS mode), since
-  that's the only connectivity option boringproxy can enforce it for.
+  page) — available whenever Selfie Proxy itself terminates the public TLS connection: always for
+  a plain HTTP homelab app (Selfie Proxy still adds the managed cert and converts to HTTPS at the
+  server, forwarding plain HTTP onward), and for an HTTPS homelab app only under Server HTTPS (the
+  recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
+  never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
 - The topbar's user menu ("▾ Account", `fragments/layout.html`) holds "Change username / password"
   (links out to `selfieproxy-identity-provider`'s self-service `/account` page, hidden when an
   external IdP is configured) and Logout. Logout ends the portal's own session and clears

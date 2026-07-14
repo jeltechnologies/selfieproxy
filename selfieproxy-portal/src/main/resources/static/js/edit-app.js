@@ -66,11 +66,12 @@
 			advancedSettings.style.display = "none";
 		}
 
-		// "Server HTTPS" only -- MANAGED is boringproxy's own name for it, and
-		// the default TLS mode when nothing else has been chosen yet (mirrors
-		// ExposedApp.canProtectWithSso() server-side).
-		var canProtectWithSso = showHttpsSettings &&
-			(selectedTlsMode() === "MANAGED" || selectedTlsMode() === null);
+		// Plain HTTP is always server-terminated (see TunnelMapper), and HTTPS only under
+		// "Server HTTPS" -- MANAGED is boringproxy's own name for it, and the default TLS
+		// mode when nothing else has been chosen yet (mirrors ExposedApp.canProtectWithSso()
+		// server-side).
+		var canProtectWithSso = !networkService && (protocolSelect.value === "HTTP" ||
+			(showHttpsSettings && (selectedTlsMode() === "MANAGED" || selectedTlsMode() === null)));
 		ssoProtectedField.style.display = canProtectWithSso ? "" : "none";
 		if (!canProtectWithSso) {
 			ssoProtectedCheckbox.checked = false;

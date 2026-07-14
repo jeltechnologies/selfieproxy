@@ -40,8 +40,14 @@ public record ExposedApp(
 		return tlsMode != null ? tlsMode : TlsMode.MANAGED;
 	}
 
-	/** "Server HTTPS" only (boringproxy's own name for TlsMode.MANAGED, its "server" TLS-termination mode) -- BYO_CERT/HOP_BY_HOP are HTTPS too but never HTTP-parsed at the server, so SSO can't be enforced for them. */
+	/**
+	 * True whenever the tunnel ends up "server"-terminated -- the only TLS-termination mode boringproxy
+	 * itself HTTP-parses, so the only one it can gate with SSO. That's always true for a plain HTTP
+	 * homelab app (Selfie Proxy still terminates the public TLS connection itself, see TunnelMapper),
+	 * and true for an HTTPS homelab app only under "Server HTTPS" (TlsMode.MANAGED) -- BYO_CERT/
+	 * HOP_BY_HOP are HTTPS too but never HTTP-parsed at the server, so SSO can't be enforced for them.
+	 */
 	public boolean canProtectWithSso() {
-		return isWebApplication() && protocol == Protocol.HTTPS && effectiveTlsMode() == TlsMode.MANAGED;
+		return isWebApplication() && (protocol == Protocol.HTTP || effectiveTlsMode() == TlsMode.MANAGED);
 	}
 }
