@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Error')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Something went wrong</h1>
+				<p class="page-subtitle">Check the log files on the server for details.</p>
+			</div>
+		</section>
+	</main>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
