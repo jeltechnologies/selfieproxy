@@ -64,7 +64,7 @@
 				"  -v selfieproxy-agent-certs:/certs \\\n" +
 				"  ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest agent \\\n" +
 				"  -server " + adminDomain + " \\\n" +
-				"  -secret \"***your_secret***\" \\\n" +
+				"  -secret \"your-secret\" \\\n" +
 				"  -agent-name " + name + " \\\n" +
 				"  -cert-dir /certs";
 
@@ -82,7 +82,7 @@
 				"      - -server\n" +
 				"      - " + adminDomain + "\n" +
 				"      - -secret\n" +
-				"      - \"***your_secret***\"\n" +
+				"      - \"your-secret\"\n" +
 				"      - -agent-name\n" +
 				"      - " + name + "\n" +
 				"      - -cert-dir\n" +

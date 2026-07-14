@@ -62,10 +62,9 @@
 			<p>2. Or with Docker Compose:</p>
 			<pre class="code-block" id="connect-docker-compose"></pre>
 
-			<p>If any of this homelab's applications use plain HTTP or Client Raw TLS, the agent obtains
-			its own Let's Encrypt certificate for them. The volume above persists those certificates
-			across restarts, so they aren't needlessly reacquired -- which can itself trigger Let's
-			Encrypt's rate limits -- every time the container restarts.</p>
+			<p>macOS and Windows users must remove the <code>network_mode: host</code> line (or the
+			<code>--network host</code> flag) from the example above -- Docker Desktop on those
+			platforms doesn't support host networking.</p>
 		</fieldset>
 	</main>
 
