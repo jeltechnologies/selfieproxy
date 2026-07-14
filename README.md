@@ -37,7 +37,7 @@ properly supported commercial product instead.
 - Built-in login screen protecting your admin portal and, optionally, any app you choose.
 - Works from behind restrictive home internet connections — no static IP or port
   forwarding required.
-- Host simple static websites directly, under their own subdomain or your own domain
+- Host simple static websites directly, under their own subdomain or your own domain.
 - Connect as many homes/locations ("homelabs") as you like.
 - Deliberately single-user — no accounts, roles or permissions to manage.
 - Installed and updated with a single Docker command.
