@@ -52,7 +52,7 @@ public class ExposedAppController {
 	public String newApp(Model model) {
 		List<String> homelabs = homelabs();
 		ExposedApp app = new ExposedApp("", null, homelabs.stream().findFirst().orElse(null),
-				ExposedAppType.WEB_APPLICATION, Protocol.HTTP, "127.0.0.1", 80, null, null, true);
+				ExposedAppType.WEB_APPLICATION, Protocol.HTTPS, "127.0.0.1", 443, null, null, true);
 		model.addAttribute("app", app);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domain", properties.domain());
