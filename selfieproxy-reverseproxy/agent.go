@@ -160,6 +160,8 @@ func (c *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("Failed to register agent. Are the agent name ('%s') and secret correct? HTTP Status code: %d. Message: %s", c.agentName, resp.StatusCode, msg)
 	}
 
+	log.Printf("Successfully connected to %s", c.server)
+
 	pollChan := make(chan struct{})
 
 	// A polling interval of 0 disables polling. Basically pollChan will
