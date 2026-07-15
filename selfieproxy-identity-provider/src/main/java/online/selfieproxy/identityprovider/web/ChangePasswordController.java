@@ -52,12 +52,14 @@ public class ChangePasswordController {
 			return null;
 		}
 		model.addAttribute("authzId", authzId);
+		model.addAttribute("username", adminUserStore.load().username());
 		return "change-password";
 	}
 
 	@PostMapping("/change-password")
-	public String changePassword(@RequestParam String newPassword, @RequestParam String confirmNewPassword,
-			@RequestParam("authz_id") String authzId, Model model, HttpServletResponse response) throws IOException {
+	public String changePassword(@RequestParam String username, @RequestParam String newPassword,
+			@RequestParam String confirmNewPassword, @RequestParam("authz_id") String authzId, Model model,
+			HttpServletResponse response) throws IOException {
 		if (authorizationService.get(authzId) == null) {
 			response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Unknown or expired authorization request.");
 			return null;
@@ -65,13 +67,22 @@ public class ChangePasswordController {
 		model.addAttribute("authzId", authzId);
 
 		AdminUser adminUser = adminUserStore.load();
+
+		String trimmedUsername = username.trim();
+		if (trimmedUsername.isEmpty()) {
+			model.addAttribute("username", adminUser.username());
+			model.addAttribute("errors", List.of("Username must not be blank."));
+			return "change-password";
+		}
+		model.addAttribute("username", trimmedUsername);
+
 		List<String> errors = passwordPolicy.validate(newPassword, confirmNewPassword, adminUser);
 		if (!errors.isEmpty()) {
 			model.addAttribute("errors", errors);
 			return "change-password";
 		}
 
-		adminUserStore.save(new AdminUser(adminUser.username(), passwordEncoder.encode(newPassword), false));
+		adminUserStore.save(new AdminUser(trimmedUsername, passwordEncoder.encode(newPassword), false));
 		idpSessionService.startSession(response);
 		authorizationService.markAuthenticated(authzId);
 		return "redirect:/authorize?authz_id=" + authzId;
