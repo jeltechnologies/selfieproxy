@@ -14,7 +14,7 @@
 		</section>
 
 		<p class="muted" th:if="${#lists.isEmpty(websites)}">
-			No local websites yet. Add one, then drop its files into <code>data/selfieproxy/sites/&lt;domain&gt;/</code> on the server.
+			No local websites yet.
 		</p>
 
 		<table class="apps-table" th:if="${not #lists.isEmpty(websites)}">
@@ -32,6 +32,7 @@
 					</td>
 					<td>
 						<a class="button-small" th:href="@{/local-websites/{domain}/edit(domain=${website.domain()})}">Edit</a>
+						<a class="button-small" th:href="@{/local-websites/{domain}/download(domain=${website.domain()})}">Download</a>
 					</td>
 				</tr>
 			</tbody>

@@ -135,15 +135,21 @@ no user-run address behind them, no Homelab to pick, just a domain. See root `CL
 this section is the portal-side UI behavior.
 
 - The nav has a "Local websites" tab next to Applications. The list page shows every site's domain
-  (opens in a new tab) and an Edit button.
+  (opens in a new tab), an Edit button, and a Download button (streams the content directory as a
+  ZIP, see `StaticSiteProvisioner.writeZip`).
 - Adding one: choose Subdomain (composes `<subdomain>.DOMAIN`, like an exposed app) or Own domain
   (a domain you already separately control DNS for, e.g. `www.jeltechnologies.com` — typed in full
   and used verbatim as the FQDN, no `.DOMAIN` suffix).
 - Renaming one: type a new domain on the edit page. The tunnel is recreated under the new domain
   and the site's files are moved to the new domain's folder — nothing is lost.
-- Removing one: takes it off the internet (tunnel and NGINX config deleted) but keeps its files on
-  the server. Adding the same domain again later reuses them automatically, since provisioning
-  only ensures the folder exists rather than clearing it.
+- Uploading a ZIP (add or edit page): replaces the site's entire content directory --
+  `StaticSiteProvisioner.replaceContents` extracts the upload into a staging directory first and
+  only swaps it in (a same-filesystem directory rename) once extraction fully succeeds, so a bad
+  upload never touches the existing files. The edit page shows a warning that this is destructive;
+  the add page doesn't, since there's nothing to lose there.
+- Removing one: takes it off the internet (tunnel and NGINX config deleted) and permanently
+  deletes its content directory from the server -- destructive, cannot be undone. Adding the same
+  domain again later starts from an empty folder.
 - Files live at `data/selfieproxy/sites/<domain>/` on the server, owned by the portal container's
   user — copy files in as root, or via `docker exec selfieproxy-portal`.
 

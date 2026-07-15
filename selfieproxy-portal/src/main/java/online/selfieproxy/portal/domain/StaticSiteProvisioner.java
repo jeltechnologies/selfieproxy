@@ -1,9 +1,21 @@
 package online.selfieproxy.portal.domain;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.util.Comparator;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import online.selfieproxy.portal.config.SitesWebserverProperties;
@@ -18,6 +30,8 @@ import online.selfieproxy.portal.config.SitesWebserverProperties;
  */
 @Component
 public class StaticSiteProvisioner {
+
+	private static final Logger log = LoggerFactory.getLogger(StaticSiteProvisioner.class);
 
 	private final Path confDir;
 	private final Path sitesDir;
@@ -45,21 +59,21 @@ public class StaticSiteProvisioner {
 		}
 	}
 
-	/** Removes domain's NGINX server block -- disables routing to it. The content directory is left intact -- no destructive delete of user files by default. */
-	public void deprovision(String domain) {
+	/** Removes domain's NGINX server block and permanently deletes its entire content directory -- a destructive operation, the site's files are gone. */
+	public void remove(String domain) {
 		try {
 			Files.deleteIfExists(confFile(domain));
+			deleteRecursively(sitesDir.resolve(domain));
 		} catch (IOException e) {
-			throw new IllegalStateException("Failed to remove static site config for " + domain, e);
+			throw new IllegalStateException("Failed to remove static site for " + domain, e);
 		}
 	}
 
 	/**
 	 * Moves oldDomain's content directory to newDomain and re-provisions under
-	 * the new name. If a directory for newDomain already exists (eg. leftover
-	 * from a previous website at that domain), it's left as-is and reused
-	 * instead of being overwritten -- same "reuse what's already there"
-	 * behavior as provision() ensuring rather than clearing a directory.
+	 * the new name. If a directory for newDomain already exists (eg. a race
+	 * with a concurrent add under that same domain), it's left as-is and
+	 * reused instead of being overwritten.
 	 */
 	public void rename(String oldDomain, String newDomain) {
 		try {
@@ -73,6 +87,103 @@ public class StaticSiteProvisioner {
 			throw new IllegalStateException("Failed to rename static site from " + oldDomain + " to " + newDomain, e);
 		}
 		provision(newDomain);
+	}
+
+	/** Zips domain's content directory to out, entries relative to the directory root (no leading domain folder). A missing directory yields an empty zip. */
+	public void writeZip(String domain, OutputStream out) throws IOException {
+		Path dir = sitesDir.resolve(domain);
+		try (ZipOutputStream zip = new ZipOutputStream(out)) {
+			if (!Files.isDirectory(dir)) {
+				return;
+			}
+			try (Stream<Path> files = Files.walk(dir).filter(Files::isRegularFile)) {
+				for (Path file : (Iterable<Path>) files::iterator) {
+					zip.putNextEntry(new ZipEntry(dir.relativize(file).toString().replace('\\', '/')));
+					Files.copy(file, zip);
+					zip.closeEntry();
+				}
+			}
+		}
+	}
+
+	/**
+	 * Replaces domain's entire content directory with the contents of zipData.
+	 * The upload is fully extracted into a staging directory first; only once
+	 * that succeeds completely are the existing files deleted and the staged
+	 * ones swapped in (a same-filesystem directory rename, so the swap itself
+	 * can't partially apply). If the upload or the ZIP is bad in any way, this
+	 * throws before touching the existing content directory at all.
+	 */
+	public void replaceContents(String domain, InputStream zipData) {
+		Path dir = sitesDir.resolve(domain);
+		Path stagingDir;
+		try {
+			stagingDir = Files.createTempDirectory(sitesDir, "upload-staging-");
+		} catch (IOException e) {
+			throw new IllegalStateException("Failed to prepare upload staging area for " + domain, e);
+		}
+		try {
+			extractZip(zipData, stagingDir);
+			deleteRecursively(dir);
+			Files.move(stagingDir, dir);
+			stagingDir = null;
+			// createTempDirectory defaults to owner-only (700) permissions -- fine for the portal
+			// container itself, but selfieproxy-local-websites' NGINX runs as a different user in
+			// its own container and needs to at least traverse into the directory to serve it.
+			Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"));
+		} catch (IOException e) {
+			throw new IllegalStateException(
+					"Failed to extract uploaded ZIP for " + domain + " -- existing files were left untouched", e);
+		} finally {
+			if (stagingDir != null) {
+				deleteQuietly(stagingDir);
+			}
+		}
+	}
+
+	/** Extracts zipData into targetDir (assumed to already exist and be empty). Rejects entries that would escape targetDir (zip-slip). */
+	private void extractZip(InputStream zipData, Path targetDir) throws IOException {
+		try (ZipInputStream zip = new ZipInputStream(zipData)) {
+			ZipEntry entry;
+			while ((entry = zip.getNextEntry()) != null) {
+				Path target = targetDir.resolve(entry.getName()).normalize();
+				if (!target.startsWith(targetDir)) {
+					throw new IOException("ZIP entry escapes target directory: " + entry.getName());
+				}
+				if (entry.isDirectory()) {
+					Files.createDirectories(target);
+				} else {
+					Files.createDirectories(target.getParent());
+					Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);
+				}
+				zip.closeEntry();
+			}
+		}
+	}
+
+	private void deleteQuietly(Path dir) {
+		try {
+			deleteRecursively(dir);
+		} catch (IOException e) {
+			log.warn("Failed to clean up upload staging directory {}", dir, e);
+		}
+	}
+
+	private void deleteRecursively(Path dir) throws IOException {
+		if (!Files.exists(dir)) {
+			return;
+		}
+		try (Stream<Path> walk = Files.walk(dir)) {
+			walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+				try {
+					Files.delete(path);
+				} catch (IOException e) {
+					throw new UncheckedIOException(e);
+				}
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
 	}
 
 	private Path confFile(String domain) {

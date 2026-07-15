@@ -11,19 +11,20 @@
 			<li th:each="e : ${errors}" th:text="${e}"></li>
 		</ul>
 
-		<form id="website-form" method="post"
+		<form id="website-form" method="post" enctype="multipart/form-data"
 			  th:action="${isNew} ? @{/local-websites} : @{/local-websites/{domain}(domain=${website.domain()})}">
 
 			<div class="field" id="domain-mode-field">
 				<label>Domain</label>
-				<label><input type="radio" name="ownDomain" value="false" th:checked="${!website.ownDomain()}"> Subdomain</label>
-				<label><input type="radio" name="ownDomain" value="true" th:checked="${website.ownDomain()}"> Own domain</label>
+				<label><input type="radio" name="ownDomain" value="false" th:checked="${!website.ownDomain()}"> <span th:text="'Subdomain of ' + ${domain}"></span></label>
+				<label><input type="radio" name="ownDomain" value="true" th:checked="${website.ownDomain()}"> Other domain</label>
 			</div>
 
 			<div class="field-row">
 				<div class="field" id="domain-field">
 					<label for="domain">Subdomain</label>
-					<input type="text" id="domain" name="domain" th:value="${website.domain()}" required>
+					<input type="text" id="domain" name="domain" th:value="${website.domain()}" required
+						   th:pattern="${website.ownDomain()} ? null : '[^.]*'" title="Subdomain cannot contain a dot (.)">
 				</div>
 
 				<div class="field">
@@ -32,9 +33,11 @@
 				</div>
 			</div>
 
-			<p class="muted" th:unless="${isNew}">
-				Renaming keeps the site's files -- they're moved to the new domain's folder.
-			</p>
+			<div class="field" id="website-zip-field">
+				<label for="websiteZip">Upload website (ZIP)</label>
+				<input type="file" id="websiteZip" name="websiteZip" accept=".zip,application/zip">
+				<p class="warning-strong" th:unless="${isNew}">Warning: uploading a ZIP file replaces this website's existing contents entirely.</p>
+			</div>
 
 			<div class="button-panel">
 				<button type="submit" class="button">OK</button>
@@ -50,7 +53,7 @@
 
 	<div id="confirm-overlay" class="overlay">
 		<div class="overlay-card">
-			<p>Remove this local website? This takes it off the internet, but its files stay on the server -- adding the same domain again later reuses them.</p>
+			<p>Remove this local website? This takes it off the internet and permanently deletes its files from the server. This cannot be undone.</p>
 			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
 			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
 		</div>

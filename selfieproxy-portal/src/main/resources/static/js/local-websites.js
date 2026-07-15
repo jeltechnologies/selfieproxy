@@ -23,8 +23,10 @@
 		domainLabel.textContent = isOwnDomain() ? "Domain" : "Subdomain";
 		domainInput.placeholder = isOwnDomain() ? "www.example.com" : "";
 		if (isOwnDomain()) {
+			domainInput.removeAttribute("pattern");
 			resultInput.textContent = domainInput.value || "(domain)";
 		} else {
+			domainInput.setAttribute("pattern", "[^.]*");
 			var subdomain = domainInput.value || "(subdomain)";
 			resultInput.textContent = subdomain + "." + domain;
 		}

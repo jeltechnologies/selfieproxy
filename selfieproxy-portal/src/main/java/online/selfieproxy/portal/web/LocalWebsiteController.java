@@ -1,5 +1,6 @@
 package online.selfieproxy.portal.web;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.BoringProxyException;
@@ -27,6 +30,7 @@ import online.selfieproxy.portal.session.PortalSession;
 import online.selfieproxy.portal.session.PortalSessions;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * Local Websites: static sites Selfie Proxy hosts itself, entirely
@@ -91,7 +95,9 @@ public class LocalWebsiteController {
 	}
 
 	@PostMapping("/local-websites")
-	public String create(@ModelAttribute LocalWebsiteForm form, HttpServletRequest request, Model model) {
+	public String create(@ModelAttribute LocalWebsiteForm form,
+			@RequestParam(value = "websiteZip", required = false) MultipartFile websiteZip,
+			HttpServletRequest request, Model model) throws IOException {
 		LocalWebsite website = toLocalWebsite(form);
 
 		List<String> errors = validate(website, null);
@@ -107,18 +113,23 @@ public class LocalWebsiteController {
 		String fqdn = fqdn(website);
 		boringProxyClient.createTunnel(toCreateTunnelRequest(fqdn, session.owner()));
 		staticSiteProvisioner.provision(fqdn);
+		if (websiteZip != null && !websiteZip.isEmpty()) {
+			staticSiteProvisioner.replaceContents(fqdn, websiteZip.getInputStream());
+		}
 		localWebsiteStore.save(website);
 		return "redirect:/local-websites";
 	}
 
 	@PostMapping("/local-websites/{domain}")
 	public String update(@PathVariable String domain, @ModelAttribute LocalWebsiteForm form,
-			HttpServletRequest request, Model model) throws InterruptedException {
+			@RequestParam(value = "websiteZip", required = false) MultipartFile websiteZip,
+			HttpServletRequest request, Model model) throws InterruptedException, IOException {
 		LocalWebsite website = toLocalWebsite(form);
+		boolean hasZip = websiteZip != null && !websiteZip.isEmpty();
 
 		LocalWebsite old = localWebsiteStore.find(domain);
-		boolean unchanged = old != null && old.domain().equals(website.domain()) && old.ownDomain() == website.ownDomain();
-		if (unchanged) {
+		boolean domainUnchanged = old != null && old.domain().equals(website.domain()) && old.ownDomain() == website.ownDomain();
+		if (domainUnchanged && !hasZip) {
 			return "redirect:/local-websites";
 		}
 
@@ -134,10 +145,15 @@ public class LocalWebsiteController {
 		PortalSession session = PortalSessions.get(request.getSession(false));
 		String oldFqdn = currentFqdn(domain);
 		String newFqdn = fqdn(website);
-		deleteTunnelIgnoringMissing(oldFqdn);
-		Thread.sleep(2000);
-		boringProxyClient.createTunnel(toCreateTunnelRequest(newFqdn, session.owner()));
-		staticSiteProvisioner.rename(oldFqdn, newFqdn);
+		if (!domainUnchanged) {
+			deleteTunnelIgnoringMissing(oldFqdn);
+			Thread.sleep(2000);
+			boringProxyClient.createTunnel(toCreateTunnelRequest(newFqdn, session.owner()));
+			staticSiteProvisioner.rename(oldFqdn, newFqdn);
+		}
+		if (hasZip) {
+			staticSiteProvisioner.replaceContents(newFqdn, websiteZip.getInputStream());
+		}
 		if (!domain.equals(website.domain())) {
 			localWebsiteStore.delete(domain);
 		}
@@ -145,13 +161,27 @@ public class LocalWebsiteController {
 		return "redirect:/local-websites";
 	}
 
-	/** Disables routing (deletes the Tunnel and the NGINX server block) but leaves the site's content directory untouched, so re-adding the same domain later picks up where it left off. */
+	@GetMapping("/local-websites/{domain}/download")
+	public void download(@PathVariable String domain, HttpServletResponse response) throws IOException {
+		LocalWebsite website = localWebsiteStore.find(domain);
+		if (website == null) {
+			response.sendError(HttpServletResponse.SC_NOT_FOUND);
+			return;
+		}
+		String fqdn = fqdn(website);
+		String safeFileName = fqdn.replaceAll("[^A-Za-z0-9.-]", "_");
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"" + safeFileName + ".zip\"");
+		staticSiteProvisioner.writeZip(fqdn, response.getOutputStream());
+	}
+
+	/** Removes the Tunnel, the NGINX server block, and permanently deletes the site's content directory -- nothing is kept. */
 	@PostMapping("/local-websites/{domain}/delete")
 	public String delete(@PathVariable String domain) {
 		String fqdn = currentFqdn(domain);
 		deleteTunnelIgnoringMissing(fqdn);
 		localWebsiteStore.delete(domain);
-		staticSiteProvisioner.deprovision(fqdn);
+		staticSiteProvisioner.remove(fqdn);
 		return "redirect:/local-websites";
 	}
 
@@ -185,6 +215,13 @@ public class LocalWebsiteController {
 		return stored != null ? fqdn(stored) : boringProxyProperties.fqdn(rawDomain);
 	}
 
+	/**
+	 * tlsTermination "server" -- selfieproxy-local-websites' shared NGINX only ever speaks plain
+	 * HTTP (see StaticSiteProvisioner's generated server blocks), so Selfie Proxy must terminate
+	 * the public TLS connection itself with a managed cert and forward plain HTTP onward, exactly
+	 * like a plain-HTTP Exposed App (see TunnelMapper). "client"/passthrough mode would pipe the
+	 * browser's raw TLS bytes straight to that plain-HTTP NGINX, which can't parse them.
+	 */
 	private CreateTunnelRequestDto toCreateTunnelRequest(String domain, String owner) {
 		return new CreateTunnelRequestDto(
 				domain,
@@ -197,7 +234,7 @@ public class LocalWebsiteController {
 				null,
 				null,
 				null,
-				"client",
+				"server",
 				null,
 				null,
 				null);
@@ -209,6 +246,11 @@ public class LocalWebsiteController {
 
 		if (website.domain() == null || website.domain().isBlank()) {
 			errors.add(website.ownDomain() ? "Domain is required." : "Subdomain is required.");
+			return errors;
+		}
+
+		if (!website.ownDomain() && website.domain().contains(".")) {
+			errors.add("Subdomain cannot contain a dot (\".\").");
 			return errors;
 		}
 
