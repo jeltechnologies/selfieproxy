@@ -13,9 +13,9 @@ The root package `boringproxy` (module `github.com/boringproxy/boringproxy`) con
 
 ## Build
 
-Requires Go 1.25+ (bumped from 1.17 when the embedded OIDC Relying Party was added —
+Requires Go 1.26+ (bumped from 1.17 when the embedded OIDC Relying Party was added —
 `github.com/coreos/go-oidc/v3` and `golang.org/x/oauth2` both need a modern toolchain; see
-`Dockerfile`'s `golang:1.25-alpine` builder stage).
+`Dockerfile`'s `golang:1.26-alpine` builder stage).
 
 ```bash
 # One-time: logo.png must exist at repo root (embedded via go:embed in ui_handler.go)
