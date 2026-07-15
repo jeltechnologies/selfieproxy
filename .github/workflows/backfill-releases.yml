@@ -1,0 +1,47 @@
+name: Backfill release notes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/backfill-releases.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create any missing releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PREV=""
+          for TAG in $(git tag --sort=creatordate); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release for $TAG already exists, skipping"
+              PREV="$TAG"
+              continue
+            fi
+
+            if [ -n "$PREV" ]; then
+              echo "## Changes since $PREV" > CHANGELOG_BODY.md
+              echo "" >> CHANGELOG_BODY.md
+              git log "${PREV}..${TAG}" --pretty=format:'- %s (%h)' >> CHANGELOG_BODY.md
+            else
+              echo "## Changes" > CHANGELOG_BODY.md
+              echo "" >> CHANGELOG_BODY.md
+              git log "$TAG" --pretty=format:'- %s (%h)' >> CHANGELOG_BODY.md
+            fi
+
+            echo "Creating release for $TAG"
+            gh release create "$TAG" --title "$TAG" --notes-file CHANGELOG_BODY.md
+            PREV="$TAG"
+          done
