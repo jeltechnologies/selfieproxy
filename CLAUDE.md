@@ -82,7 +82,11 @@ container runs.
 
 Every service in `docker-compose.yaml` carries both `image:` (a published `ghcr.io/jeltechnologies/*`
 tag, built and pushed by `.github/workflows/docker-publish.yml` on every push to `main`/`v*.*.*` tag)
-and `build:` (a local Dockerfile context under this repo). Compose's default `pull_policy` tries
+and `build:` (a local Dockerfile context under this repo). On a `v*.*.*` tag push, that workflow's
+`release` job also creates the GitHub Release itself, once every image has finished building —
+its notes are just `git log <previous-tag>..<this-tag>` (commit subject + short hash), not
+PR-based, since this repo takes commits straight to `main` with no PR/branch workflow. Compose's
+default `pull_policy` tries
 the registry image first and only falls back to a local build if the pull fails — so a deployer
 who only has `docker-compose.yaml` and `.env` (no git checkout of this repo at all) can run
 `docker compose up -d` with no `--build` and no source directories present; `--build` is only
