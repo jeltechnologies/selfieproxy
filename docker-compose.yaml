@@ -92,6 +92,8 @@ services:
         condition: service_completed_successfully
       selfieproxy-localsites-agent:
         condition: service_started
+    environment:
+      DEBUG_MODE: "${DEBUG_MODE:-false}"
     volumes:
       - ./data/selfieproxy/sites-conf:/etc/nginx/conf.d
       - ./data/selfieproxy/sites:/sites:ro

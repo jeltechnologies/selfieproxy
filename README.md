@@ -111,7 +111,7 @@ Our thanks to Anders for the excellent foundation. On top of it, we added:
 4. Start Selfie Proxy:
 
    ```bash
-   docker compose -f docker-compose.yaml up -d
+   docker compose up -d
    ```
 
 5. Visit your admin portal at `selfieproxy.<your domain>`, log in with the credentials

@@ -64,7 +64,7 @@ runtime config/volumes they use:
 Host requirement: Linux only (amd64 or 64-bit arm, e.g. a 64-bit Raspberry Pi OS on Pi 3/4/5) — `network_mode: host` rules out Docker Desktop, and only `linux/amd64`/`linux/arm64` images are published (no Windows, no 32-bit arm).
 
 ```bash
-docker compose -f docker-compose.yaml up -d --build       # selfieproxy server + admin portal
+docker compose up -d --build       # selfieproxy server + admin portal
 ```
 
 Every service that carries a `HEALTHCHECK` (`selfieproxy-reverseproxy`, `selfieproxy-portal`,
@@ -152,7 +152,11 @@ when it's set — that record would otherwise seed a live admin account (from
 legitimately need or check. `DEBUG_MODE` (default `false`) turns on
 boringproxy's `-debug` per-request access log (timestamp, remote IP, method, host, path) to
 stdout — off by default since every agent poll and every Homelabs-page auto-refresh tick would
-otherwise log a line. `LETSENCRYPT_EMAIL` (blank by default) is passed through as `-acme-email`
+otherwise log a line. The same flag also gates `selfieproxy-local-websites`' NGINX access log
+(`access_log off;` by default, `access_log /dev/stdout;` only when `DEBUG_MODE=true` — see its
+`entrypoint.sh`, which generates `/etc/nginx/access_log.conf` from the env var at container
+start), since every request to every Local Website would otherwise log a line there too.
+`LETSENCRYPT_EMAIL` (blank by default) is passed through as `-acme-email`
 to boringproxy — see below. `SSO_SESSION_IDLE_MINUTES`/`SSO_SESSION_MAX_MINUTES` (default `30`/
 `600`, i.e. 30 minutes idle / 10 hours absolute, matching Keycloak's own SSO Session Idle/Max
 defaults) become boringproxy's `-sso-idle-minutes`/`-sso-max-minutes`, governing the `_selfieproxy_sso`

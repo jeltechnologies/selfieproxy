@@ -1,6 +1,14 @@
 #!/bin/sh
 set -eu
 
+# Off by default -- every request to every local website would otherwise be
+# logged, unlike boringproxy's own -debug flag which this mirrors.
+if [ "${DEBUG_MODE:-false}" = "true" ]; then
+	echo 'access_log /dev/stdout;' > /etc/nginx/access_log.conf
+else
+	echo 'access_log off;' > /etc/nginx/access_log.conf
+fi
+
 nginx -g 'daemon off;' &
 NGINX_PID=$!
 trap 'kill -TERM "$NGINX_PID" 2>/dev/null' TERM INT
