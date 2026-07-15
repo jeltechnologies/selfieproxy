@@ -56,11 +56,11 @@
 			required so the agent can resolve your homelab's local hostnames, which macOS and
 			Windows Docker Desktop don't support.</p>
 
-			<p>1. Run this command inside your homelab:</p>
-			<pre class="code-block" id="connect-docker-run"></pre>
-
-			<p>2. Or with Docker Compose:</p>
+			<p>1. Run this with Docker Compose inside your homelab:</p>
 			<pre class="code-block" id="connect-docker-compose"></pre>
+
+			<p>2. Or with a single Docker command:</p>
+			<pre class="code-block" id="connect-docker-run"></pre>
 
 			<p>macOS and Windows users must remove the <code>network_mode: host</code> line (or the
 			<code>--network host</code> flag) from the example above -- Docker Desktop on those

@@ -61,7 +61,7 @@
 			dockerRun.textContent =
 				"docker run -d --name selfieproxy-reverseproxy --restart unless-stopped \\\n" +
 				"  --network host \\\n" +
-				"  -v selfieproxy-agent-certs:/certs \\\n" +
+				"  -v ./data/selfieproxy-certs:/certs \\\n" +
 				"  ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest agent \\\n" +
 				"  -server " + adminDomain + " \\\n" +
 				"  -secret \"your-secret\" \\\n" +
@@ -76,7 +76,7 @@
 				"    restart: unless-stopped\n" +
 				"    network_mode: host\n" +
 				"    volumes:\n" +
-				"      - selfieproxy-agent-certs:/certs\n" +
+				"      - ./data/selfieproxy-certs:/certs\n" +
 				"    command:\n" +
 				"      - agent\n" +
 				"      - -server\n" +
@@ -86,9 +86,7 @@
 				"      - -agent-name\n" +
 				"      - " + name + "\n" +
 				"      - -cert-dir\n" +
-				"      - /certs\n" +
-				"volumes:\n" +
-				"  selfieproxy-agent-certs:\n";
+				"      - /certs\n";
 		};
 
 		renderConnectInfo();
