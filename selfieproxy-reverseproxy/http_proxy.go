@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -59,7 +60,41 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 	// https://golang.org/pkg/net/http/#Request.Write
 	upstreamReq.ContentLength = r.ContentLength
 
+	// Fix for Proxmox. http.NewRequest only infers a known length from a
+	// handful of concrete reader types (*bytes.Buffer/*bytes.Reader/*strings.Reader);
+	// r.Body from an incoming request is none of those, so it stays a
+	// real (non-nil, non-NoBody) reader even for a zero-length body. Deep
+	// in net/http, Request.outgoingLength() treats "ContentLength == 0
+	// with a real Body reader" as *unknown* length rather than zero, and
+	// falls back to Transfer-Encoding: chunked when writing the request --
+	// invisibly, since it doesn't touch ContentLength or TransferEncoding
+	// on the struct itself. Some backends (e.g. Proxmox's API daemon)
+	// reject chunked request bodies outright, breaking every empty-body
+	// POST (VM start/stop, no parameters needed) while non-empty POSTs
+	// (e.g. login) go through the normal, unambiguous Content-Length path
+	// and work fine. Using the NoBody sentinel for an explicitly empty
+	// body avoids the ambiguity.
+	if upstreamReq.ContentLength == 0 {
+		upstreamReq.Body = http.NoBody
+	}
+
 	upstreamReq.Header = downstreamReqHeaders
+
+	// Go's HTTP/2 server lowercases all header names on the wire (mandated
+	// by the HTTP/2 spec) and canonicalizes them back on read -- but its
+	// canonicalization only capitalizes hyphen-separated words, so a
+	// run-together mixed-case name like Proxmox's CSRFPreventionToken
+	// becomes "Csrfpreventiontoken". Proxmox's own API server does a
+	// case-sensitive lookup for the exact original casing, so over an
+	// HTTP/2 downstream connection its CSRF check silently never finds the
+	// token and rejects the request (start/stop, and any other POST/PUT/
+	// DELETE after login) while GETs and login itself -- which don't
+	// carry this header -- work fine. Restore the exact casing backends
+	// expect.
+	if csrf, ok := upstreamReq.Header["Csrfpreventiontoken"]; ok {
+		delete(upstreamReq.Header, "Csrfpreventiontoken")
+		upstreamReq.Header["CSRFPreventionToken"] = csrf
+	}
 
 	downstreamScheme := "https"
 	if r.TLS == nil {
@@ -96,12 +131,17 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 
 	upstreamRes, err := httpClient.Do(upstreamReq)
 	if err != nil {
+		log.Printf("proxyRequest upstream error: %s %s -> %s: %s", r.Method, r.Host, upstreamUrl, err)
 		errMessage := fmt.Sprintf("%s", err)
 		w.WriteHeader(502)
 		io.WriteString(w, errMessage)
 		return
 	}
 	defer upstreamRes.Body.Close()
+
+	if upstreamRes.StatusCode >= 500 {
+		log.Printf("proxyRequest upstream status: %s %s -> %s: %d", r.Method, r.Host, upstreamUrl, upstreamRes.StatusCode)
+	}
 
 	var forwardHeaders map[string][]string
 
