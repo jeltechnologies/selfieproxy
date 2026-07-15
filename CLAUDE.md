@@ -67,6 +67,19 @@ Host requirement: Linux only (amd64 or 64-bit arm, e.g. a 64-bit Raspberry Pi OS
 docker compose -f docker-compose.yaml up -d --build       # selfieproxy server + admin portal
 ```
 
+Every service that carries a `HEALTHCHECK` (`selfieproxy-reverseproxy`, `selfieproxy-portal`,
+`selfieproxy-identity-provider`) also sets `init: true`, as does `selfieproxy-localsites-agent`
+for consistency — none of the four Dockerfiles run tini/dumb-init, so each container's own
+process (the Go binary or the JVM) is PID 1. Neither `exec.Command` nor any Java equivalent
+exists in these codebases, but Docker's own healthcheck runner still execs a short-lived shell
+into the container's PID namespace on every tick and abandons it once the check completes; that
+process gets reparented to PID 1 per Linux PID-namespace semantics, and since the app itself
+never calls `wait()` on children it didn't spawn, it becomes a permanent zombie. `init: true`
+makes compose inject `tini` as the real PID 1 so it reaps them instead. Don't remove this
+thinking it's unnecessary — without it, zombies silently accumulate at roughly one per
+healthcheck interval (60s for reverseproxy, 10s for portal/identity-provider) for as long as the
+container runs.
+
 Every service in `docker-compose.yaml` carries both `image:` (a published `ghcr.io/jeltechnologies/*`
 tag, built and pushed by `.github/workflows/docker-publish.yml` on every push to `main`/`v*.*.*` tag)
 and `build:` (a local Dockerfile context under this repo). Compose's default `pull_policy` tries

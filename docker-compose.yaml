@@ -9,6 +9,7 @@ services:
     build: ./selfieproxy-reverseproxy
     container_name: selfieproxy-reverseproxy
     restart: unless-stopped
+    init: true
     depends_on:
       selfieproxy-identity-provider:
         condition: service_healthy
@@ -35,6 +36,7 @@ services:
     build: ./selfieproxy-portal
     container_name: selfieproxy-portal
     restart: unless-stopped
+    init: true
     depends_on:
       selfieproxy-reverseproxy:
         condition: service_healthy
@@ -59,6 +61,7 @@ services:
     build: ./selfieproxy-identity-provider
     container_name: selfieproxy-identity-provider
     restart: unless-stopped
+    init: true
     depends_on:
       check-prerequisites:
         condition: service_completed_successfully
@@ -100,6 +103,7 @@ services:
     build: ./selfieproxy-reverseproxy
     container_name: selfieproxy-localsites-agent
     restart: unless-stopped
+    init: true
     depends_on:
       selfieproxy-portal:
         condition: service_healthy
