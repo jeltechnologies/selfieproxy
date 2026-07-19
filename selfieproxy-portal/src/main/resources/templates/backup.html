@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Backup & Restore')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='backup')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Backup &amp; Restore</h1>
+				<p class="page-subtitle">Back up every Homelab, Exposed App, and Local Website (including its files) into one ZIP.</p>
+			</div>
+		</section>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<div class="warning" th:if="${result != null}">
+			<p>
+				Restored <strong th:text="${result.homelabsRestored()}"></strong> homelab(s),
+				<strong th:text="${result.exposedAppsRestored()}"></strong> exposed app(s), and
+				<strong th:text="${result.localWebsitesRestored()}"></strong> local website(s).
+			</p>
+			<ul th:if="${result.hasFailures()}">
+				<li th:each="f : ${result.failures()}" th:text="${f}"></li>
+			</ul>
+		</div>
+
+		<fieldset>
+			<legend>Create backup</legend>
+			<p>Downloads a ZIP with every Homelab name, every Exposed App's settings, and every Local Website's
+				settings and files. Agent secrets and the admin login are never included -- restoring a homelab
+				always issues it a brand-new secret.</p>
+			<a id="download-backup-link" class="button" th:href="@{/backup/download}">Download Backup</a>
+		</fieldset>
+
+		<fieldset>
+			<legend>Restore</legend>
+			<p>Upload a backup ZIP to choose what to restore. Existing configuration matching what you choose will
+				be overwritten, and you'll get a full warning before anything changes.</p>
+			<form method="post" enctype="multipart/form-data" th:action="@{/backup/restore/stage}">
+				<div class="field">
+					<label for="backupZip">Backup ZIP</label>
+					<input type="file" id="backupZip" name="backupZip" accept=".zip,application/zip" required>
+				</div>
+				<div class="button-panel">
+					<button type="submit" class="button">Upload &amp; Choose What to Restore</button>
+				</div>
+			</form>
+		</fieldset>
+	</main>
+
+	<script th:src="@{/js/backup.js}"></script>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

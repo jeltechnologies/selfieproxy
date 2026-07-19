@@ -24,6 +24,8 @@ those, use a commercial product instead.
 - Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
+- One-click backup and restore, including static website files — move to a new server or
+  recover from data loss.
 - Single Docker command to install and update.
 
 ## Background
@@ -37,6 +39,7 @@ Anders Pitman, which is no longer actively maintained. On top of it we added:
 - Centralized agent ("client") management from the admin portal.
 - Built-in SSO login for the portal, with support for swapping in an external OIDC provider.
 - Static website hosting.
+- Backup and restore for every homelab, exposed app, and static website.
 - Fixed tunnel authentication failing on modern OpenSSH (8.8+), which rejects the old
   RSA/`ssh-rsa` keys by default, by switching to Ed25519 — also a more secure algorithm.
 - A one-command Docker install.
@@ -114,6 +117,10 @@ forwarding through another reverse proxy breaks both.
 **Is this secure?** The homelab-to-server tunnel is encrypted, the server is under your own
 control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
 app) sits behind login. It's open source.
+
+**What's in a backup?** Every homelab, exposed app, and static website — including website
+files. Homelab secrets and the admin login are never included; restoring a homelab always
+issues it a new secret, which you then update on that homelab.
 
 ## License
 

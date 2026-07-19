@@ -153,6 +153,44 @@ this section is the portal-side UI behavior.
 - Files live at `data/selfieproxy/sites/<domain>/` on the server, owned by the portal container's
   user — copy files in as root, or via `docker exec selfieproxy-portal`.
 
+## Backup and restore
+
+A "Backup & Restore" nav tab lets the admin download one ZIP covering every Homelab, Exposed App
+("server" in the restore picker's own wording), and Local Website (config *and* its actual
+content files) -- usable both for disaster recovery on the same server and for moving to a brand
+new one, since Exposed App subdomains and Local Website domains are already relative to whatever
+`DOMAIN` the target server has. `BackupService` does the work; `BackupController` is the thin web
+layer.
+
+- **What's included**: Homelab names; every Exposed App's full settings (the same merged view
+  `ExposedAppController` itself edits: `TunnelMapper.toExposedApp` overlaid with
+  `ExposedAppStore.reconcile`); every Local Website's settings (`LocalWebsiteStore`) plus its
+  content directory, zipped under `local-websites/<fqdn>/` alongside a root-level `manifest.json`
+  describing everything else.
+- **What's deliberately excluded, always**: a Homelab's secret (its boringproxy access token) is
+  never backed up. Restoring a Homelab that doesn't already exist on the target server always
+  mints it a **brand-new** secret -- the restore picker warns about this up front, and the
+  operator must re-paste the new secret into that homelab's `.env` afterward. Also excluded:
+  `selfieproxy-identity-provider`'s admin account and RSA signing key -- a backup ZIP must never
+  be able to grant login access to a different server, so restore never touches server-local auth
+  material, only goes through the same `BoringProxyClient` REST calls the rest of the portal
+  already uses.
+- **Restore flow**: upload a ZIP (`POST /backup/restore/stage`) extracts it into a staging
+  directory and validates `manifest.json` before anything live is touched. The picker
+  (`GET /backup/restore/{stagingId}`) then lets the admin choose specific Homelabs/Exposed
+  Apps/Local Websites, or hit "Restore All" (server-computed from the full manifest, not trusted
+  from a giant posted form). Applying always shows the same warning: matching existing
+  configuration is overwritten, restored Exposed Apps/Local Websites have their tunnel deleted and
+  recreated (the same delete-then-recreate-with-a-2s-wait pattern an ordinary edit already uses,
+  just applied in bulk -- brief downtime for that homelab's users), and restored Homelabs get a
+  fresh secret. A failure restoring one item is recorded and never aborts the rest of the restore.
+  The staging directory is removed once restore completes (or is cancelled).
+- **Download filename**: `selfieproxy-backup-<domain>-<timestamp>.zip`, where the timestamp
+  reflects the *browser's* local timezone, not the server's -- `backup.js` reads
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` and passes it as `?tz=`, which
+  `BackupController` validates as a real zone id before use (falling back to UTC otherwise). The
+  manifest's own internal `createdAt` field stays a plain server-side UTC instant.
+
 ## Mapping to the boringproxy data model
 
 This portal is built on a forked BoringProxy (`selfieproxy-reverseproxy/`), enhanced with

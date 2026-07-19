@@ -390,3 +390,8 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 }
 
 .overlay-card .button { margin-right: 0.5rem; min-width: 6rem; text-align: center; }
+
+.restore-tree { margin-bottom: 0.75rem; }
+.restore-item { display: block; font-weight: normal; margin-bottom: 0.35rem; }
+.restore-item input { margin-right: 0.4rem; }
+.restore-children { margin-left: 1.75rem; }

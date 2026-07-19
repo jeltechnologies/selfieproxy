@@ -3,15 +3,9 @@ package online.selfieproxy.portal.domain;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.util.Comparator;
-import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import org.slf4j.Logger;
@@ -63,7 +57,7 @@ public class StaticSiteProvisioner {
 	public void remove(String domain) {
 		try {
 			Files.deleteIfExists(confFile(domain));
-			deleteRecursively(sitesDir.resolve(domain));
+			ZipUtils.deleteRecursively(sitesDir.resolve(domain));
 		} catch (IOException e) {
 			throw new IllegalStateException("Failed to remove static site for " + domain, e);
 		}
@@ -91,19 +85,14 @@ public class StaticSiteProvisioner {
 
 	/** Zips domain's content directory to out, entries relative to the directory root (no leading domain folder). A missing directory yields an empty zip. */
 	public void writeZip(String domain, OutputStream out) throws IOException {
-		Path dir = sitesDir.resolve(domain);
 		try (ZipOutputStream zip = new ZipOutputStream(out)) {
-			if (!Files.isDirectory(dir)) {
-				return;
-			}
-			try (Stream<Path> files = Files.walk(dir).filter(Files::isRegularFile)) {
-				for (Path file : (Iterable<Path>) files::iterator) {
-					zip.putNextEntry(new ZipEntry(dir.relativize(file).toString().replace('\\', '/')));
-					Files.copy(file, zip);
-					zip.closeEntry();
-				}
-			}
+			writeEntries(domain, "", zip);
 		}
+	}
+
+	/** Writes domain's content directory into an already-open zip, entry names prefixed with entryPrefix -- used to embed several sites' content into one larger backup ZIP (see BackupService); writeZip is for a single site's standalone download. */
+	public void writeEntries(String domain, String entryPrefix, ZipOutputStream zip) throws IOException {
+		ZipUtils.writeDirectoryEntries(sitesDir.resolve(domain), entryPrefix, zip);
 	}
 
 	/**
@@ -123,8 +112,8 @@ public class StaticSiteProvisioner {
 			throw new IllegalStateException("Failed to prepare upload staging area for " + domain, e);
 		}
 		try {
-			extractZip(zipData, stagingDir);
-			deleteRecursively(dir);
+			ZipUtils.extract(zipData, stagingDir);
+			ZipUtils.deleteRecursively(dir);
 			Files.move(stagingDir, dir);
 			stagingDir = null;
 			// createTempDirectory defaults to owner-only (700) permissions -- fine for the portal
@@ -141,48 +130,11 @@ public class StaticSiteProvisioner {
 		}
 	}
 
-	/** Extracts zipData into targetDir (assumed to already exist and be empty). Rejects entries that would escape targetDir (zip-slip). */
-	private void extractZip(InputStream zipData, Path targetDir) throws IOException {
-		try (ZipInputStream zip = new ZipInputStream(zipData)) {
-			ZipEntry entry;
-			while ((entry = zip.getNextEntry()) != null) {
-				Path target = targetDir.resolve(entry.getName()).normalize();
-				if (!target.startsWith(targetDir)) {
-					throw new IOException("ZIP entry escapes target directory: " + entry.getName());
-				}
-				if (entry.isDirectory()) {
-					Files.createDirectories(target);
-				} else {
-					Files.createDirectories(target.getParent());
-					Files.copy(zip, target, StandardCopyOption.REPLACE_EXISTING);
-				}
-				zip.closeEntry();
-			}
-		}
-	}
-
 	private void deleteQuietly(Path dir) {
 		try {
-			deleteRecursively(dir);
+			ZipUtils.deleteRecursively(dir);
 		} catch (IOException e) {
 			log.warn("Failed to clean up upload staging directory {}", dir, e);
-		}
-	}
-
-	private void deleteRecursively(Path dir) throws IOException {
-		if (!Files.exists(dir)) {
-			return;
-		}
-		try (Stream<Path> walk = Files.walk(dir)) {
-			walk.sorted(Comparator.reverseOrder()).forEach(path -> {
-				try {
-					Files.delete(path);
-				} catch (IOException e) {
-					throw new UncheckedIOException(e);
-				}
-			});
-		} catch (UncheckedIOException e) {
-			throw e.getCause();
 		}
 	}
 
