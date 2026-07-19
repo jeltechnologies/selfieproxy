@@ -7,7 +7,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +35,7 @@ import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -60,6 +63,7 @@ public class BackupService {
 	// globally-configured snake_case naming strategy.
 	private final ObjectMapper objectMapper = JsonMapper.builder()
 			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+			.enable(SerializationFeature.INDENT_OUTPUT)
 			.build();
 
 	private final BoringProxyClient boringProxyClient;
@@ -88,9 +92,14 @@ public class BackupService {
 		this.stagingRoot = Path.of(backupProperties.restoreStagingPath());
 	}
 
-	/** Builds the manifest from live state and streams manifest.json + every Local Website's content into out as one ZIP. */
-	public void writeBackup(OutputStream out) throws IOException {
-		BackupManifest manifest = buildManifest();
+	/**
+	 * Builds the manifest from live state, keeps only what selection picked, and streams
+	 * manifest.json + every selected Local Website's content into out as one ZIP. zone is the
+	 * browser's local timezone (see BackupController), used only for the manifest's informational
+	 * createdAt field.
+	 */
+	public void writeBackup(OutputStream out, ZoneId zone, RestoreSelection selection) throws IOException {
+		BackupManifest manifest = filterManifest(buildManifest(zone), selection);
 		try (ZipOutputStream zip = new ZipOutputStream(out)) {
 			zip.putNextEntry(new ZipEntry(MANIFEST_ENTRY));
 			zip.write(objectMapper.writeValueAsBytes(manifest));
@@ -111,7 +120,8 @@ public class BackupService {
 				.toList();
 	}
 
-	private BackupManifest buildManifest() {
+	/** The full manifest built from live server state -- also used by BackupController to list what's available on the backup selection page (see filterManifest). */
+	public BackupManifest buildManifest(ZoneId zone) {
 		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
 
 		List<ExposedApp> exposedApps = tunnels.values().stream()
@@ -120,7 +130,8 @@ public class BackupService {
 				.map(exposedAppStore::reconcile)
 				.toList();
 
-		return new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
+		String createdAt = ZonedDateTime.now(zone).truncatedTo(ChronoUnit.MILLIS).toString();
+		return new BackupManifest(BackupManifest.CURRENT_VERSION, createdAt,
 				boringProxyProperties.domain(), homelabNames(), exposedApps, localWebsiteStore.list());
 	}
 
@@ -144,12 +155,23 @@ public class BackupService {
 		return readManifest(stagingRoot.resolve(stagingId));
 	}
 
-	/** Every homelab, exposed app, and local website in a staged manifest -- what "Restore All" restores. */
+	/** Every homelab, exposed app, and local website in a staged manifest -- what "Import All" imports. */
 	public RestoreSelection fullSelection(BackupManifest manifest) {
 		return new RestoreSelection(
 				manifest.homelabs(),
 				manifest.exposedApps().stream().map(ExposedApp::subdomain).toList(),
 				manifest.localWebsites().stream().map(LocalWebsite::domain).toList());
+	}
+
+	/** Keeps only the homelabs/exposed apps/local websites selection picked -- what the backup page's checkbox tree narrows a backup ZIP down to. */
+	public BackupManifest filterManifest(BackupManifest manifest, RestoreSelection selection) {
+		Set<String> homelabs = new HashSet<>(selection.homelabs());
+		Set<String> exposedAppSubdomains = new HashSet<>(selection.exposedAppSubdomains());
+		Set<String> localWebsiteDomains = new HashSet<>(selection.localWebsiteDomains());
+		return new BackupManifest(manifest.version(), manifest.createdAt(), manifest.sourceDomain(),
+				manifest.homelabs().stream().filter(homelabs::contains).toList(),
+				manifest.exposedApps().stream().filter(app -> exposedAppSubdomains.contains(app.subdomain())).toList(),
+				manifest.localWebsites().stream().filter(site -> localWebsiteDomains.contains(site.domain())).toList());
 	}
 
 	/**
@@ -195,7 +217,7 @@ public class BackupService {
 		for (String subdomain : selection.exposedAppSubdomains()) {
 			ExposedApp app = appsBySubdomain.get(subdomain);
 			if (app == null) {
-				failures.add("Exposed app " + subdomain + ": not found in backup");
+				failures.add("Exposed app " + subdomain + ": not found in configuration export");
 				continue;
 			}
 			try {
@@ -217,7 +239,7 @@ public class BackupService {
 		for (String domain : selection.localWebsiteDomains()) {
 			LocalWebsite site = sitesByDomain.get(domain);
 			if (site == null) {
-				failures.add("Local website " + domain + ": not found in backup");
+				failures.add("Local website " + domain + ": not found in configuration export");
 				continue;
 			}
 			try {
@@ -304,17 +326,17 @@ public class BackupService {
 	private BackupManifest readManifest(Path stagingDir) {
 		Path manifestFile = stagingDir.resolve(MANIFEST_ENTRY);
 		if (!Files.exists(manifestFile)) {
-			throw new IllegalArgumentException("Backup is missing manifest.json, or the staging id is unknown/expired.");
+			throw new IllegalArgumentException("Configuration export is missing manifest.json, or the staging id is unknown/expired.");
 		}
 		BackupManifest manifest;
 		try {
 			manifest = objectMapper.readValue(manifestFile.toFile(), BackupManifest.class);
 		} catch (Exception e) {
-			throw new IllegalArgumentException("Failed to read backup manifest.json", e);
+			throw new IllegalArgumentException("Failed to read configuration export manifest.json", e);
 		}
 		if (manifest.version() != BackupManifest.CURRENT_VERSION) {
 			throw new IllegalArgumentException(
-					"Unsupported backup version " + manifest.version() + " (expected " + BackupManifest.CURRENT_VERSION + ")");
+					"Unsupported configuration export version " + manifest.version() + " (expected " + BackupManifest.CURRENT_VERSION + ")");
 		}
 		return manifest;
 	}

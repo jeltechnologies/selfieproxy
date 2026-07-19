@@ -29,12 +29,18 @@ container. After a successful login the user lands on the exposed applications p
   server, forwarding plain HTTP onward), and for an HTTPS homelab app only under Server HTTPS (the
   recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
   never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
-- The topbar's user menu ("▾ Account", `fragments/layout.html`) holds "Change username / password"
-  (links out to `selfieproxy-identity-provider`'s self-service `/account` page, hidden when an
-  external IdP is configured) and Logout. Logout ends the portal's own session and clears
-  boringproxy's SSO cookie for the portal domain, landing on a confirmation page served by
-  `selfieproxy-identity-provider` with a link back into the portal — which immediately requires
-  logging in again, since both session and cookie are gone.
+- The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds "Export configuration"
+  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Change username /
+  password" (links out to `selfieproxy-identity-provider`'s self-service `/account` page, hidden
+  when an external IdP is configured), and Logout. The user-facing labels and URLs say
+  "export"/"import configuration"; the Java domain types underneath (`BackupService`,
+  `BackupController`, `RestoreSelection`, `RestoreResult`, templates named `backup.html`/
+  `restore.html`/`restore-picker.html`) keep the shorter "backup"/"restore" naming (see "Backup
+  and restore" below), the same kind of internal-vs-UI naming split as Homelab/Agent and Exposed
+  App/Tunnel. Logout ends the portal's own session and clears boringproxy's SSO cookie for
+  the portal domain, landing on a confirmation page served by `selfieproxy-identity-provider` with
+  a link back into the portal — which immediately requires logging in again, since both session
+  and cookie are gone.
 
 ## Homelabs
 
@@ -155,41 +161,67 @@ this section is the portal-side UI behavior.
 
 ## Backup and restore
 
-A "Backup & Restore" nav tab lets the admin download one ZIP covering every Homelab, Exposed App
-("server" in the restore picker's own wording), and Local Website (config *and* its actual
+"Export configuration" and "Import configuration" are two separate pages, each its own entry in
+the topbar's Settings menu (not a nav tab) -- exporting and importing are different enough
+workflows (one reads live state, the other stages an upload and steps through a picker) that they
+don't share a page anymore, even though they share most of their underlying selection machinery.
+User-facing text says "export"/"import configuration", and their URLs follow suit
+(`/export-configuration`, `/import-configuration`); the Java types underneath keep the shorter
+"backup"/"restore" naming (`BackupService`/`BackupController`, `RestoreSelection`/`RestoreResult`)
+-- see the "Login" section's note on this split. Together the two pages cover every Homelab,
+Exposed App ("server" in the picker's own wording), and Local Website (config *and* its actual
 content files) -- usable both for disaster recovery on the same server and for moving to a brand
 new one, since Exposed App subdomains and Local Website domains are already relative to whatever
 `DOMAIN` the target server has. `BackupService` does the work; `BackupController` is the thin web
-layer.
+layer for both pages.
 
-- **What's included**: Homelab names; every Exposed App's full settings (the same merged view
-  `ExposedAppController` itself edits: `TunnelMapper.toExposedApp` overlaid with
-  `ExposedAppStore.reconcile`); every Local Website's settings (`LocalWebsiteStore`) plus its
-  content directory, zipped under `local-websites/<fqdn>/` alongside a root-level `manifest.json`
-  describing everything else.
+- **Export configuration page** (`GET /export-configuration`): three flat checkbox lists over
+  *live* server state, in a fixed order -- Homelabs, then Exposed Apps (each entry showing its own
+  Homelab name, since apps aren't nested/grouped under one), then Local Websites -- all pre-checked,
+  plus "Select All"/"Select None" buttons above the lists (`backup.js`, targeting every checkbox
+  under `#backup-form` at once). Submitting the form (`GET /export-configuration/download`, a plain
+  query-string GET since it only reads state) streams a ZIP containing only what's checked:
+  `BackupService.buildManifest` builds the full picture from live state, `BackupService.filterManifest`
+  narrows it down to the submitted selection before it's serialized and zipped.
+- **What's included** in a selected item: Homelab names; each selected Exposed App's full settings
+  (the same merged view `ExposedAppController` itself edits: `TunnelMapper.toExposedApp` overlaid
+  with `ExposedAppStore.reconcile`); each selected Local Website's settings (`LocalWebsiteStore`)
+  plus its content directory, zipped under `local-websites/<fqdn>/` alongside a root-level
+  `manifest.json` describing everything else. `manifest.json` is pretty-printed (Jackson
+  `INDENT_OUTPUT`) since it's meant to be readable/hand-editable before an import, not just
+  machine-consumed.
 - **What's deliberately excluded, always**: a Homelab's secret (its boringproxy access token) is
-  never backed up. Restoring a Homelab that doesn't already exist on the target server always
-  mints it a **brand-new** secret -- the restore picker warns about this up front, and the
-  operator must re-paste the new secret into that homelab's `.env` afterward. Also excluded:
-  `selfieproxy-identity-provider`'s admin account and RSA signing key -- a backup ZIP must never
-  be able to grant login access to a different server, so restore never touches server-local auth
-  material, only goes through the same `BoringProxyClient` REST calls the rest of the portal
-  already uses.
-- **Restore flow**: upload a ZIP (`POST /backup/restore/stage`) extracts it into a staging
-  directory and validates `manifest.json` before anything live is touched. The picker
-  (`GET /backup/restore/{stagingId}`) then lets the admin choose specific Homelabs/Exposed
-  Apps/Local Websites, or hit "Restore All" (server-computed from the full manifest, not trusted
-  from a giant posted form). Applying always shows the same warning: matching existing
-  configuration is overwritten, restored Exposed Apps/Local Websites have their tunnel deleted and
+  never exported. Importing a Homelab that doesn't already exist on the target server always mints
+  it a **brand-new** secret -- the import picker warns about this up front, and the operator must
+  re-paste the new secret into that homelab's `.env` afterward. Also excluded:
+  `selfieproxy-identity-provider`'s admin account and RSA signing key -- a configuration export
+  must never be able to grant login access to a different server, so import never touches
+  server-local auth material, only goes through the same `BoringProxyClient` REST calls the rest
+  of the portal already uses.
+- **Import configuration page** (`GET /import-configuration`): just the upload form (plus any
+  errors/result flashed back from the flow below). Uploading a ZIP
+  (`POST /import-configuration/stage`) extracts it into a staging directory and validates
+  `manifest.json` before anything live is touched. The picker
+  (`GET /import-configuration/{stagingId}`) then shows the same flat Homelabs/Exposed Apps/Local
+  Websites checkbox lists as the Export page -- built from the staged manifest instead of live
+  state -- and lets the admin choose specific items, or hit "Import All" (server-computed from the full
+  manifest, not trusted from a giant posted form). Applying
+  (`POST /import-configuration/{stagingId}/apply`) always shows the same warning: matching existing
+  configuration is overwritten, imported Exposed Apps/Local Websites have their tunnel deleted and
   recreated (the same delete-then-recreate-with-a-2s-wait pattern an ordinary edit already uses,
-  just applied in bulk -- brief downtime for that homelab's users), and restored Homelabs get a
-  fresh secret. A failure restoring one item is recorded and never aborts the rest of the restore.
-  The staging directory is removed once restore completes (or is cancelled).
-- **Download filename**: `selfieproxy-backup-<domain>-<timestamp>.zip`, where the timestamp
+  just applied in bulk -- brief downtime for that homelab's users), and imported Homelabs get a
+  fresh secret. A failure importing one item is recorded and never aborts the rest of the import.
+  The staging directory is removed once the import completes or is cancelled
+  (`POST /import-configuration/{stagingId}/cancel`), and either action redirects back to
+  `/import-configuration`.
+- **Download filename**: `selfieproxy-config-export-<domain>-<timestamp>.zip`, where the timestamp
   reflects the *browser's* local timezone, not the server's -- `backup.js` reads
-  `Intl.DateTimeFormat().resolvedOptions().timeZone` and passes it as `?tz=`, which
-  `BackupController` validates as a real zone id before use (falling back to UTC otherwise). The
-  manifest's own internal `createdAt` field stays a plain server-side UTC instant.
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` and fills a hidden `tz` field on the export
+  page's form with it, which `BackupController` validates as a real zone id before use (falling
+  back to UTC otherwise). The same resolved zone is reused for the manifest's own `createdAt`
+  field (millisecond precision, ISO-8601 with UTC offset and zone id, e.g.
+  `2026-07-19T14:32:10.123+02:00[Europe/Amsterdam]`) -- both are the browser's local time, not the
+  server's.
 
 ## Mapping to the boringproxy data model
 

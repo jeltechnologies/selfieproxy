@@ -7,8 +7,6 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -23,18 +21,19 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.domain.BackupManifest;
 import online.selfieproxy.portal.domain.BackupService;
-import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.RestoreResult;
 import online.selfieproxy.portal.domain.RestoreSelection;
 
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * "Backup & Restore" page: download a single ZIP covering every Homelab,
- * Exposed App ("server"), and Local Website (config + content), and restore
- * from one -- see BackupService for the actual logic and
- * selfieproxy-portal/CLAUDE.md's "Backup and restore" section for the full
- * product behavior.
+ * "Export configuration" (<code>/export-configuration</code>) and "Import configuration"
+ * (<code>/import-configuration</code>) pages, reached from the Settings dropdown --
+ * download a ZIP covering a chosen subset of Homelabs, Exposed Apps ("servers"), and
+ * Local Websites (config + content), and import from one. The underlying domain types
+ * keep the shorter "backup"/"restore" naming -- see BackupService for the actual logic
+ * and selfieproxy-portal/CLAUDE.md's "Backup and restore" section for the full product
+ * behavior.
  */
 @Controller
 public class BackupController {
@@ -49,66 +48,69 @@ public class BackupController {
 		this.boringProxyProperties = boringProxyProperties;
 	}
 
-	@GetMapping("/backup")
-	public String page() {
+	/** Export configuration page: flat Homelabs/Exposed Apps/Local Websites checkbox lists over live server state, everything pre-checked, submitting a GET to /export-configuration/download. */
+	@GetMapping("/export-configuration")
+	public String page(Model model) {
+		model.addAttribute("manifest", backupService.buildManifest(ZoneOffset.UTC));
 		return "backup";
 	}
 
 	/**
-	 * Streams the backup ZIP. GET is fine here despite the "no GET for
-	 * state-changing actions" convention elsewhere in this codebase -- creating
-	 * a backup reads live state, it doesn't change any. The filename's
-	 * timestamp is the browser's local time, not the server's: backup.js reads
-	 * Intl.DateTimeFormat().resolvedOptions().timeZone and appends it as
-	 * ?tz=..., and tz is validated as a real zone id before use, falling back
-	 * to UTC otherwise -- never trusted beyond that parse.
+	 * Streams the configuration export ZIP, filtered down to the homelabs/exposedApps/localWebsites
+	 * the export page's checkboxes selected. GET is fine here despite the "no GET for
+	 * state-changing actions" convention elsewhere in this codebase -- creating an export
+	 * reads live state, it doesn't change any. The filename's timestamp, and the manifest's
+	 * own createdAt field, use the browser's local time, not the server's: backup.js reads
+	 * Intl.DateTimeFormat().resolvedOptions().timeZone and sets it on a hidden tz form field,
+	 * and tz is validated as a real zone id before use, falling back to UTC otherwise -- never
+	 * trusted beyond that parse.
 	 */
-	@GetMapping("/backup/download")
-	public void download(@RequestParam(required = false) String tz, HttpServletResponse response) throws IOException {
-		String timestamp = ZonedDateTime.now(resolveZone(tz)).format(FILENAME_TIMESTAMP);
+	@GetMapping("/export-configuration/download")
+	public void download(@RequestParam(required = false) String tz,
+			@RequestParam(required = false) List<String> homelabs,
+			@RequestParam(required = false) List<String> exposedApps,
+			@RequestParam(required = false) List<String> localWebsites,
+			HttpServletResponse response) throws IOException {
+		ZoneId zone = resolveZone(tz);
+		String timestamp = ZonedDateTime.now(zone).format(FILENAME_TIMESTAMP);
 		String safeDomain = boringProxyProperties.domain().replaceAll("[^A-Za-z0-9.-]", "_");
-		String filename = "selfieproxy-backup-" + safeDomain + "-" + timestamp + ".zip";
+		String filename = "selfieproxy-config-export-" + safeDomain + "-" + timestamp + ".zip";
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-		backupService.writeBackup(response.getOutputStream());
+		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps), nullToEmpty(localWebsites));
+		backupService.writeBackup(response.getOutputStream(), zone, selection);
 	}
 
-	@PostMapping("/backup/restore/stage")
+	/** Import configuration page: upload form, plus any errors/result flashed back from the staging/apply flow below. */
+	@GetMapping("/import-configuration")
+	public String restorePage() {
+		return "restore";
+	}
+
+	@PostMapping("/import-configuration/stage")
 	public String stage(@RequestParam("backupZip") MultipartFile backupZip, Model model) throws IOException {
 		if (backupZip.isEmpty()) {
-			model.addAttribute("errors", List.of("Choose a backup ZIP file to upload."));
-			return "backup";
+			model.addAttribute("errors", List.of("Choose a configuration export ZIP file to upload."));
+			return "restore";
 		}
 		String stagingId;
 		try {
 			stagingId = backupService.stageRestore(backupZip.getInputStream());
 		} catch (IllegalArgumentException e) {
 			model.addAttribute("errors", List.of(e.getMessage()));
-			return "backup";
+			return "restore";
 		}
-		return "redirect:/backup/restore/" + stagingId;
+		return "redirect:/import-configuration/" + stagingId;
 	}
 
-	@GetMapping("/backup/restore/{stagingId}")
+	@GetMapping("/import-configuration/{stagingId}")
 	public String picker(@PathVariable String stagingId, Model model) {
-		BackupManifest manifest = backupService.readStagedManifest(stagingId);
-		Map<String, List<ExposedApp>> appsByHomelab = manifest.exposedApps().stream()
-				.collect(Collectors.groupingBy(ExposedApp::homelabName));
-		// Normally every app's homelabName is one of manifest.homelabs() already (see
-		// BackupService.homelabNames()), but a manually-edited or older backup could reference one
-		// that isn't -- surfaced as its own group so it's still selectable, not silently dropped.
-		List<ExposedApp> orphanApps = manifest.exposedApps().stream()
-				.filter(app -> !manifest.homelabs().contains(app.homelabName()))
-				.toList();
-
+		model.addAttribute("manifest", backupService.readStagedManifest(stagingId));
 		model.addAttribute("stagingId", stagingId);
-		model.addAttribute("manifest", manifest);
-		model.addAttribute("appsByHomelab", appsByHomelab);
-		model.addAttribute("orphanApps", orphanApps);
 		return "restore-picker";
 	}
 
-	@PostMapping("/backup/restore/{stagingId}/apply")
+	@PostMapping("/import-configuration/{stagingId}/apply")
 	public String apply(@PathVariable String stagingId,
 			@RequestParam(defaultValue = "false") boolean all,
 			@RequestParam(required = false) List<String> homelabs,
@@ -121,20 +123,20 @@ public class BackupController {
 				: new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps), nullToEmpty(localWebsites));
 		RestoreResult result = backupService.applyRestore(stagingId, selection);
 		redirectAttributes.addFlashAttribute("result", result);
-		return "redirect:/backup";
+		return "redirect:/import-configuration";
 	}
 
-	@PostMapping("/backup/restore/{stagingId}/cancel")
+	@PostMapping("/import-configuration/{stagingId}/cancel")
 	public String cancel(@PathVariable String stagingId) {
 		backupService.cancelStaged(stagingId);
-		return "redirect:/backup";
+		return "redirect:/import-configuration";
 	}
 
-	/** An unknown/expired staging id (eg. a stale bookmark, or a double-submit after apply already cleaned it up) lands back on /backup with an explanation instead of a stack trace. */
+	/** An unknown/expired staging id (eg. a stale bookmark, or a double-submit after apply already cleaned it up) lands back on /import-configuration with an explanation instead of a stack trace. */
 	@ExceptionHandler(IllegalArgumentException.class)
 	public String staleStaging(IllegalArgumentException e, RedirectAttributes redirectAttributes) {
 		redirectAttributes.addFlashAttribute("errors", List.of(e.getMessage()));
-		return "redirect:/backup";
+		return "redirect:/import-configuration";
 	}
 
 	private ZoneId resolveZone(String tz) {

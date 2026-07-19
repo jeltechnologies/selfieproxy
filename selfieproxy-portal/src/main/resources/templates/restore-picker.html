@@ -1,56 +1,53 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Restore')}"></head>
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Import configuration')}"></head>
 <body>
-	<header th:replace="~{fragments/layout :: topbar(active='backup')}"></header>
+	<header th:replace="~{fragments/layout :: topbar(active='import')}"></header>
 
 	<main class="page">
-		<h1>Choose what to restore</h1>
-		<p class="page-subtitle" th:text="'Backup from ' + ${manifest.sourceDomain()} + ', created ' + ${manifest.createdAt()} + '.'"></p>
+		<h1>Choose what to import</h1>
+		<p class="page-subtitle" th:text="'Configuration export from ' + ${manifest.sourceDomain()} + ', created ' + ${manifest.createdAt()} + '.'"></p>
 
 		<div class="warning">
-			<p><strong>Restoring will overwrite matching existing configuration.</strong></p>
-			<p>Exposed Apps and Local Websites you restore have their tunnels deleted and recreated, causing brief
+			<p><strong>Importing will overwrite matching existing configuration.</strong></p>
+			<p>Exposed Apps and Local Websites you import have their tunnels deleted and recreated, causing brief
 				downtime for that homelab's users.</p>
-			<p>Homelabs you restore are issued a brand-new secret -- agent secrets are never included in a backup.
-				You must update each affected homelab's configuration with its new secret after restoring.</p>
+			<p>Homelabs you import are issued a brand-new secret -- agent secrets are never included in an exported
+				configuration. You must update each affected homelab's configuration with its new secret after
+				importing.</p>
 		</div>
 
-		<form id="restore-form" method="post" th:action="@{/backup/restore/{stagingId}/apply(stagingId=${stagingId})}">
+		<form id="restore-form" method="post" th:action="@{/import-configuration/{stagingId}/apply(stagingId=${stagingId})}">
 
 			<fieldset th:if="${#lists.isEmpty(manifest.homelabs())}">
 				<legend>Homelabs</legend>
-				<p class="muted">No homelabs in this backup.</p>
+				<p class="muted">No homelabs in this configuration export.</p>
 			</fieldset>
 
 			<fieldset th:unless="${#lists.isEmpty(manifest.homelabs())}">
-				<legend>Homelabs &amp; Exposed Apps</legend>
-				<div class="restore-tree" th:each="homelab : ${manifest.homelabs()}">
-					<label class="restore-item">
-						<input type="checkbox" name="homelabs" th:value="${homelab}" class="restore-homelab" checked>
-						<span th:text="${homelab}"></span>
-					</label>
-					<div class="restore-children">
-						<label class="restore-item" th:each="app : ${appsByHomelab.get(homelab)}">
-							<input type="checkbox" name="exposedApps" th:value="${app.subdomain()}" class="restore-app" checked>
-							<span th:text="${app.isNetworkService() ? app.name() : app.subdomain()}"></span>
-						</label>
-					</div>
-				</div>
+				<legend>Homelabs</legend>
+				<label class="restore-item" th:each="homelab : ${manifest.homelabs()}">
+					<input type="checkbox" name="homelabs" th:value="${homelab}" checked>
+					<span th:text="${homelab}"></span>
+				</label>
 			</fieldset>
 
-			<fieldset th:unless="${#lists.isEmpty(orphanApps)}">
-				<legend>Other exposed apps</legend>
-				<p class="muted">These reference a homelab not otherwise listed above.</p>
-				<label class="restore-item" th:each="app : ${orphanApps}">
+			<fieldset th:if="${#lists.isEmpty(manifest.exposedApps())}">
+				<legend>Exposed apps</legend>
+				<p class="muted">No exposed apps in this configuration export.</p>
+			</fieldset>
+
+			<fieldset th:unless="${#lists.isEmpty(manifest.exposedApps())}">
+				<legend>Exposed apps</legend>
+				<label class="restore-item" th:each="app : ${manifest.exposedApps()}">
 					<input type="checkbox" name="exposedApps" th:value="${app.subdomain()}" checked>
-					<span th:text="${app.isNetworkService() ? app.name() : app.subdomain()} + ' (' + ${app.homelabName()} + ')'"></span>
+					<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
 				</label>
 			</fieldset>
 
 			<fieldset th:if="${#lists.isEmpty(manifest.localWebsites())}">
 				<legend>Local websites</legend>
-				<p class="muted">No local websites in this backup.</p>
+				<p class="muted">No local websites in this configuration export.</p>
 			</fieldset>
 
 			<fieldset th:unless="${#lists.isEmpty(manifest.localWebsites())}">
@@ -62,12 +59,12 @@
 			</fieldset>
 
 			<div class="button-panel">
-				<button type="submit" name="all" value="false" class="button">Restore Selected</button>
-				<button type="submit" name="all" value="true" class="button">Restore All</button>
+				<button type="submit" name="all" value="false" class="button">Import Selected</button>
+				<button type="submit" name="all" value="true" class="button">Import All</button>
 			</div>
 		</form>
 
-		<form method="post" th:action="@{/backup/restore/{stagingId}/cancel(stagingId=${stagingId})}">
+		<form method="post" th:action="@{/import-configuration/{stagingId}/cancel(stagingId=${stagingId})}">
 			<button type="submit" class="link-button">Cancel</button>
 		</form>
 	</main>

@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * What the user chose to restore from a staged backup, built by
- * BackupController from either the "Restore All" shortcut (server computes
+ * BackupController from either the "Import All" shortcut (server computes
  * the full selection from the staged manifest -- see BackupService) or the
  * checkbox tree the user submitted.
  */

@@ -105,8 +105,10 @@ h1 { font-size: 32px; }
 	padding: 0;
 	white-space: nowrap;
 }
+.user-menu-panel a:visited { color: var(--text); }
 .user-menu-panel a:hover,
 .user-menu-panel .link-button:hover { color: var(--accent); text-decoration: underline; }
+.user-menu-panel a.active { color: var(--accent); font-weight: 600; }
 .user-menu-panel form { margin: 0; }
 
 .secret-field { display: flex; align-items: center; gap: 0.5rem; }
@@ -391,7 +393,5 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 
 .overlay-card .button { margin-right: 0.5rem; min-width: 6rem; text-align: center; }
 
-.restore-tree { margin-bottom: 0.75rem; }
 .restore-item { display: block; font-weight: normal; margin-bottom: 0.35rem; }
 .restore-item input { margin-right: 0.4rem; }
-.restore-children { margin-left: 1.75rem; }

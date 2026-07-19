@@ -26,11 +26,12 @@
 			<a th:href="@{/}" th:classappend="${active == 'homelabs'} ? 'active'">Homelabs</a>
 			<a th:href="@{/apps}" th:classappend="${active == 'apps'} ? 'active'">Applications</a>
 			<a th:href="@{/local-websites}" th:classappend="${active == 'local-websites'} ? 'active'">Local websites</a>
-			<a th:href="@{/backup}" th:classappend="${active == 'backup'} ? 'active'">Backup &amp; Restore</a>
 		</nav>
 		<details class="user-menu">
-			<summary>Account</summary>
+			<summary>Settings</summary>
 			<div class="user-menu-panel">
+				<a th:href="@{/export-configuration}" th:classappend="${active == 'export'} ? 'active'">Export configuration</a>
+				<a th:href="@{/import-configuration}" th:classappend="${active == 'import'} ? 'active'">Import configuration</a>
 				<a th:if="${accountUrl != null}" th:href="${accountUrl}">Change username / password</a>
 				<form method="post" th:action="@{/logout}">
 					<button type="submit" class="link-button">Logout</button>

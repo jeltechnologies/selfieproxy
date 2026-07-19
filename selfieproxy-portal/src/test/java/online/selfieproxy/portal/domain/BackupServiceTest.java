@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -79,7 +80,34 @@ class BackupServiceTest {
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
-		service.writeBackup(backupBytes);
+		RestoreSelection selection = new RestoreSelection(List.of("lab1"), List.of("blog"), List.of("blogsite"));
+		service.writeBackup(backupBytes, ZoneOffset.UTC, selection);
+
+		String stagingId = service.stageRestore(new ByteArrayInputStream(backupBytes.toByteArray()));
+		BackupManifest manifest = service.readStagedManifest(stagingId);
+
+		assertEquals(List.of("lab1"), manifest.homelabs());
+		assertEquals(1, manifest.exposedApps().size());
+		assertEquals("blog", manifest.exposedApps().get(0).subdomain());
+		assertEquals(1, manifest.localWebsites().size());
+		assertEquals("blogsite", manifest.localWebsites().get(0).domain());
+	}
+
+	@Test
+	void writeBackupOnlyIncludesSelectedItems() throws IOException {
+		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null), "lab2", new AgentStatusDto(null)));
+		TunnelDto blogTunnel = new TunnelDto("blog.example.com", null, 0, null, null, 0, null,
+				"127.0.0.1", 8080, false, "server", false, false, "admin", "lab1", null, null);
+		TunnelDto shopTunnel = new TunnelDto("shop.example.com", null, 0, null, null, 0, null,
+				"127.0.0.1", 8081, false, "server", false, false, "admin", "lab2", null, null);
+		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", blogTunnel, "shop.example.com", shopTunnel));
+		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", false), new LocalWebsite("shopsite", false)));
+
+		BackupService service = newService();
+		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
+		RestoreSelection selection = new RestoreSelection(List.of("lab1"), List.of("blog"), List.of("blogsite"));
+		service.writeBackup(backupBytes, ZoneOffset.UTC, selection);
 
 		String stagingId = service.stageRestore(new ByteArrayInputStream(backupBytes.toByteArray()));
 		BackupManifest manifest = service.readStagedManifest(stagingId);

@@ -10,7 +10,8 @@ import java.util.List;
  * is an internal persistence format, not an API response.
  *
  * @param version        manifest schema version -- BackupService rejects any value it doesn't recognize
- * @param createdAt      ISO-8601 instant (server UTC) the backup was created, informational only
+ * @param createdAt      ISO-8601 date-time (millisecond precision, with offset/zone) the backup was created, in the
+ *                       browser's local timezone at download time -- see BackupController's {@code ?tz=} param, informational only
  * @param sourceDomain   the DOMAIN of the server the backup was taken from, informational only -- restore never depends on it, since subdomains are already relative
  * @param homelabs       every Homelab (Agent) name except the hidden "This Server" one -- see ThisServerAgentProperties
  * @param exposedApps    every Exposed App ("server"), the same merged view ExposedAppController itself shows/edits
