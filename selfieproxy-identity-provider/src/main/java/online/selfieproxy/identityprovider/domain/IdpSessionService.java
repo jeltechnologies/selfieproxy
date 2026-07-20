@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
@@ -16,15 +17,16 @@ import online.selfieproxy.identityprovider.config.SsoProperties;
 
 /**
  * This IdP's own login session -- what actually makes sign-on "single":
- * without it, every SSO-protected domain's authorization round trip would
+ * without it, every single-sign-on-protected domain's authorization round trip would
  * always re-show the login form here, even moments after authenticating for
- * a different domain. Deliberately single-user (this system only ever has
- * one admin user), so a valid, unexpired token is proof enough -- no
- * username is tracked. In-memory-only, same no-DB/random-token style as
- * AuthorizationService. The session cookie's Max-Age is set to the absolute
- * cap (sessionMaxMinutes) so the browser retains it for the full possible
- * session lifetime; the shorter idle timeout (sessionIdleMinutes) is
- * enforced independently server-side, in this map, and slides on every
+ * a different domain. Now tracks who logged in and whether they're the
+ * admin (rather than a bare boolean), since both AuthorizeController's
+ * silent single-sign-on path and the /users pages need to know whose session it is, not
+ * just that a session exists. In-memory-only, same no-DB/random-token style
+ * as AuthorizationService. The session cookie's Max-Age is set to the
+ * absolute cap (sessionMaxMinutes) so the browser retains it for the full
+ * possible session lifetime; the shorter idle timeout (sessionIdleMinutes)
+ * is enforced independently server-side, in this map, and slides on every
  * successful validate().
  */
 @Component
@@ -41,36 +43,36 @@ public class IdpSessionService {
 	}
 
 	/** Mints a new session and sets its cookie on the response -- call this once, right after a successful login/password-change. */
-	public void startSession(HttpServletResponse response) {
+	public void startSession(HttpServletResponse response, String username, boolean isAdmin) {
 		String token = randomToken();
 		Instant now = Instant.now();
 		Instant maxExpiry = now.plusSeconds(properties.sessionMaxMinutes() * 60L);
 		Instant idleExpiry = capAtMax(now.plusSeconds(properties.sessionIdleMinutes() * 60L), maxExpiry);
-		sessionsByToken.put(token, new Session(idleExpiry, maxExpiry));
+		sessionsByToken.put(token, new Session(username, isAdmin, idleExpiry, maxExpiry));
 
 		long maxAgeSeconds = properties.sessionMaxMinutes() * 60L;
 		response.addHeader("Set-Cookie", COOKIE_NAME + "=" + token
 				+ "; Path=/; Max-Age=" + maxAgeSeconds + "; HttpOnly; Secure; SameSite=Lax");
 	}
 
-	/** True if the browser presents a still-valid session cookie -- slides the idle deadline (capped at the absolute max) on success. */
-	public boolean validate(HttpServletRequest request) {
+	/** Present if the browser presents a still-valid session cookie -- slides the idle deadline (capped at the absolute max) on success. */
+	public Optional<SessionInfo> validate(HttpServletRequest request) {
 		String token = readCookie(request);
 		if (token == null) {
-			return false;
+			return Optional.empty();
 		}
 		Session session = sessionsByToken.get(token);
 		if (session == null) {
-			return false;
+			return Optional.empty();
 		}
 		Instant now = Instant.now();
 		if (now.isAfter(session.idleExpiry()) || now.isAfter(session.maxExpiry())) {
 			sessionsByToken.remove(token);
-			return false;
+			return Optional.empty();
 		}
 		Instant slidIdleExpiry = capAtMax(now.plusSeconds(properties.sessionIdleMinutes() * 60L), session.maxExpiry());
-		sessionsByToken.put(token, new Session(slidIdleExpiry, session.maxExpiry()));
-		return true;
+		sessionsByToken.put(token, new Session(session.username(), session.isAdmin(), slidIdleExpiry, session.maxExpiry()));
+		return Optional.of(new SessionInfo(session.username(), session.isAdmin()));
 	}
 
 	/** Ends the session server-side (if any) and clears the cookie -- call on explicit logout. */
@@ -105,6 +107,10 @@ public class IdpSessionService {
 		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 	}
 
-	private record Session(Instant idleExpiry, Instant maxExpiry) {
+	private record Session(String username, boolean isAdmin, Instant idleExpiry, Instant maxExpiry) {
+	}
+
+	/** Who a still-valid session belongs to -- returned by validate() for both AuthorizeController's silent single-sign-on path and the /users pages' admin gate. */
+	public record SessionInfo(String username, boolean isAdmin) {
 	}
 }

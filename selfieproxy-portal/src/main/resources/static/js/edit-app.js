@@ -4,7 +4,7 @@
 	var domain = (window.selfieProxy && window.selfieProxy.domain) || "";
 	var isNew = !!(window.selfieProxy && window.selfieProxy.isNew);
 	var ssoUserTouched = false;
-	// null until the first updateVisibility() run, then tracks whether SSO protection was
+	// null until the first updateVisibility() run, then tracks whether single sign on protection was
 	// available on the *previous* run -- so we can tell "just became available" (default it
 	// back on) apart from "was already available at page load" (leave the saved/checked
 	// state alone, e.g. an existing app someone deliberately left unprotected).

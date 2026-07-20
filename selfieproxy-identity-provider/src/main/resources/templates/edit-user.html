@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${isNew} ? 'Add user - Selfie Proxy' : 'Edit user - Selfie Proxy'"></title>
+	<link rel="stylesheet" th:href="@{/css/style.css}">
+
+	<link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+	<link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+	<link rel="icon" type="image/png" sizes="16x16" th:href="@{/img/favicon/favicon-16x16.png}">
+	<link rel="icon" type="image/png" sizes="32x32" th:href="@{/img/favicon/favicon-32x32.png}">
+	<link rel="apple-touch-icon" sizes="180x180" th:href="@{/img/favicon/apple-touch-icon.png}">
+	<link rel="manifest" th:href="@{/site.webmanifest}">
+	<meta name="theme-color" content="#ffffff">
+</head>
+<body>
+	<main class="page">
+		<h1 th:text="${isNew} ? 'Add user' : 'Edit ' + ${username}"></h1>
+
+		<p class="warning-strong" th:if="${isAdminRow}">Warning: Remember this username and password — there is no recovery option. Losing it means reinstalling the server and losing all your data.</p>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<form id="user-form" method="post"
+			  th:action="${isNew} ? @{/users/new(return_to=${returnTo})} : @{/users/{username}/edit(username=${username}, return_to=${returnTo})}">
+
+			<div class="field">
+				<label for="username">Username</label>
+				<input type="text" id="username" name="username" th:value="${username}" required autofocus>
+			</div>
+
+			<div th:if="${isNew}">
+				<div class="field">
+					<label for="password">Password</label>
+					<div class="secret-input-wrap">
+						<input type="password" id="password" name="password" required minlength="12">
+						<button type="button" class="icon-button password-toggle" data-for="password" title="Show password" aria-label="Show password">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+						</button>
+					</div>
+				</div>
+
+				<div class="field">
+					<label for="confirmPassword">Confirm password</label>
+					<div class="secret-input-wrap">
+						<input type="password" id="confirmPassword" name="confirmPassword" required minlength="12">
+						<button type="button" class="icon-button password-toggle" data-for="confirmPassword" title="Show password" aria-label="Show password">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div th:unless="${isNew}">
+				<h2>Change password</h2>
+				<p class="muted">Leave blank to keep the current password.</p>
+
+				<div class="field" th:if="${isAdminRow}">
+					<label for="currentPassword">Current password</label>
+					<div class="secret-input-wrap">
+						<input type="password" id="currentPassword" name="currentPassword" autocomplete="current-password">
+						<button type="button" class="icon-button password-toggle" data-for="currentPassword" title="Show password" aria-label="Show password">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+						</button>
+					</div>
+				</div>
+
+				<div class="field">
+					<label for="newPassword">New password</label>
+					<div class="secret-input-wrap">
+						<input type="password" id="newPassword" name="newPassword" minlength="12">
+						<button type="button" class="icon-button password-toggle" data-for="newPassword" title="Show password" aria-label="Show password">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+						</button>
+					</div>
+				</div>
+
+				<div class="field">
+					<label for="confirmNewPassword">Confirm new password</label>
+					<div class="secret-input-wrap">
+						<input type="password" id="confirmNewPassword" name="confirmNewPassword" minlength="12">
+						<button type="button" class="icon-button password-toggle" data-for="confirmNewPassword" title="Show password" aria-label="Show password">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="button-panel">
+				<button type="submit" class="button">OK</button>
+				<button type="button" id="remove-button" class="button button-danger" th:if="${not isNew and not isAdminRow}">Remove</button>
+				<a class="button button-cancel" th:href="@{/users(return_to=${returnTo})}">Cancel</a>
+			</div>
+		</form>
+
+		<form id="delete-form" method="post" th:if="${not isNew and not isAdminRow}"
+			  th:action="@{/users/{username}/delete(username=${username}, return_to=${returnTo})}">
+		</form>
+	</main>
+
+	<div id="confirm-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>Remove this user? They will no longer be able to log in to any exposed application. This cannot be undone.</p>
+			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
+			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<script th:src="@{/js/users.js}"></script>
+
+	<footer class="login-footer muted">Powered by selfieproxy by Jelte Jansons — built on boringproxy by Anders Pitman — MIT Licensed</footer>
+</body>
+</html>

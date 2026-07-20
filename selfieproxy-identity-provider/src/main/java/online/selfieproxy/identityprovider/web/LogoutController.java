@@ -12,7 +12,7 @@ import online.selfieproxy.identityprovider.domain.IdpSessionService;
 
 /**
  * Landing page boringproxy's /oidc/logout redirects to after clearing its
- * per-domain SSO cookie. This is also where this IdP's own login session
+ * per-domain single sign on cookie. This is also where this IdP's own login session
  * (IdpSessionService) is ended -- every domain's /oidc/logout funnels here,
  * so it's the natural single choke point to tell the IdP "this user signed
  * out," ensuring a still-open second app can't silently resurrect the login

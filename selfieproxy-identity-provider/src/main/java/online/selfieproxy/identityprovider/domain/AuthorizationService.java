@@ -29,7 +29,7 @@ public class AuthorizationService {
 	/** Starts a new pending authorization request; caller must have already validated client_id/redirect_uri. */
 	public String start(String redirectUri, String codeChallenge, String codeChallengeMethod, String state) {
 		String authzId = randomToken();
-		pendingByAuthzId.put(authzId, new PendingAuthorization(redirectUri, codeChallenge, codeChallengeMethod, state, false));
+		pendingByAuthzId.put(authzId, new PendingAuthorization(redirectUri, codeChallenge, codeChallengeMethod, state, false, null, false));
 		return authzId;
 	}
 
@@ -37,8 +37,8 @@ public class AuthorizationService {
 		return pendingByAuthzId.get(authzId);
 	}
 
-	public void markAuthenticated(String authzId) {
-		pendingByAuthzId.computeIfPresent(authzId, (id, pending) -> pending.withAuthenticated(true));
+	public void markAuthenticated(String authzId, String username, boolean isAdmin) {
+		pendingByAuthzId.computeIfPresent(authzId, (id, pending) -> pending.withAuthenticated(username, isAdmin));
 	}
 
 	/** One-time: removes the pending authorization and mints a short-lived code bound to the same redirect_uri/code_challenge, for /token to verify later. Returns null if authzId is unknown or not yet authenticated. */
@@ -51,7 +51,8 @@ public class AuthorizationService {
 
 		String code = randomToken();
 		Instant expiry = Instant.now().plusSeconds(CODE_TTL_SECONDS);
-		codesByCode.put(code, new IssuedCode(pending.redirectUri(), pending.codeChallenge(), pending.codeChallengeMethod(), expiry));
+		codesByCode.put(code, new IssuedCode(pending.redirectUri(), pending.codeChallenge(), pending.codeChallengeMethod(),
+				pending.username(), pending.isAdmin(), expiry));
 		return code;
 	}
 
@@ -81,13 +82,14 @@ public class AuthorizationService {
 	}
 
 	public record PendingAuthorization(String redirectUri, String codeChallenge, String codeChallengeMethod, String state,
-			boolean authenticated) {
-		PendingAuthorization withAuthenticated(boolean value) {
-			return new PendingAuthorization(redirectUri, codeChallenge, codeChallengeMethod, state, value);
+			boolean authenticated, String username, boolean isAdmin) {
+		PendingAuthorization withAuthenticated(String username, boolean isAdmin) {
+			return new PendingAuthorization(redirectUri, codeChallenge, codeChallengeMethod, state, true, username, isAdmin);
 		}
 	}
 
-	public record IssuedCode(String redirectUri, String codeChallenge, String codeChallengeMethod, Instant expiry) {
+	public record IssuedCode(String redirectUri, String codeChallenge, String codeChallengeMethod, String username,
+			boolean isAdmin, Instant expiry) {
 		boolean isExpired() {
 			return Instant.now().isAfter(expiry);
 		}

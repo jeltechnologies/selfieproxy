@@ -50,11 +50,11 @@ func Listen() {
 	portalPort := flagSet.Int("portal-port", 0, "Local port -portal-domain is proxied to")
 	ssoDomain := flagSet.String("sso-domain", "", "Domain reverse-proxied directly to -sso-port on localhost, without a Tunnel/Agent (Selfie Proxy's bundled OIDC IdP, selfieproxy-sso-server, which must be reachable before any agent exists)")
 	ssoPort := flagSet.Int("sso-port", 0, "Local port -sso-domain is proxied to")
-	oidcIssuer := flagSet.String("oidc-issuer", "", "OIDC issuer URL boringproxy authenticates the portal domain and any SSO-protected tunnel against; blank disables SSO entirely")
+	oidcIssuer := flagSet.String("oidc-issuer", "", "OIDC issuer URL boringproxy authenticates the portal domain and any tunnel protected with single sign on against; blank disables single sign on entirely")
 	oidcClientId := flagSet.String("oidc-client-id", "", "OIDC client ID boringproxy registers as with -oidc-issuer")
 	oidcClientSecret := flagSet.String("oidc-client-secret", "", "OIDC client secret, if the issuer requires one (blank for the bundled selfieproxy-sso-server, which trusts PKCE alone)")
-	ssoIdleMinutes := flagSet.Int("sso-idle-minutes", 30, "Minutes of inactivity before an SSO session (portal domain or an SSO-protected tunnel) expires; refreshed on every request")
-	ssoMaxMinutes := flagSet.Int("sso-max-minutes", 600, "Absolute maximum minutes an SSO session stays valid, regardless of activity")
+	ssoIdleMinutes := flagSet.Int("sso-idle-minutes", 30, "Minutes of inactivity before a single sign on session (portal domain or a tunnel protected with single sign on) expires; refreshed on every request")
+	ssoMaxMinutes := flagSet.Int("sso-max-minutes", 600, "Absolute maximum minutes a single sign on session stays valid, regardless of activity")
 	sshServerPort := flagSet.Int("ssh-server-port", 22, "SSH Server Port")
 	dbDir := flagSet.String("db-dir", "", "Database file directory")
 	certDir := flagSet.String("cert-dir", "", "TLS cert directory")
@@ -174,7 +174,7 @@ func Listen() {
 		log.Print(fmt.Sprintf("Successfully acquired certificate for sso domain (%s)", *ssoDomain))
 	}
 
-	StartOidcAuth(*oidcIssuer, *oidcClientId, *oidcClientSecret, adminDomain,
+	StartOidcAuth(*oidcIssuer, *oidcClientId, *oidcClientSecret, adminDomain, *portalDomain,
 		time.Duration(*ssoIdleMinutes)*time.Minute, time.Duration(*ssoMaxMinutes)*time.Minute)
 
 	// Add admin user if it doesn't already exist
@@ -374,8 +374,8 @@ func Listen() {
 			// Proxied directly to a fixed local address, not through a
 			// Tunnel/Agent -- this must work before any agent is ever
 			// connected, since it's how the portal used to set one up.
-			// Always SSO-gated (unlike ordinary tunnels, where it's opt-in
-			// via SsoProtected): the portal has no login of its own left,
+			// Always gated behind single sign on (unlike ordinary tunnels, where
+			// it's opt-in via SsoProtected): the portal has no login of its own left,
 			// see selfieproxy-portal's SessionInterceptor.
 			portalTunnel := Tunnel{Domain: *portalDomain}
 			if !requireSsoIfNeeded(w, r, portalTunnel.Domain, true) {
@@ -385,8 +385,8 @@ func Listen() {
 			proxyRequest(w, r, portalTunnel, httpClient, "localhost", *portalPort, *behindProxy)
 		} else if *ssoDomain != "" && hostDomain == *ssoDomain {
 			// Proxied directly to selfieproxy-sso-server, same
-			// before-any-agent-exists carve-out as -portal-domain. Never
-			// SSO-gated itself -- it's the IdP the gate calls out to.
+			// before-any-agent-exists carve-out as -portal-domain. Never gated
+			// behind single sign on itself -- it's the IdP the gate calls out to.
 			ssoTunnel := Tunnel{Domain: *ssoDomain}
 			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, *behindProxy)
 		} else {

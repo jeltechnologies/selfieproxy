@@ -60,13 +60,13 @@ public class SigningKeyProvider {
 		try {
 			if (!Files.exists(path)) {
 				generateAndWrite(path);
-				log.info("Generated new SSO signing keypair at {}", path);
+				log.info("Generated new single sign on signing keypair at {}", path);
 			}
 			this.rsaKey = load(path);
-			log.info("Loaded SSO signing key (kid={}) from {}", rsaKey.getKeyID(), path);
+			log.info("Loaded single sign on signing key (kid={}) from {}", rsaKey.getKeyID(), path);
 		} catch (Exception e) {
-			log.error("Failed to initialize SSO signing key at {}", path, e);
-			throw new IllegalStateException("Failed to initialize SSO signing key at " + path, e);
+			log.error("Failed to initialize single sign on signing key at {}", path, e);
+			throw new IllegalStateException("Failed to initialize single sign on signing key at " + path, e);
 		}
 	}
 

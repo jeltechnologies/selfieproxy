@@ -89,7 +89,7 @@ class AdminPortalSmokeTest {
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("music")));
 
-		// SSO can only ever gate "Server HTTPS" (Web Application + HTTPS +
+		// Single sign on can only ever gate "Server HTTPS" (Web Application + HTTPS +
 		// TlsMode.MANAGED, boringproxy's own "server" TLS termination) --
 		// requesting it for a BYO_CERT app must be rejected, never silently
 		// dropped, since BYO_CERT/HOP_BY_HOP are HTTPS too and it'd be easy
@@ -106,7 +106,7 @@ class AdminPortalSmokeTest {
 						.param("port", "443"))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString(
-						"SSO protection requires Web Application, HTTPS, and the recommended End-to-end encrypted option.")));
+						"Single sign on protection requires Web Application, HTTPS, and the recommended End-to-end encrypted option.")));
 
 		when(boringProxyClient.createTunnel(any(CreateTunnelRequestDto.class))).thenReturn(webTunnel);
 

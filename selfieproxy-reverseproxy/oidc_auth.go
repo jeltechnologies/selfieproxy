@@ -32,8 +32,9 @@ const (
 
 // oidcAuthHolder is populated asynchronously by StartOidcAuth -- see its
 // doc comment for why OIDC discovery can't happen synchronously during
-// Listen()'s startup. Every call site treats a nil Load() as "SSO isn't
-// ready yet" rather than "SSO is disabled" (that's -oidc-issuer == "").
+// Listen()'s startup. Every call site treats a nil Load() as "single sign
+// on isn't ready yet" rather than "single sign on is disabled" (that's
+// -oidc-issuer == "").
 var oidcAuthHolder atomic.Pointer[OidcAuthenticator]
 
 // OidcAuthenticator is boringproxy's embedded OIDC Relying Party: one
@@ -47,6 +48,7 @@ type OidcAuthenticator struct {
 	verifier     *oidc.IDTokenVerifier
 	oauth2Config oauth2.Config
 	adminDomain  string
+	portalDomain string
 	signingKey   []byte
 	idleTTL      time.Duration
 	maxTTL       time.Duration
@@ -82,7 +84,7 @@ type ssoStateClaims struct {
 // StartOidcAuth kicks off asynchronous OIDC discovery against issuer and
 // returns immediately; it never blocks Listen()'s startup. This matters
 // because of a bootstrap ordering problem: discovery is an HTTP call to
-// the SSO server, which boringproxy itself proxies to via -sso-domain --
+// the single sign on server, which boringproxy itself proxies to via -sso-domain --
 // so it can only succeed once boringproxy's own accept loop is running.
 // selfieproxy-sso-server boots concurrently with boringproxy (no
 // depends_on between them in docker-compose.yaml, precisely so it
@@ -93,19 +95,19 @@ type ssoStateClaims struct {
 // (RequireAuth's callers in boringproxy.go, HandleAuthorize,
 // HandleCallback) treats a not-yet-ready OidcAuthenticator as a transient
 // 503, not a hard failure.
-// A blank issuer disables SSO entirely -- not expected to happen in the
+// A blank issuer disables single sign on entirely -- not expected to happen in the
 // Selfie Proxy deployment, where docker-compose.yaml always
 // computes a default pointing at the bundled server, but kept as an
 // escape hatch for anyone running the bare boringproxy binary directly.
-func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string, idleTTL, maxTTL time.Duration) {
+func StartOidcAuth(issuer, clientId, clientSecret, adminDomain, portalDomain string, idleTTL, maxTTL time.Duration) {
 	if issuer == "" {
-		log.Println("SSO disabled (-oidc-issuer not set)")
+		log.Println("Single sign on disabled (-oidc-issuer not set)")
 		return
 	}
 
 	signingKey, err := loadOrCreateSsoSigningKey()
 	if err != nil {
-		log.Fatal("failed to initialize SSO signing key: ", err)
+		log.Fatal("failed to initialize single sign on signing key: ", err)
 	}
 
 	go func() {
@@ -125,12 +127,13 @@ func StartOidcAuth(issuer, clientId, clientSecret, adminDomain string, idleTTL, 
 						RedirectURL:  fmt.Sprintf("https://%s/oidc/callback", adminDomain),
 						Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 					},
-					adminDomain: adminDomain,
-					signingKey:  signingKey,
-					idleTTL:     idleTTL,
-					maxTTL:      maxTTL,
+					adminDomain:  adminDomain,
+					portalDomain: portalDomain,
+					signingKey:   signingKey,
+					idleTTL:      idleTTL,
+					maxTTL:       maxTTL,
 				})
-				log.Printf("OIDC SSO ready (issuer %s)\n", issuer)
+				log.Printf("OIDC single sign on ready (issuer %s)\n", issuer)
 				return
 			}
 
@@ -156,7 +159,7 @@ func loadOrCreateSsoSigningKey() ([]byte, error) {
 
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("failed generating SSO signing key: %w", err)
+		return nil, fmt.Errorf("failed generating single sign on signing key: %w", err)
 	}
 	if err := os.WriteFile(path, key, 0600); err != nil {
 		return nil, fmt.Errorf("failed writing %s: %w", path, err)
@@ -185,7 +188,7 @@ func requireSsoIfNeeded(w http.ResponseWriter, r *http.Request, domain string, p
 	return oidcAuth.RequireAuth(w, r, domain)
 }
 
-// RequireAuth is the single SSO check: valid session cookie for this exact
+// RequireAuth is the single sign on check: valid session cookie for this exact
 // domain proceeds, sliding its idle deadline forward (capped at its
 // existing, unextended absolute MaxExp); a valid relay token (?sso_token=)
 // for this domain sets a fresh cookie (a new absolute MaxExp, since this is
@@ -256,7 +259,7 @@ func (a *OidcAuthenticator) HandleAuthorize(w http.ResponseWriter, r *http.Reque
 // to that original domain, not the admin domain this callback runs on.
 func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	if errParam := r.URL.Query().Get("error"); errParam != "" {
-		http.Error(w, "SSO login failed: "+errParam, http.StatusBadRequest)
+		http.Error(w, "Single sign on login failed: "+errParam, http.StatusBadRequest)
 		return
 	}
 
@@ -265,13 +268,13 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 
 	payload, ok := a.verifyToken(state)
 	if !ok {
-		http.Error(w, "invalid or tampered SSO state", http.StatusBadRequest)
+		http.Error(w, "invalid or tampered single sign on state", http.StatusBadRequest)
 		return
 	}
 
 	var claims ssoStateClaims
 	if err := json.Unmarshal(payload, &claims); err != nil || time.Now().Unix() > claims.Exp {
-		http.Error(w, "expired or malformed SSO state", http.StatusBadRequest)
+		http.Error(w, "expired or malformed single sign on state", http.StatusBadRequest)
 		return
 	}
 
@@ -287,9 +290,28 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if _, err := a.verifier.Verify(r.Context(), rawIdToken); err != nil {
+	idToken, err := a.verifier.Verify(r.Context(), rawIdToken)
+	if err != nil {
 		http.Error(w, "id_token verification failed: "+err.Error(), http.StatusForbidden)
 		return
+	}
+
+	// The is_admin claim only gates the portal domain -- an absent claim (any
+	// IdP other than the bundled selfieproxy-identity-provider) is treated as
+	// permissive, which is what scopes this whole restriction to the bundled
+	// IdP without oidc_auth.go needing to know which IdP is actually in use.
+	if claims.Domain == a.portalDomain {
+		var identityClaims struct {
+			IsAdmin *bool `json:"is_admin"`
+		}
+		if err := idToken.Claims(&identityClaims); err != nil {
+			http.Error(w, "failed to parse id_token claims: "+err.Error(), http.StatusForbidden)
+			return
+		}
+		if identityClaims.IsAdmin != nil && !*identityClaims.IsAdmin {
+			http.Error(w, "This account can only access exposed applications, not the Selfie Proxy portal.", http.StatusForbidden)
+			return
+		}
 	}
 
 	relayToken := a.signToken(ssoClaims{
@@ -299,7 +321,7 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 
 	returnUrl, err := url.Parse(claims.ReturnTo)
 	if err != nil {
-		http.Error(w, "invalid return_to in SSO state", http.StatusBadRequest)
+		http.Error(w, "invalid return_to in single sign on state", http.StatusBadRequest)
 		return
 	}
 	q := returnUrl.Query()
@@ -311,7 +333,7 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 
 // HandleLogout serves /oidc/logout -- a top-level carve-out checked on
 // every domain (see boringproxy.go's main dispatch), not just the admin
-// domain, since the SSO cookie it clears is host-only and scoped to
+// domain, since the single sign on cookie it clears is host-only and scoped to
 // whichever domain the browser is currently on. Deliberately a free
 // function rather than an OidcAuthenticator method: clearing a cookie
 // needs no IdP round trip, so logout must keep working even before OIDC

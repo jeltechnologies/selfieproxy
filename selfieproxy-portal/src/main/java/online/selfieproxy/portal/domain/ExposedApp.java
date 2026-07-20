@@ -10,7 +10,7 @@ package online.selfieproxy.portal.domain;
  * @param exposedPort  only set when type is NETWORK_SERVICE
  * @param protocol     only meaningful when type is WEB_APPLICATION (Network Service is always TCP)
  * @param tlsMode      only set when type is WEB_APPLICATION and protocol is HTTPS
- * @param ssoProtected whether boringproxy gates this app behind the configured OIDC issuer; only ever true when {@link #canProtectWithSso()} holds, since boringproxy only ever parses HTTP (and so can enforce SSO) for "server"-termination tunnels -- see TlsMode.MANAGED
+ * @param ssoProtected whether boringproxy gates this app behind the configured OIDC issuer; only ever true when {@link #canProtectWithSso()} holds, since boringproxy only ever parses HTTP (and so can enforce single sign on) for "server"-termination tunnels -- see TlsMode.MANAGED
  */
 public record ExposedApp(
 		String subdomain,
@@ -42,10 +42,10 @@ public record ExposedApp(
 
 	/**
 	 * True whenever the tunnel ends up "server"-terminated -- the only TLS-termination mode boringproxy
-	 * itself HTTP-parses, so the only one it can gate with SSO. That's always true for a plain HTTP
+	 * itself HTTP-parses, so the only one it can gate with single sign on. That's always true for a plain HTTP
 	 * homelab app (Selfie Proxy still terminates the public TLS connection itself, see TunnelMapper),
 	 * and true for an HTTPS homelab app only under "Server HTTPS" (TlsMode.MANAGED) -- BYO_CERT/
-	 * HOP_BY_HOP are HTTPS too but never HTTP-parsed at the server, so SSO can't be enforced for them.
+	 * HOP_BY_HOP are HTTPS too but never HTTP-parsed at the server, so single sign on can't be enforced for them.
 	 */
 	public boolean canProtectWithSso() {
 		return isWebApplication() && (protocol == Protocol.HTTP || effectiveTlsMode() == TlsMode.MANAGED);

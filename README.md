@@ -20,7 +20,7 @@ enterprise compliance tooling — if you need those, use a commercial product in
 
 - Admin portal to manage every exposed app and website.
 - Automatic, auto-renewing HTTPS certificates.
-- Built-in login (SSO) protecting the admin portal and, optionally, individual exposed apps.
+- Built-in login (single sign on) protecting the admin portal and, optionally, individual exposed apps.
 - Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
@@ -38,7 +38,7 @@ Anders Pitman, which is no longer actively maintained. On top of it we added:
 - WebSocket support.
 - Per-app authentication for exposed applications.
 - Centralized agent ("client") management from the admin portal.
-- Built-in SSO login for the portal, with support for swapping in an external OIDC provider.
+- Built-in single sign on login for the portal, with support for swapping in an external OIDC provider.
 - Static website hosting.
 - Export/import configuration for every homelab, application, and static website.
 - Fixed tunnel authentication failing on modern OpenSSH (8.8+), which rejects the old

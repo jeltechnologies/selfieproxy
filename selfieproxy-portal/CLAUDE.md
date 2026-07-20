@@ -9,8 +9,10 @@ repo, and `selfieproxy-reverseproxy/CLAUDE.md` for the underlying tunnel engine 
 - The portal is kept as simple as possible, deliberately hiding complex network setup from the
   user. This is the main design pressure on every UI decision here: prefer fewer steps and fewer
   concepts over configurability.
-- Selfie Proxy is single-user: one admin account manages many Homelabs. No accounts, roles, or
-  permissions to build.
+- The portal itself stays single-operator: one admin account manages many Homelabs, and only that
+  admin can ever reach the portal. Selfie Proxy as a whole, though, also supports login-only Users
+  (see "Login" below) who can authenticate to exposed apps protected with single sign on but never the portal --
+  keep that distinction in mind rather than assuming every login is the admin.
 - A Homelab exposes several web services to the internet as subdomains of the Selfie Proxy domain.
 - boringproxy terminology ("Client", "Tunnel") must never leak into the portal UI — it only adds
   confusion for the non-networking audience this product targets. Internally the portal maps its
@@ -23,21 +25,29 @@ The portal has no login of its own (see root `CLAUDE.md`'s "Running" section for
 OIDC/env-var picture) — boringproxy gates the portal domain before any request reaches this
 container. After a successful login the user lands on the exposed applications page.
 
-- A Web Application exposed app can opt in to the same SSO gate ("Protect with SSO" on its edit
-  page) — available whenever Selfie Proxy itself terminates the public TLS connection: always for
+- A Web Application exposed app can opt in to the same single sign on gate (the authentication
+  checkbox on its edit page) — available whenever Selfie Proxy itself terminates the public TLS connection: always for
   a plain HTTP homelab app (Selfie Proxy still adds the managed cert and converts to HTTPS at the
   server, forwarding plain HTTP onward), and for an HTTPS homelab app only under Server HTTPS (the
   recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
   never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
 - The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds "Export configuration"
-  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Change username /
-  password" (links out to `selfieproxy-identity-provider`'s self-service `/account` page, hidden
-  when an external IdP is configured), and Logout. The user-facing labels and URLs say
+  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Users" (links out
+  to `selfieproxy-identity-provider`'s `/users` list -- add/edit/remove non-admin Users and change
+  any user's password, hidden whenever an external IdP is configured, since Selfie Proxy no longer
+  controls who can authenticate in that case), and Logout. There is no separate "Change username /
+  password" entry: the admin's own username and password are changed from the Users page's admin
+  row (Edit / Change password) like any other row, rather than through a standalone self-service
+  page -- `selfieproxy-identity-provider`'s old `/account` page and `AccountController` were
+  removed once the Users page's admin row covered the same ground. Users are never included in a
+  configuration export/import (`BackupService`) -- they live entirely in
+  `selfieproxy-identity-provider`'s own data directory, the same treatment as the admin account
+  and its RSA signing key. The user-facing labels and URLs say
   "export"/"import configuration"; the Java domain types underneath (`BackupService`,
   `BackupController`, `RestoreSelection`, `RestoreResult`, templates named `backup.html`/
   `restore.html`/`restore-picker.html`) keep the shorter "backup"/"restore" naming (see "Backup
   and restore" below), the same kind of internal-vs-UI naming split as Homelab/Agent and Exposed
-  App/Tunnel. Logout ends the portal's own session and clears boringproxy's SSO cookie for
+  App/Tunnel. Logout ends the portal's own session and clears boringproxy's single sign on cookie for
   the portal domain, landing on a confirmation page served by `selfieproxy-identity-provider` with
   a link back into the portal — which immediately requires logging in again, since both session
   and cookie are gone.
@@ -107,7 +117,7 @@ Connectivity options between Selfie Proxy and the homelab:
 
 1. **End-to-end encrypted** (default, recommended, "Server HTTPS") — Selfie Proxy automatically
    creates and renews a signed certificate, and is the only HTTPS connectivity option that can
-   also be protected with SSO (see `ExposedApp.canProtectWithSso()` and the "Protect by forcing
+   also be protected with single sign on (see `ExposedApp.canProtectWithSso()` and the "Protect by forcing
    authentication through Selfieproxy login" checkbox above).
 2. **End-to-end encrypted, self-provided** ("Client Raw TLS") — **not supported behind a reverse
    proxy** (e.g. NGINX) in the homelab: the agent must connect directly to the web application,

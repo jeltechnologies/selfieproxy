@@ -194,7 +194,7 @@ public class ExposedAppController {
 		}
 
 		if (app.ssoProtected() && !app.canProtectWithSso()) {
-			errors.add("SSO protection requires Web Application, HTTPS, and the recommended End-to-end encrypted option.");
+			errors.add("Single sign on protection requires Web Application, HTTPS, and the recommended End-to-end encrypted option.");
 		}
 
 		if (app.isNetworkService() && (app.name() == null || app.name().isBlank())) {

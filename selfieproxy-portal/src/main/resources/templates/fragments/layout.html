@@ -33,7 +33,7 @@
 			<div class="user-menu-panel">
 				<a th:href="@{/export-configuration}" th:classappend="${active == 'export'} ? 'active'">Export configuration</a>
 				<a th:href="@{/import-configuration}" th:classappend="${active == 'import'} ? 'active'">Import configuration</a>
-				<a th:if="${accountUrl != null}" th:href="${accountUrl}">Change username / password</a>
+				<a th:if="${usersUrl != null}" th:href="${usersUrl}">Users</a>
 				<form method="post" th:action="@{/logout}">
 					<button type="submit" class="link-button">Logout</button>
 				</form>

@@ -25,7 +25,6 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
-import online.selfieproxy.identityprovider.config.AdminAuthProperties;
 import online.selfieproxy.identityprovider.config.SsoProperties;
 import online.selfieproxy.identityprovider.domain.AuthorizationService;
 import online.selfieproxy.identityprovider.domain.AuthorizationService.IssuedCode;
@@ -36,21 +35,18 @@ import online.selfieproxy.identityprovider.domain.SigningKeyProvider;
 public class TokenController {
 
 	private static final String CLIENT_ID = "selfieproxy";
-	private static final String SUBJECT = "admin";
 	private static final long ID_TOKEN_TTL_SECONDS = 3600;
 	private static final SecureRandom RANDOM = new SecureRandom();
 
 	private final AuthorizationService authorizationService;
 	private final SigningKeyProvider signingKeyProvider;
 	private final SsoProperties ssoProperties;
-	private final AdminAuthProperties adminAuthProperties;
 
 	public TokenController(AuthorizationService authorizationService, SigningKeyProvider signingKeyProvider,
-			SsoProperties ssoProperties, AdminAuthProperties adminAuthProperties) {
+			SsoProperties ssoProperties) {
 		this.authorizationService = authorizationService;
 		this.signingKeyProvider = signingKeyProvider;
 		this.ssoProperties = ssoProperties;
-		this.adminAuthProperties = adminAuthProperties;
 	}
 
 	@PostMapping(value = "/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -87,7 +83,7 @@ public class TokenController {
 					"access_token", randomToken(),
 					"token_type", "Bearer",
 					"expires_in", ID_TOKEN_TTL_SECONDS,
-					"id_token", mintIdToken());
+					"id_token", mintIdToken(issued));
 			return ResponseEntity.ok(body);
 		} catch (JOSEException e) {
 			throw new IllegalStateException("Failed to sign ID token", e);
@@ -104,19 +100,19 @@ public class TokenController {
 		}
 	}
 
-	private String mintIdToken() throws JOSEException {
+	private String mintIdToken(IssuedCode issued) throws JOSEException {
 		RSAKey rsaKey = signingKeyProvider.getRsaKey();
 		Instant now = Instant.now();
-		String email = adminAuthProperties.username();
 
 		JWTClaimsSet claims = new JWTClaimsSet.Builder()
 				.issuer(ssoProperties.issuerUrl())
-				.subject(SUBJECT)
+				.subject(issued.username())
 				.audience(CLIENT_ID)
 				.issueTime(Date.from(now))
 				.expirationTime(Date.from(now.plusSeconds(ID_TOKEN_TTL_SECONDS)))
-				.claim("email", email)
-				.claim("name", email)
+				.claim("email", issued.username())
+				.claim("name", issued.username())
+				.claim("is_admin", issued.isAdmin())
 				.build();
 
 		JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaKey.getKeyID()).build();

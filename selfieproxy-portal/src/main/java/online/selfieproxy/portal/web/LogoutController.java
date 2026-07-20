@@ -11,10 +11,10 @@ import jakarta.servlet.http.HttpSession;
 
 /**
  * Ends the portal's own session and hands off to boringproxy's /oidc/logout
- * carve-out to clear the SSO cookie too -- invalidating only one of the two
- * would leave the other still granting access (see SessionInterceptor,
- * which trusts an existing PortalSession before it even looks at the SSO
- * header).
+ * carve-out to clear the single sign on cookie too -- invalidating only one
+ * of the two would leave the other still granting access (see
+ * SessionInterceptor, which trusts an existing PortalSession before it even
+ * looks at the single sign on header).
  */
 @Controller
 public class LogoutController {

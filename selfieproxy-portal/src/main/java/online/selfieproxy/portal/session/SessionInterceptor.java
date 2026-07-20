@@ -36,7 +36,7 @@ public class SessionInterceptor implements HandlerInterceptor {
 			return true;
 		}
 		response.sendError(HttpServletResponse.SC_FORBIDDEN,
-				"This request did not come through Selfie Proxy's SSO gate.");
+				"This request did not come through Selfie Proxy's single sign on gate.");
 		return false;
 	}
 }

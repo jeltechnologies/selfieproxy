@@ -3,6 +3,7 @@ package online.selfieproxy.identityprovider.web;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +24,7 @@ import online.selfieproxy.identityprovider.domain.IdpSessionService;
  * sso.client-redirect-uri on every fresh request, and a mismatch is a flat
  * 400 -- never a redirect, since the redirect_uri itself isn't trusted yet.
  *
- * This endpoint is shared by every SSO-protected domain's round trip
+ * This endpoint is shared by every single-sign-on-protected domain's round trip
  * (portal and every exposed app alike), so it's also where single sign-on
  * actually happens: startNew checks IdpSessionService for an existing IdP
  * login session before falling back to the login form -- if the browser
@@ -92,8 +93,9 @@ public class AuthorizeController {
 		}
 
 		String authzId = authorizationService.start(redirectUri, codeChallenge, codeChallengeMethod, state);
-		if (idpSessionService.validate(request)) {
-			authorizationService.markAuthenticated(authzId);
+		Optional<IdpSessionService.SessionInfo> session = idpSessionService.validate(request);
+		if (session.isPresent()) {
+			authorizationService.markAuthenticated(authzId, session.get().username(), session.get().isAdmin());
 			return issueCodeAndRedirect(authorizationService.get(authzId), authzId, response);
 		}
 		return "redirect:/login?authz_id=" + authzId;

@@ -54,7 +54,7 @@ public class TunnelMapper {
 			// Selfie Proxy still terminates the public TLS connection itself (managed cert, same as
 			// MANAGED/"Server HTTPS") and forwards plain HTTP onward -- proxyRequest defaults to
 			// upstreamScheme "http" whenever clientAddr has no "https://" prefix. This is what lets
-			// an HTTP-only homelab app still be SSO-protected (see ExposedApp.canProtectWithSso()).
+			// an HTTP-only homelab app still be protected with single sign on (see ExposedApp.canProtectWithSso()).
 			tlsTermination = "server";
 		} else {
 			clientAddr = HTTPS_PREFIX + app.host();

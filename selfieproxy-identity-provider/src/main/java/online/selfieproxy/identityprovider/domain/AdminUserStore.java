@@ -32,13 +32,13 @@ import online.selfieproxy.identityprovider.config.OidcProperties;
  * with an external IdP never authenticates against this bundled server, so
  * there's no reason to hash and persist a bootstrap password (least of all
  * one left blank, which would otherwise seed a live admin account with an
- * empty password) for a record LoginController/AccountController will never
+ * empty password) for a record LoginController/UsersController will never
  * legitimately be asked to check.
  *
  * load() also migrates records persisted before the username field existed:
  * such a file deserializes with username()==null (Jackson leaves missing
  * record components null rather than failing), which would otherwise both
- * blank out AccountController's username field and permanently break
+ * blank out the Users page's admin-row username field and permanently break
  * LoginController's username check ("admin".equals(null) is always false).
  * Backfilled from admin-portal.username and persisted immediately so this
  * only happens once.

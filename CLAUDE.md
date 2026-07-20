@@ -20,7 +20,7 @@ runtime config/volumes they use:
   own anymore — see `selfieproxy-identity-provider/` below.
 - `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, single-user OIDC Identity Provider
   (Java/Spring, same Maven/Dockerfile template as `selfieproxy-portal/`). Used by default to
-  authenticate the admin portal and any exposed app with "Protect with SSO" enabled; a BYO
+  authenticate the admin portal and any exposed app with single sign on protection enabled; a BYO
   external IdP (Keycloak, Authentik, etc.) can be swapped in instead via
   `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`, since `boringproxy`'s embedded OIDC
   client only ever speaks generic OIDC. Self-provisions its RSA signing keypair into
@@ -130,7 +130,15 @@ The server host's `.env` (from `.env.example`) only needs `DOMAIN` and
 bcrypt-hashes it into a persisted admin record (`data/selfieproxy/admin-user.json`) only on first
 boot, when no record exists yet, and the first login is forced through a change-password screen
 before the admin's OIDC session is issued — after that, the `.env` value is permanently ignored
-and the real password only lives in that hashed record. Four more
+and the real password only lives in that hashed record. Sibling to that record is
+`data/selfieproxy/users.json` (`UserStore`), the list of non-admin Users — login-only identities
+that can authenticate against any exposed app protected with single sign on but never the portal (see the "Users"
+entry under the admin portal's Settings menu, `selfieproxy-portal/CLAUDE.md`'s Login section). No
+bootstrap: the file simply doesn't exist until the admin adds the first user. Like the admin
+record, `data/selfieproxy/users.json` is never included in a configuration export/import, and is
+irrelevant whenever `OIDC_ISSUER_URL` is set — an external IdP means Selfie Proxy no longer
+controls who can authenticate at all, so the Users list itself is hidden from the Settings menu in
+that case. Four more
 vars are optional, poweruser-only overrides with sensible defaults baked into
 application.properties/docker-compose.yaml (both must agree, since they're not read from a
 single source of truth): `REVERSE_PROXY_LISTENER_SUBDOMAIN` (default
@@ -143,11 +151,12 @@ agent under on first boot, see the Agents page). Separately, `OIDC_ISSUER_URL`/
 issuer to an external IdP instead of the bundled server — see `selfieproxy-identity-provider/` above
 and `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. `selfieproxy-portal` also reads
 `OIDC_ISSUER_URL` directly (`OidcProperties`, `application.properties`'s `oidc.issuer-url`) to
-decide whether to show the topbar user menu's "Change username / password" link at all — the
-bundled `selfieproxy-identity-provider`'s self-service `/account` page is meaningless once an
-external IdP is doing the real authentication, so the link is hidden (`GlobalModelAttributes`)
-whenever `OIDC_ISSUER_URL` is set; Logout is unaffected since it always goes through
-boringproxy's generic `/oidc/logout` carve-out regardless of issuer.
+decide whether to show the topbar user menu's "Users" link at all — the bundled
+`selfieproxy-identity-provider`'s `/users` page (which is also where the admin's own username/
+password are changed now, from its pinned admin row — there's no separate self-service page for
+that anymore) is meaningless once an external IdP is doing the real authentication, so the link is
+hidden (`GlobalModelAttributes`) whenever `OIDC_ISSUER_URL` is set; Logout is unaffected since it
+always goes through boringproxy's generic `/oidc/logout` carve-out regardless of issuer.
 `selfieproxy-identity-provider` also reads `OIDC_ISSUER_URL` itself (its own
 `OidcProperties`/`oidc.issuer-url`, not to be confused with `sso.issuer-url`, this server's own
 issuer identity) so `AdminUserStore` can skip bootstrapping the admin password record entirely
@@ -167,7 +176,7 @@ defaults) become boringproxy's `-sso-idle-minutes`/`-sso-max-minutes`, governing
 cookie's sliding idle deadline and absolute cap, and also size `selfieproxy-identity-provider`'s own
 login session (`sso.session-idle-minutes`/`sso.session-max-minutes`, `IdpSessionService`) — the
 session that makes sign-on actually silent between domains, since a valid one lets a second
-SSO-protected domain's authorization round trip skip the login form entirely — see
+single-sign-on-protected domain's authorization round trip skip the login form entirely — see
 `selfieproxy-reverseproxy/CLAUDE.md`'s OIDC section. The colocated homelab's name is hardcoded to
 `selfieproxy-internal-agent` on both sides (docker-compose.yaml's selfieproxy-localsites-agent service
 and selfieproxy-portal's `this-server.agent-name`) rather than even optionally env-configurable,
