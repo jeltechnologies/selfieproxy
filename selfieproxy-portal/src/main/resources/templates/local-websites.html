@@ -17,6 +17,19 @@
 			No local websites yet.
 		</p>
 
+		<p class="warning" th:if="${hasDnsMismatch}">
+			One or more local websites' DNS records do not point at this server -- Let's Encrypt can't verify
+			ownership over a domain that resolves elsewhere, so it will never obtain a trusted certificate here
+			until the domain's DNS is corrected.
+		</p>
+
+		<p class="warning" th:if="${hasPendingCerts}">
+			One or more local websites are temporarily using a self-signed certificate -- browsers will show a
+			security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can
+			happen after creating many local websites in a short time; Selfie Proxy retries automatically in
+			the background.
+		</p>
+
 		<table class="apps-table" th:if="${not #lists.isEmpty(websites)}">
 			<thead>
 				<tr>
@@ -29,6 +42,11 @@
 					th:with="fqdn=${website.ownDomain() ? website.domain() : boringProxyProperties.fqdn(website.domain())}">
 					<td>
 						<a th:href="'https://' + ${fqdn}" target="_blank" rel="noopener" th:text="${fqdn}"></a>
+						<span th:if="${dnsMismatchByDomain.get(fqdn)}"
+							  class="warning-icon" title="This domain's DNS does not point at this server">&#9888;</span>
+						<span th:if="${certPendingByDomain.get(fqdn)}"
+							  class="cert-pending-badge"
+							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
 					</td>
 					<td>
 						<a class="button-small" th:href="@{/local-websites/{domain}/edit(domain=${website.domain()})}">Edit</a>

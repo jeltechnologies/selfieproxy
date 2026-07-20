@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Import configuration')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='import')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Import configuration</h1>
+				<p class="page-subtitle" th:text="'Step ' + ${stepNumber} + ' of ' + ${totalSteps} + ': Select the homelabs to import'"></p>
+			</div>
+		</section>
+
+		<form id="cancel-form" method="post" th:action="@{/import-configuration/{stagingId}/cancel(stagingId=${stagingId})}"></form>
+
+		<form id="wizard-form" method="get" th:action="${nextUrl}">
+
+			<p class="muted" th:if="${#lists.isEmpty(manifest.homelabs())}">No homelabs in this configuration export.</p>
+
+			<div th:unless="${#lists.isEmpty(manifest.homelabs())}">
+				<div class="button-panel select-controls">
+					<button type="button" id="select-all-btn" class="button-small">Select All</button>
+					<button type="button" id="select-none-btn" class="button-small">Select None</button>
+				</div>
+				<div th:each="homelab : ${manifest.homelabs()}">
+					<label class="restore-item">
+						<input type="checkbox" name="homelabs" th:value="${homelab}">
+						<span th:text="${homelab}"></span>
+						<span th:if="${existingHomelabs.contains(homelab)}" class="status-badge status-badge-existing">Existing</span>
+						<span th:unless="${existingHomelabs.contains(homelab)}" class="status-badge status-badge-new">New</span>
+					</label>
+				</div>
+			</div>
+
+			<div class="button-panel">
+				<a class="button" th:if="${previousUrl != null}" th:href="${previousUrl}">Back</a>
+				<button type="submit" form="cancel-form" class="button" th:if="${previousUrl == null}">Back</button>
+				<button type="submit" class="button">Next</button>
+				<button type="submit" form="cancel-form" class="button button-cancel">Cancel</button>
+			</div>
+		</form>
+	</main>
+
+	<script th:src="@{/js/restore-wizard.js}"></script>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -24,8 +24,9 @@ those, use a commercial product instead.
 - Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
-- One-click backup and restore, including static website files — move to a new server or
-  recover from data loss.
+- Export/import configuration as a single portable ZIP, including static website files — move
+  to a new server or recover from data loss, with a step-by-step review of what's new versus
+  what already exists before anything changes.
 - Single Docker command to install and update.
 
 ## Background
@@ -39,7 +40,7 @@ Anders Pitman, which is no longer actively maintained. On top of it we added:
 - Centralized agent ("client") management from the admin portal.
 - Built-in SSO login for the portal, with support for swapping in an external OIDC provider.
 - Static website hosting.
-- Backup and restore for every homelab, exposed app, and static website.
+- Export/import configuration for every homelab, application, and static website.
 - Fixed tunnel authentication failing on modern OpenSSH (8.8+), which rejects the old
   RSA/`ssh-rsa` keys by default, by switching to Ed25519 — also a more secure algorithm.
 - A one-command Docker install.
@@ -118,9 +119,12 @@ forwarding through another reverse proxy breaks both.
 control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
 app) sits behind login. It's open source.
 
-**What's in a backup?** Every homelab, exposed app, and static website — including website
-files. Homelab secrets and the admin login are never included; restoring a homelab always
-issues it a new secret, which you then update on that homelab.
+**What's in a configuration export?** Every homelab, application, and static website —
+including website files — in a single ZIP you can store safely or move to a new server.
+Homelab secrets and the admin login are never included; importing walks you through a
+step-by-step wizard showing what's new versus what already exists, with a warning wherever
+something will actually change, before anything is applied. A restored homelab always gets a
+new secret, which you then update on that homelab.
 
 ## License
 

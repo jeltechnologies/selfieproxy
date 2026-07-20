@@ -47,7 +47,8 @@
 				<div class="field" id="subdomain-field">
 					<label for="subdomain">Subdomain</label>
 					<input type="text" id="subdomain" name="subdomain" th:value="${app.subdomain()}"
-						   pattern="[^.]*" title="Subdomain cannot contain a dot (.)">
+						   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen">
 				</div>
 
 				<div class="field">

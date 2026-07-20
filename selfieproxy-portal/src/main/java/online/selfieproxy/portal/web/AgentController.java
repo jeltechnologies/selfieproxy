@@ -23,6 +23,7 @@ import online.selfieproxy.portal.boringproxy.dto.TokenDataDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.DnsLabelValidator;
 
 @Controller
 public class AgentController {
@@ -231,6 +232,9 @@ public class AgentController {
 		if (isThisServer(name)) {
 			errors.add("\"" + name + "\" is reserved for Local Websites.");
 			return errors;
+		}
+		if (!DnsLabelValidator.isValid(name)) {
+			errors.add("Homelab name can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen.");
 		}
 
 		boolean taken = boringProxyClient.listAgents().keySet().stream()

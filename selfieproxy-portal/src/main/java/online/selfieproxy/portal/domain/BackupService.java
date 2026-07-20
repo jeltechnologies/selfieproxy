@@ -155,12 +155,24 @@ public class BackupService {
 		return readManifest(stagingRoot.resolve(stagingId));
 	}
 
-	/** Every homelab, exposed app, and local website in a staged manifest -- what "Import All" imports. */
-	public RestoreSelection fullSelection(BackupManifest manifest) {
-		return new RestoreSelection(
-				manifest.homelabs(),
-				manifest.exposedApps().stream().map(ExposedApp::subdomain).toList(),
-				manifest.localWebsites().stream().map(LocalWebsite::domain).toList());
+	/**
+	 * Which items in manifest already exist on this server, for the restore wizard's
+	 * per-item New/Existing status and contextual warnings -- computed against live
+	 * state, same lookups doApplyRestore itself relies on (ensureHomelab's existingAgents
+	 * set, exposedAppStore/localWebsiteStore as the source of truth for what an ordinary
+	 * edit would overwrite).
+	 */
+	public RestoreDiff diffManifest(BackupManifest manifest) {
+		Set<String> existingHomelabs = new HashSet<>(boringProxyClient.listAgents().keySet());
+		Set<String> existingExposedApps = manifest.exposedApps().stream()
+				.map(ExposedApp::subdomain)
+				.filter(subdomain -> exposedAppStore.find(subdomain) != null)
+				.collect(Collectors.toSet());
+		Set<String> existingLocalWebsites = manifest.localWebsites().stream()
+				.map(LocalWebsite::domain)
+				.filter(domain -> localWebsiteStore.find(domain) != null)
+				.collect(Collectors.toSet());
+		return new RestoreDiff(existingHomelabs, existingExposedApps, existingLocalWebsites);
 	}
 
 	/** Keeps only the homelabs/exposed apps/local websites selection picked -- what the backup page's checkbox tree narrows a backup ZIP down to. */
@@ -202,6 +214,10 @@ public class BackupService {
 
 		int homelabsRestored = 0;
 		for (String name : selection.homelabs()) {
+			if (!DnsLabelValidator.isValid(name)) {
+				failures.add("Homelab " + name + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
+				continue;
+			}
 			try {
 				if (ensureHomelab(name, existingAgents)) {
 					homelabsRestored++;
@@ -218,6 +234,10 @@ public class BackupService {
 			ExposedApp app = appsBySubdomain.get(subdomain);
 			if (app == null) {
 				failures.add("Exposed app " + subdomain + ": not found in configuration export");
+				continue;
+			}
+			if (!DnsLabelValidator.isValid(subdomain)) {
+				failures.add("Exposed app " + subdomain + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}
 			try {
@@ -240,6 +260,10 @@ public class BackupService {
 			LocalWebsite site = sitesByDomain.get(domain);
 			if (site == null) {
 				failures.add("Local website " + domain + ": not found in configuration export");
+				continue;
+			}
+			if (!site.ownDomain() && !DnsLabelValidator.isValid(domain)) {
+				failures.add("Local website " + domain + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}
 			try {

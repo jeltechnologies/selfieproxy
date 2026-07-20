@@ -248,6 +248,13 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	font-size: 0.95rem;
 }
 
+.button:disabled, button.button:disabled {
+	background: var(--border);
+	border-color: var(--border);
+	color: var(--muted);
+	cursor: not-allowed;
+}
+
 .button-small {
 	padding: 0.25rem 0.6rem;
 	border-radius: 6px;
@@ -296,6 +303,8 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	gap: 0.75rem;
 	margin-top: 1.5rem;
 }
+
+.select-controls { margin-bottom: 1rem; }
 
 #connect-info {
 	margin-top: 2rem;
@@ -350,6 +359,7 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	margin-bottom: 1.5rem;
 }
 .page-header h1 { margin: 0; }
+.page-tagline { margin: 0.3rem 0 0.75rem; color: var(--text); font-weight: 500; }
 .page-subtitle { margin: 0.3rem 0 0; color: var(--muted); }
 
 .apps-table {
@@ -395,3 +405,7 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 
 .restore-item { display: block; font-weight: normal; margin-bottom: 0.35rem; }
 .restore-item input { margin-right: 0.4rem; }
+
+.status-badge { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; }
+.status-badge-new { background: rgba(46, 158, 79, 0.15); border: 1px solid var(--success); color: var(--success); }
+.status-badge-existing { background: var(--warning-bg); border: 1px solid var(--warning-border); }

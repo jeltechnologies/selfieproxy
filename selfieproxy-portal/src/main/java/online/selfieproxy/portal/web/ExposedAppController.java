@@ -16,6 +16,7 @@ import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.DnsLabelValidator;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
 import online.selfieproxy.portal.domain.ExposedAppType;
@@ -170,8 +171,8 @@ public class ExposedAppController {
 			errors.add("Subdomain is required.");
 			return errors;
 		}
-		if (app.subdomain().contains(".")) {
-			errors.add("Subdomain cannot contain a dot (\".\").");
+		if (!DnsLabelValidator.isValid(app.subdomain())) {
+			errors.add("Subdomain can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen.");
 		}
 		if (app.subdomain().equalsIgnoreCase(properties.adminSubdomain())) {
 			errors.add("\"" + app.subdomain() + "\" is reserved for the BoringProxy admin portal itself.");

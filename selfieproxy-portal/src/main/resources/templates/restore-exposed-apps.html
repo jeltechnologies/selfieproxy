@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Import configuration')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='import')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Import configuration</h1>
+				<p class="page-subtitle" th:text="'Step ' + ${stepNumber} + ' of ' + ${totalSteps} + ': Select which applications to import'"></p>
+			</div>
+		</section>
+
+		<form id="cancel-form" method="post" th:action="@{/import-configuration/{stagingId}/cancel(stagingId=${stagingId})}"></form>
+
+		<form id="wizard-form" method="get" th:action="${nextUrl}">
+			<input type="hidden" name="homelabs" th:each="h : ${selectedHomelabs}" th:value="${h}">
+
+			<p class="muted" th:if="${#lists.isEmpty(manifest.exposedApps())}">No applications in this configuration export.</p>
+
+			<div th:unless="${#lists.isEmpty(manifest.exposedApps())}">
+				<div class="button-panel select-controls">
+					<button type="button" id="select-all-btn" class="button-small">Select All</button>
+					<button type="button" id="select-none-btn" class="button-small">Select None</button>
+				</div>
+				<div th:each="app : ${manifest.exposedApps()}">
+					<label class="restore-item">
+						<input type="checkbox" name="exposedApps" th:value="${app.subdomain()}">
+						<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
+						<span th:if="${existingExposedApps.contains(app.subdomain())}" class="status-badge status-badge-existing">Existing</span>
+						<span th:unless="${existingExposedApps.contains(app.subdomain())}" class="status-badge status-badge-new">New</span>
+					</label>
+				</div>
+			</div>
+
+			<div class="button-panel">
+				<a class="button" th:if="${previousUrl != null}" th:href="${previousUrl}">Back</a>
+				<button type="submit" form="cancel-form" class="button" th:if="${previousUrl == null}">Back</button>
+				<button type="submit" class="button">Next</button>
+				<button type="submit" form="cancel-form" class="button button-cancel">Cancel</button>
+			</div>
+		</form>
+	</main>
+
+	<script th:src="@{/js/restore-wizard.js}"></script>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

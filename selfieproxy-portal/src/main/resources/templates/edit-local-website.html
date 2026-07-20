@@ -24,7 +24,8 @@
 				<div class="field" id="domain-field">
 					<label for="domain">Subdomain</label>
 					<input type="text" id="domain" name="domain" th:value="${website.domain()}" required
-						   th:pattern="${website.ownDomain()} ? null : '[^.]*'" title="Subdomain cannot contain a dot (.)">
+						   th:pattern="${website.ownDomain()} ? '\S*' : '[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?'"
+						   th:title="${website.ownDomain()} ? 'Domain cannot contain a space' : 'Only letters, numbers, and hyphens -- cannot start or end with a hyphen'">
 				</div>
 
 				<div class="field">

@@ -8,7 +8,7 @@
 		<section class="page-header">
 			<div>
 				<h1>Import configuration</h1>
-				<p class="page-subtitle">Upload an exported configuration ZIP to choose what to import.</p>
+				<p class="page-subtitle">Upload an exported configuration ZIP. In the next steps you choose what to import from this ZIP file.</p>
 			</div>
 		</section>
 
@@ -19,7 +19,7 @@
 		<div class="warning" th:if="${result != null}">
 			<p>
 				Imported <strong th:text="${result.homelabsRestored()}"></strong> homelab(s),
-				<strong th:text="${result.exposedAppsRestored()}"></strong> exposed app(s), and
+				<strong th:text="${result.exposedAppsRestored()}"></strong> application(s), and
 				<strong th:text="${result.localWebsitesRestored()}"></strong> local website(s).
 			</p>
 			<ul th:if="${result.hasFailures()}">
@@ -27,20 +27,17 @@
 			</ul>
 		</div>
 
-		<fieldset>
-			<legend>Import an exported configuration</legend>
-			<p>Existing configuration matching what you choose will be overwritten, and you'll get a full warning
-				before anything changes.</p>
-			<form method="post" enctype="multipart/form-data" th:action="@{/import-configuration/stage}">
-				<div class="field">
-					<label for="backupZip">Configuration ZIP</label>
-					<input type="file" id="backupZip" name="backupZip" accept=".zip,application/zip" required>
-				</div>
-				<div class="button-panel">
-					<button type="submit" class="button">Upload &amp; Choose What to Import</button>
-				</div>
-			</form>
-		</fieldset>
+		<form method="post" enctype="multipart/form-data" th:action="@{/import-configuration/stage}">
+			<div class="field">
+				<label for="backupZip">Configuration ZIP</label>
+				<input type="file" id="backupZip" name="backupZip" accept=".zip,application/zip" required>
+			</div>
+			<div class="button-panel">
+				<button type="button" class="button" disabled>Back</button>
+				<button type="submit" class="button">Continue</button>
+				<a class="button button-cancel" th:href="@{/}">Cancel</a>
+			</div>
+		</form>
 	</main>
 
 	<footer th:replace="~{fragments/layout :: footer}"></footer>

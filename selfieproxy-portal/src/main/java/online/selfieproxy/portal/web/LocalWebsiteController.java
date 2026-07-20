@@ -1,9 +1,12 @@
 package online.selfieproxy.portal.web;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +26,7 @@ import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.SitesWebserverProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.DnsLabelValidator;
 import online.selfieproxy.portal.domain.LocalWebsite;
 import online.selfieproxy.portal.domain.LocalWebsiteStore;
 import online.selfieproxy.portal.domain.StaticSiteProvisioner;
@@ -69,8 +73,42 @@ public class LocalWebsiteController {
 
 	@GetMapping("/local-websites")
 	public String list(Model model) {
-		model.addAttribute("websites", localWebsiteStore.list());
+		List<LocalWebsite> websites = localWebsiteStore.list();
+		model.addAttribute("websites", websites);
 		model.addAttribute("boringProxyProperties", boringProxyProperties);
+
+		// DNS correctness only needs checking for ownDomain sites -- a label.DOMAIN site is already
+		// guaranteed to resolve here by check-prerequisites' *.DOMAIN wildcard validation at startup
+		// (see selfieproxy/CLAUDE.md), but an ownDomain site is a domain the user owns separately and
+		// nothing enforces its DNS points at this server, which is exactly what starves it of a real
+		// certificate (Let's Encrypt's HTTP-01 challenge has to reach *this* server at that domain to
+		// prove ownership -- see the cert-pending investigation above).
+		String serverIp = resolveIp(boringProxyProperties.domain());
+		Map<String, Boolean> dnsMismatchByDomain = websites.stream()
+				.filter(LocalWebsite::ownDomain)
+				.collect(Collectors.toMap(LocalWebsite::domain, site -> hasDnsMismatch(site.domain(), serverIp)));
+		model.addAttribute("dnsMismatchByDomain", dnsMismatchByDomain);
+		model.addAttribute("hasDnsMismatch", dnsMismatchByDomain.values().stream().anyMatch(Boolean::booleanValue));
+
+		// Domains still waiting on a Let's Encrypt certificate (e.g. after hitting a rate limit) --
+		// boringproxy serves those over a temporary self-signed certificate in the meantime and
+		// keeps retrying in the background, see selfieproxy-reverseproxy's TunnelManager. Scoped to
+		// This Server's own tunnels (the opposite filter from DashboardController's Applications
+		// page), since a Local Website's tunnel always belongs to the hidden "This Server" homelab.
+		// The page-level banner is suppressed for a domain already flagged by the DNS-mismatch check
+		// above -- that domain's pending cert is fully explained by its wrong DNS, so showing both
+		// warnings would just be saying the same thing twice; a *different* domain still pending for
+		// an unrelated reason (e.g. a plain rate limit on a correctly-pointed domain) still triggers
+		// it. The per-row badge is untouched -- it's a compact factual indicator, not a redundant
+		// explanation, so it stays alongside the row's own DNS warning icon.
+		Map<String, Boolean> certPendingByDomain = boringProxyClient.listTunnels().values().stream()
+				.filter(tunnel -> thisServerAgentProperties.agentName().equals(tunnel.agentName()))
+				.collect(Collectors.toMap(TunnelDto::domain, TunnelDto::certPending));
+		model.addAttribute("certPendingByDomain", certPendingByDomain);
+		boolean hasPendingCerts = certPendingByDomain.entrySet().stream()
+				.anyMatch(e -> e.getValue() && !Boolean.TRUE.equals(dnsMismatchByDomain.get(e.getKey())));
+		model.addAttribute("hasPendingCerts", hasPendingCerts);
+
 		return "local-websites";
 	}
 
@@ -209,6 +247,24 @@ public class LocalWebsiteController {
 		return website.ownDomain() ? website.domain() : boringProxyProperties.fqdn(website.domain());
 	}
 
+	/** This server's own public IP, as resolved via boringProxyProperties.domain() -- already guaranteed correct by check-prerequisites' startup DNS check, so no extra external lookup (e.g. an ifconfig.me call) is needed here. Null if resolution fails for some reason, in which case DNS mismatch checks are skipped rather than risking a false positive. */
+	private String resolveIp(String hostname) {
+		try {
+			return InetAddress.getByName(hostname).getHostAddress();
+		} catch (UnknownHostException e) {
+			log.warn("Could not resolve {} to check Local Website DNS records against", hostname, e);
+			return null;
+		}
+	}
+
+	/** True when an ownDomain site's own DNS doesn't resolve to this server at all, or resolves somewhere else -- exactly what starves it of a real Let's Encrypt certificate, since the ACME HTTP-01 challenge has to reach this server at that domain. serverIp null (couldn't resolve our own domain) never reports a mismatch, to avoid a false positive. */
+	private boolean hasDnsMismatch(String domain, String serverIp) {
+		if (serverIp == null) {
+			return false;
+		}
+		return !serverIp.equals(resolveIp(domain));
+	}
+
 	/** The tunnel domain for rawDomain (the LocalWebsiteStore key) as it exists right now (mode-aware via the stored record), or the default label.DOMAIN composition if we have no record for it yet. */
 	private String currentFqdn(String rawDomain) {
 		LocalWebsite stored = localWebsiteStore.find(rawDomain);
@@ -249,8 +305,13 @@ public class LocalWebsiteController {
 			return errors;
 		}
 
-		if (!website.ownDomain() && website.domain().contains(".")) {
-			errors.add("Subdomain cannot contain a dot (\".\").");
+		if (website.ownDomain()) {
+			if (website.domain().chars().anyMatch(Character::isWhitespace)) {
+				errors.add("Domain cannot contain a space.");
+				return errors;
+			}
+		} else if (!DnsLabelValidator.isValid(website.domain())) {
+			errors.add("Subdomain can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen.");
 			return errors;
 		}
 

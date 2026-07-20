@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -175,5 +176,29 @@ class BackupServiceTest {
 		verify(boringProxyClient, times(1)).createToken("admin", "lab1");
 		verify(boringProxyClient).createTunnel(any());
 		verify(exposedAppStore).save(app);
+	}
+
+	@Test
+	void diffManifestFlagsExistingItemsAgainstLiveState() {
+		ExposedApp existingApp = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
+				"127.0.0.1", 8080, null, null, false);
+		ExposedApp newApp = new ExposedApp("shop", null, "lab2", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
+				"127.0.0.1", 8081, null, null, false);
+		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
+				"example.com", List.of("lab1", "lab2"), List.of(existingApp, newApp),
+				List.of(new LocalWebsite("blogsite", false), new LocalWebsite("newsite", false)));
+
+		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
+		when(exposedAppStore.find("blog")).thenReturn(existingApp);
+		when(exposedAppStore.find("shop")).thenReturn(null);
+		when(localWebsiteStore.find("blogsite")).thenReturn(new LocalWebsite("blogsite", false));
+		when(localWebsiteStore.find("newsite")).thenReturn(null);
+
+		BackupService service = newService();
+		RestoreDiff diff = service.diffManifest(manifest);
+
+		assertEquals(Set.of("lab1"), diff.existingHomelabs());
+		assertEquals(Set.of("blog"), diff.existingExposedAppSubdomains());
+		assertEquals(Set.of("blogsite"), diff.existingLocalWebsiteDomains());
 	}
 }

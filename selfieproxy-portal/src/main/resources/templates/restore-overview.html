@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Import configuration')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='import')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Import configuration</h1>
+				<p class="page-subtitle" th:text="'Step ' + ${stepNumber} + ' of ' + ${totalSteps} + ': Overview'"></p>
+			</div>
+		</section>
+
+		<div class="warning"
+				th:if="${#lists.isEmpty(selectedHomelabs) and #lists.isEmpty(selectedExposedApps) and #lists.isEmpty(selectedLocalWebsites)}">
+			<p><strong>Nothing to import.</strong></p>
+		</div>
+
+		<fieldset th:unless="${#lists.isEmpty(selectedHomelabs)}">
+			<legend>Homelabs</legend>
+			<div th:each="homelab : ${manifest.homelabs()}" th:if="${selectedHomelabs.contains(homelab)}">
+				<span th:text="${homelab}"></span>
+				<span th:if="${existingHomelabs.contains(homelab)}" class="status-badge status-badge-existing">Existing</span>
+				<span th:unless="${existingHomelabs.contains(homelab)}" class="status-badge status-badge-new">New</span>
+				<p class="warning" th:unless="${existingHomelabs.contains(homelab)}">
+					This homelab will be created with a brand-new secret. Update its agent configuration with the new
+					secret after importing.
+				</p>
+			</div>
+		</fieldset>
+
+		<fieldset th:unless="${#lists.isEmpty(selectedExposedApps)}">
+			<legend>Applications</legend>
+			<div th:each="app : ${manifest.exposedApps()}" th:if="${selectedExposedApps.contains(app.subdomain())}">
+				<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
+				<span th:if="${existingExposedApps.contains(app.subdomain())}" class="status-badge status-badge-existing">Existing</span>
+				<span th:unless="${existingExposedApps.contains(app.subdomain())}" class="status-badge status-badge-new">New</span>
+				<p class="warning" th:if="${existingExposedApps.contains(app.subdomain())}">
+					This application configuration will be overwritten
+				</p>
+			</div>
+		</fieldset>
+
+		<fieldset th:unless="${#lists.isEmpty(selectedLocalWebsites)}">
+			<legend>Local websites</legend>
+			<div th:each="site : ${manifest.localWebsites()}" th:if="${selectedLocalWebsites.contains(site.domain())}">
+				<span th:text="${site.domain()}"></span>
+				<span th:if="${existingLocalWebsites.contains(site.domain())}" class="status-badge status-badge-existing">Existing</span>
+				<span th:unless="${existingLocalWebsites.contains(site.domain())}" class="status-badge status-badge-new">New</span>
+				<p class="warning" th:if="${existingLocalWebsites.contains(site.domain())}">
+					This local website already exists and will be replaced by the version in this configuration
+					export.
+				</p>
+			</div>
+		</fieldset>
+
+		<div class="warning"
+				th:unless="${#lists.isEmpty(selectedHomelabs) and #lists.isEmpty(selectedExposedApps) and #lists.isEmpty(selectedLocalWebsites)}">
+			<p><strong>Importing cannot be undone.</strong></p>
+		</div>
+
+		<form id="cancel-form" method="post" th:action="@{/import-configuration/{stagingId}/cancel(stagingId=${stagingId})}"></form>
+
+		<form method="post" th:action="@{/import-configuration/{stagingId}/apply(stagingId=${stagingId})}">
+			<input type="hidden" name="homelabs" th:each="h : ${selectedHomelabs}" th:value="${h}">
+			<input type="hidden" name="exposedApps" th:each="a : ${selectedExposedApps}" th:value="${a}">
+			<input type="hidden" name="localWebsites" th:each="s : ${selectedLocalWebsites}" th:value="${s}">
+			<div class="button-panel">
+				<a class="button" th:if="${previousUrl != null}" th:href="${previousUrl}">Back</a>
+				<button type="submit" class="button">Finish</button>
+				<button type="submit" form="cancel-form" class="button button-cancel">Cancel</button>
+			</div>
+		</form>
+	</main>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

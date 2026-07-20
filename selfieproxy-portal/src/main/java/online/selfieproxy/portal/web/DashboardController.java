@@ -61,10 +61,14 @@ public class DashboardController {
 
 		// Domains still waiting on a Let's Encrypt certificate (e.g. after hitting a rate limit) --
 		// boringproxy serves those over a temporary self-signed certificate in the meantime and
-		// keeps retrying in the background, see selfieproxy-reverseproxy's TunnelManager.
+		// keeps retrying in the background, see selfieproxy-reverseproxy's TunnelManager. Scoped to
+		// exposedApps' own tunnels (This Server/Local Websites excluded, same filter as above) --
+		// otherwise a Local Website's own pending cert would incorrectly trigger this page's
+		// "applications" warning for a completely separate feature.
 		Map<String, Boolean> certPendingByDomain = tunnels.values().stream()
+				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
 				.collect(Collectors.toMap(TunnelDto::domain, TunnelDto::certPending));
-		boolean hasPendingCerts = tunnels.values().stream().anyMatch(TunnelDto::certPending);
+		boolean hasPendingCerts = certPendingByDomain.values().stream().anyMatch(Boolean::booleanValue);
 
 		model.addAttribute("homelabs", homelabs);
 		model.addAttribute("exposedApps", exposedApps);

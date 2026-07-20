@@ -8,6 +8,7 @@
 		<section class="page-header">
 			<div>
 				<h1>Export configuration</h1>
+				<p class="page-tagline">Use the exported configuration as backup, or import it to another server.</p>
 				<p class="page-subtitle">Choose what to include, then export a configuration ZIP. Agent secrets and
 					the admin login are never included -- importing a homelab always issues it a brand-new secret.</p>
 			</div>
@@ -35,12 +36,12 @@
 			</fieldset>
 
 			<fieldset th:if="${#lists.isEmpty(manifest.exposedApps())}">
-				<legend>Exposed apps</legend>
-				<p class="muted">No exposed apps on this server.</p>
+				<legend>Applications</legend>
+				<p class="muted">No applications on this server.</p>
 			</fieldset>
 
 			<fieldset th:unless="${#lists.isEmpty(manifest.exposedApps())}">
-				<legend>Exposed apps</legend>
+				<legend>Applications</legend>
 				<label class="restore-item" th:each="app : ${manifest.exposedApps()}">
 					<input type="checkbox" name="exposedApps" th:value="${app.subdomain()}" checked>
 					<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>

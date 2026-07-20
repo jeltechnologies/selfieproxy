@@ -158,8 +158,33 @@ this section is the portal-side UI behavior.
   domain again later starts from an empty folder.
 - Files live at `data/selfieproxy/sites/<domain>/` on the server, owned by the portal container's
   user — copy files in as root, or via `docker exec selfieproxy-portal`.
+- **Two independent warnings** on the list page (`LocalWebsiteController.list`), both recomputed
+  live on every page load, no caching: a cert-pending one (mirrors the Applications page's own,
+  but scoped to This Server's tunnels instead of excluding them, since every Local Website tunnel
+  belongs to the hidden "This Server" homelab) shown whenever boringproxy is still retrying Let's
+  Encrypt for a site (self-signed cert served in the meantime -- expected and fine, not itself a
+  bug); and a DNS-mismatch one, checked only for **Own domain** sites (`LocalWebsite.ownDomain`) by
+  resolving both the site's domain and `boringProxyProperties.domain()` (trusted correct already,
+  per check-prerequisites' startup wildcard check) and comparing IPs -- a **Subdomain** site never
+  needs this check, since `*.DOMAIN` is already guaranteed to resolve here. An Own domain site
+  whose DNS points elsewhere is *expected* to sit on a temporary self-signed certificate
+  indefinitely (Let's Encrypt's HTTP-01 challenge can never reach this server at that domain to
+  prove ownership) -- the DNS-mismatch warning explains why, the cert-pending warning is just a
+  symptom of it; neither is something to silently "fix" by removing the site, since a self-signed
+  fallback with both warnings visible is the deliberately correct behavior for that case.
 
 ## Backup and restore
+
+**Value to the user**: a single ZIP is the admin's entire setup made portable -- every Homelab,
+Application, and Local Website (including each site's actual files), captured in one download with
+no config files to hand-copy and nothing to reconstruct from memory. That ZIP is what turns two
+otherwise-scary situations into a routine one: recovering after this server is lost/corrupted, or
+deliberately standing up a brand new server (a VPS migration, a provider switch) without redoing
+every Homelab connection, Application, and Local Website by hand. The import side is designed so
+that "restoring" never feels like a leap of faith -- before anything is touched, the wizard shows,
+item by item, what's already on this server versus what's new, and warns exactly where something
+will actually change (a fresh Homelab secret, an Application/Local Website being overwritten) --
+so the admin always knows what a click of Finish is about to do.
 
 "Export configuration" and "Import configuration" are two separate pages, each its own entry in
 the topbar's Settings menu (not a nav tab) -- exporting and importing are different enough
@@ -192,28 +217,71 @@ layer for both pages.
   machine-consumed.
 - **What's deliberately excluded, always**: a Homelab's secret (its boringproxy access token) is
   never exported. Importing a Homelab that doesn't already exist on the target server always mints
-  it a **brand-new** secret -- the import picker warns about this up front, and the operator must
-  re-paste the new secret into that homelab's `.env` afterward. Also excluded:
+  it a **brand-new** secret -- the import wizard's Homelabs step warns about this per item (only
+  for the ones flagged New, see below), and the operator must re-paste the new secret into that
+  homelab's `.env` afterward. Also excluded:
   `selfieproxy-identity-provider`'s admin account and RSA signing key -- a configuration export
   must never be able to grant login access to a different server, so import never touches
   server-local auth material, only goes through the same `BoringProxyClient` REST calls the rest
   of the portal already uses.
-- **Import configuration page** (`GET /import-configuration`): just the upload form (plus any
-  errors/result flashed back from the flow below). Uploading a ZIP
-  (`POST /import-configuration/stage`) extracts it into a staging directory and validates
-  `manifest.json` before anything live is touched. The picker
-  (`GET /import-configuration/{stagingId}`) then shows the same flat Homelabs/Exposed Apps/Local
-  Websites checkbox lists as the Export page -- built from the staged manifest instead of live
-  state -- and lets the admin choose specific items, or hit "Import All" (server-computed from the full
-  manifest, not trusted from a giant posted form). Applying
-  (`POST /import-configuration/{stagingId}/apply`) always shows the same warning: matching existing
-  configuration is overwritten, imported Exposed Apps/Local Websites have their tunnel deleted and
-  recreated (the same delete-then-recreate-with-a-2s-wait pattern an ordinary edit already uses,
-  just applied in bulk -- brief downtime for that homelab's users), and imported Homelabs get a
-  fresh secret. A failure importing one item is recorded and never aborts the rest of the import.
-  The staging directory is removed once the import completes or is cancelled
-  (`POST /import-configuration/{stagingId}/cancel`), and either action redirects back to
-  `/import-configuration`.
+- **Import configuration page** (`GET /import-configuration`): just the upload form -- a bare file
+  input and a "Continue" button, no fieldset box around it, subtitle "Upload an exported
+  configuration ZIP. In the next steps you choose what to import from this ZIP file." (plus any
+  errors/result flashed back from the flow below). Uploading a ZIP (`POST
+  /import-configuration/stage`) extracts it into a staging directory and validates `manifest.json`
+  before anything live is touched, then redirects into a review wizard (`BackupController`'s
+  `homelabsStep`/`exposedAppsStep`/`localWebsitesStep`/`overviewStep`, templates
+  `restore-homelabs.html`/`restore-exposed-apps.html`/`restore-local-websites.html`/
+  `restore-overview.html`): Homelabs, then Applications (the exposed-apps step -- user-facing
+  copy says "Applications"/"applications" throughout, never "exposed app(s)"; the Java
+  identifiers/JSON fields stay `exposedApps` etc., this is display wording only), then Local
+  Websites, then Overview -- except a category step is skipped entirely when the staged export has
+  nothing in that category (`BackupController.firstStep`/`nextStep`/`previousStep`, checked
+  against `manifest.homelabs()`/`exposedApps()`/`localWebsites()` being empty), so the wizard's
+  total step count and which category is effectively "first" both vary with what's actually in the
+  ZIP -- an export with only Applications goes straight from upload to the Applications step,
+  skipping Homelabs, and each step's "Step N of ..." label (`BackupController.stepNumber`/
+  `totalSteps`) reflects the actual count, not a hardcoded 5. Each step's subtitle names the
+  action, not just the category -- "Select the homelabs to import" / "Select which applications to
+  import" / "Select which local websites to import" -- and the source domain/created-at from the
+  manifest isn't shown per step at all, it's informational only and adds noise to a page the admin
+  will click through repeatedly. Each surviving category step lists every item from the staged
+  manifest for that category with a checkbox (unchecked by default -- the admin actively picks
+  what to import, item by item, rather than starting from an implicit "everything selected") and a
+  New/Existing status badge computed against live state (`BackupService.diffManifest`, against
+  `boringProxyClient.listAgents()`/`ExposedAppStore.find`/`LocalWebsiteStore.find`), plus a Select
+  All/Select None button pair above the list (`restore-wizard.js`, mirrors the export page's own
+  `backup.js` pattern, scoped to that step's own `#wizard-form`) -- the Homelabs and Applications
+  steps show their list plain with no box around it, the Local Websites step still wraps its list
+  in a fieldset. None of the category steps show a warning next to New/Existing items -- that's
+  reserved entirely for the Overview step, which summarizes everything actually selected (a
+  category section is omitted entirely, not shown empty, when nothing was picked in it) with the
+  same New/Existing badges plus the actual contextual warning per item: a **New** Homelab warns
+  it'll get a brand-new secret (see above); an **Existing** Application warns "This application
+  configuration will be overwritten"; an **Existing** Local Website warns it'll be replaced -- New
+  Applications/Local Websites and Existing Homelabs get no warning, since nothing unexpected
+  happens to them. If nothing was selected in any category, the Overview step shows only "Nothing
+  to import." in place of the category sections and the cannot-be-undone warning. The tunnel
+  delete-then-recreate mechanics an import actually performs are deliberately not mentioned in any
+  wizard copy -- too technical for this audience (see "Product principles" above). Each step's
+  selection carries forward statelessly via GET query params/hidden fields (no server-side
+  session) as the admin clicks Next; Previous reconstructs the prior surviving step's upstream
+  selections from those same params, though a step's own checkboxes reset to unchecked on a fresh
+  render rather than preserving exact prior state -- an accepted simplification, since the common
+  path is upload-then-review-forward, not repeated back-and-forth. Only one file can be staged at a
+  time, so on whichever category step ends up effectively first (`previousUrl == null`), Previous
+  is rendered as a submit button targeting the same `cancel-form` every step already has for
+  Cancel, rather than being hidden -- clicking it abandons the current staged file (same effect as
+  Cancel) and returns to the upload step so the admin can pick a different ZIP. The Overview step's
+  final warning (when something was actually selected) is that importing cannot be undone.
+  Applying (`POST /import-configuration/{stagingId}/apply`, fed
+  by the Overview step's hidden fields) recreates each selected Application/Local Website's tunnel
+  (the same delete-then-recreate-with-a-2s-wait pattern an ordinary edit already uses, just applied
+  in bulk -- brief downtime for that homelab's users) and creates each selected new Homelab with a
+  fresh secret; existing Homelabs are left untouched. A failure importing one item is recorded and
+  never aborts the rest of the import. The staging directory is removed once the import completes
+  or is cancelled (`POST /import-configuration/{stagingId}/cancel`, available from every wizard
+  step), and either action redirects back to `/import-configuration`.
 - **Download filename**: `selfieproxy-config-export-<domain>-<timestamp>.zip`, where the timestamp
   reflects the *browser's* local timezone, not the server's -- `backup.js` reads
   `Intl.DateTimeFormat().resolvedOptions().timeZone` and fills a hidden `tz` field on the export

@@ -23,10 +23,12 @@
 		domainLabel.textContent = isOwnDomain() ? "Domain" : "Subdomain";
 		domainInput.placeholder = isOwnDomain() ? "www.example.com" : "";
 		if (isOwnDomain()) {
-			domainInput.removeAttribute("pattern");
+			domainInput.setAttribute("pattern", "\\S*");
+			domainInput.title = "Domain cannot contain a space";
 			resultInput.textContent = domainInput.value || "(domain)";
 		} else {
-			domainInput.setAttribute("pattern", "[^.]*");
+			domainInput.setAttribute("pattern", "[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?");
+			domainInput.title = "Only letters, numbers, and hyphens -- cannot start or end with a hyphen";
 			var subdomain = domainInput.value || "(subdomain)";
 			resultInput.textContent = subdomain + "." + domain;
 		}

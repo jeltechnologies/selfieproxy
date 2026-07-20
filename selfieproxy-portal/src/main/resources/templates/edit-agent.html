@@ -16,7 +16,9 @@
 
 			<div class="field">
 				<label for="name">Name</label>
-				<input type="text" id="name" name="name" th:value="${agent.name()}" required>
+				<input type="text" id="name" name="name" th:value="${agent.name()}" required
+					   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+					   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen">
 			</div>
 
 			<div class="field" th:unless="${isNew}">
