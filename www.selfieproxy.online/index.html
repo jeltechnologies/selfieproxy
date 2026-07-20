@@ -59,7 +59,7 @@
 
   <!-- ============ HERO ============ -->
   <section class="hero" id="top">
-    <div class="container">
+    <div class="container hero-grid">
       <div class="hero-copy">
         <p class="eyebrow">Simple · Secure · Free forever</p>
         <h1>Self-host your homelab on the internet.</h1>
@@ -75,62 +75,15 @@
         <p class="hero-note">Free and open source, forever. Runs on the cheapest VPS you can find.</p>
       </div>
 
-      <div class="diagram-wrap reveal">
-        <div class="diagram-wrap-inner">
-        <svg viewBox="0 0 1000 290" role="img" aria-labelledby="diagram-title">
-          <title id="diagram-title">Diagram: your home network connects through one encrypted tunnel to your server, which exposes each app under its own friendly HTTPS address.</title>
-
-          <!-- home node -->
-          <rect x="40" y="100" width="130" height="100" rx="16" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>
-          <path d="M75,150 L105,122 L135,150" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M85,148 V180 H125 V148" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <text x="105" y="224" text-anchor="middle" class="diagram-node-label">YOUR HOME</text>
-          <text x="105" y="240" text-anchor="middle" class="diagram-node-sub">behind any router, any IP</text>
-
-          <!-- tunnel -->
-          <path id="tunnel-path" class="tunnel-line" d="M170,150 L430,150"/>
-          <text x="300" y="122" text-anchor="middle" class="diagram-node-sub">encrypted tunnel · outbound only</text>
-          <circle r="4" class="tunnel-pulse">
-            <animateMotion dur="2.6s" repeatCount="indefinite" path="M170,150 L430,150"/>
-          </circle>
-
-          <!-- server node -->
-          <rect x="430" y="100" width="130" height="100" rx="16" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>
-          <rect x="480" y="128" width="30" height="42" rx="3" fill="none" stroke="var(--text-dim)" stroke-width="1.5"/>
-          <line x1="485" y1="138" x2="505" y2="138" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="485" y1="148" x2="505" y2="148" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="485" y1="158" x2="505" y2="158" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
-          <text x="495" y="224" text-anchor="middle" class="diagram-node-label">YOUR SERVER</text>
-          <text x="495" y="240" text-anchor="middle" class="diagram-node-sub">any cheap VPS</text>
-
-          <!-- fan out -->
-          <path class="fan-line" d="M560,150 C605,150 610,60 650,60"/>
-          <path class="fan-line" d="M560,150 L650,150"/>
-          <path class="fan-line" d="M560,150 C605,150 610,235 650,235"/>
-
-          <!-- row 1 -->
-          <rect x="650" y="39" width="310" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-          <circle cx="672" cy="60" r="8" class="status-dot-glow"/>
-          <circle cx="672" cy="60" r="4" class="status-dot"/>
-          <text x="688" y="65" class="diagram-url">nas.yourdomain.com</text>
-          <path d="M932,53 h10 v13 h-10 z M934,53 v-4 a4,4 0 0 1 8,0 v4" fill="none" stroke="var(--text-faint)" stroke-width="1.3"/>
-
-          <!-- row 2 -->
-          <rect x="650" y="129" width="310" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-          <circle cx="672" cy="150" r="8" class="status-dot-glow"/>
-          <circle cx="672" cy="150" r="4" class="status-dot"/>
-          <text x="688" y="155" class="diagram-url">photos.yourdomain.com</text>
-          <path d="M932,143 h10 v13 h-10 z M934,143 v-4 a4,4 0 0 1 8,0 v4" fill="none" stroke="var(--text-faint)" stroke-width="1.3"/>
-
-          <!-- row 3 -->
-          <rect x="650" y="214" width="310" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-          <circle cx="672" cy="235" r="8" class="status-dot-glow"/>
-          <circle cx="672" cy="235" r="4" class="status-dot"/>
-          <text x="688" y="240" class="diagram-url">home.yourdomain.com</text>
-          <path d="M932,228 h10 v13 h-10 z M934,228 v-4 a4,4 0 0 1 8,0 v4" fill="none" stroke="var(--text-faint)" stroke-width="1.3"/>
-        </svg>
+      <div class="hero-shot reveal">
+        <div class="browser-frame">
+          <div class="browser-chrome"><span></span><span></span><span></span></div>
+          <button type="button" class="shot-frame shot-trigger"
+                  data-lightbox-src="screenshots/applications.png"
+                  data-lightbox-alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address.">
+            <img src="screenshots/applications.png" alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address." width="1549" height="760" />
+          </button>
         </div>
-        <p class="diagram-caption">One encrypted tunnel out. Everything else stays home.</p>
       </div>
     </div>
   </section>
@@ -144,15 +97,16 @@
       </div>
       <div class="problem-body reveal">
         <p>
-          Shared IP addresses. No port forwarding. An address that changes overnight.
-          That's most residential internet today — and it's exactly why the thing you
-          built at home stays stuck at home.
+          It used to be easy to expose your homelab to the internet, but that doesn't
+          work today: internet providers use CGNAT and shared addresses to protect
+          consumers and save cost — and that's exactly why the thing you built at home
+          stays stuck at home.
         </p>
         <p>
           There are tools that solve this properly for a living: Cloudflare Tunnel,
-          Tailscale, Pangolin, and others. They work well. They're also built for teams
-          of network engineers, and most of what they offer is functionality a
-          self-hoster will never touch.
+          Tailscale, Pangolin, and others. They work well, but their setup and interfaces
+          are designed for enterprise network engineers. Selfie Proxy instead focuses on
+          usability and simplicity for the self-hoster.
         </p>
         <ul class="tool-list" aria-hidden="true">
           <li>high availability</li>
@@ -170,7 +124,7 @@
     <div class="container">
       <div class="section-head reveal">
         <p class="eyebrow">What you get</p>
-        <h2>Everything a homelab needs. Nothing a homelab doesn't.</h2>
+        <h2>Everything a homelab needs.</h2>
         <p>Six things, each solving a real problem you've probably already hit.</p>
       </div>
 
@@ -228,12 +182,38 @@
         <div class="feature-card">
           <div class="feature-icon-badge">
             <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="10"/>
+              <rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 7l2-4h14l2 4"/><line x1="10" y1="12" x2="14" y2="12"/>
             </svg>
           </div>
-          <h3>See what's online at a glance</h3>
-          <p>A green dot means a homelab's tunnel is up right now. Red means it isn't. No SSH, no guessing which app went down.</p>
+          <h3>Back up your setup, or move it to a new server</h3>
+          <p>Every homelab, application, and static site, down to the files, in one ZIP you can restore anywhere. Other solutions lock this behind a paid enterprise plan.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ NOT FOR ENTERPRISE ============ -->
+  <section class="boundary">
+    <div class="container">
+      <div class="boundary-card reveal">
+        <div>
+          <p class="eyebrow">What this isn't</p>
+          <h2>Deliberately not for the enterprise</h2>
+          <p>
+            Selfie Proxy skips high availability, load balancing, role-based access,
+            managed SaaS offerings, and auditing/enterprise compliance tooling. Those things matter
+            for business continuity — and they're notoriously easy to misconfigure. For a
+            homelab, they're just bloat waiting to bite you. If you're running this for a
+            company, use a properly supported commercial product instead.
+          </p>
+        </div>
+        <ul class="omit-list">
+          <li>No high availability and clustering</li>
+          <li>No load balancing across replicas</li>
+          <li>No multi-user roles and permissions</li>
+          <li>No managed, hosted SaaS offering</li>
+          <li>No auditing and enterprise compliance</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -251,9 +231,11 @@
         <div class="tour-frame">
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
-            <div class="shot-frame">
+            <button type="button" class="shot-frame shot-trigger"
+                    data-lightbox-src="screenshots/homelabs.png"
+                    data-lightbox-alt="Homelabs page listing two connected networks, my-homelab shown Connected in green and smart home network shown Disconnected in red, each with an application count.">
               <img src="screenshots/homelabs.png" alt="Homelabs page listing two connected networks, my-homelab shown Connected in green and smart home network shown Disconnected in red, each with an application count." loading="lazy" width="1180" height="527" />
-            </div>
+            </button>
           </div>
         </div>
         <div class="tour-text">
@@ -267,9 +249,11 @@
         <div class="tour-frame">
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
-            <div class="shot-frame">
+            <button type="button" class="shot-frame shot-trigger"
+                    data-lightbox-src="screenshots/applications.png"
+                    data-lightbox-alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address.">
               <img src="screenshots/applications.png" alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address." loading="lazy" width="1549" height="760" />
-            </div>
+            </button>
           </div>
         </div>
         <div class="tour-text">
@@ -283,9 +267,11 @@
         <div class="tour-frame">
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
-            <div class="shot-frame">
+            <button type="button" class="shot-frame shot-trigger"
+                    data-lightbox-src="screenshots/edit-application.png"
+                    data-lightbox-alt="Edit application form for navidrome, showing subdomain, the resulting HTTPS address, an authentication checkbox, and the local homelab address with protocol, host and port fields.">
               <img src="screenshots/edit-application.png" alt="Edit application form for navidrome, showing subdomain, the resulting HTTPS address, an authentication checkbox, and the local homelab address with protocol, host and port fields." loading="lazy" width="954" height="800" />
-            </div>
+            </button>
           </div>
         </div>
         <div class="tour-text">
@@ -299,9 +285,11 @@
         <div class="tour-frame">
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
-            <div class="shot-frame">
+            <button type="button" class="shot-frame shot-trigger"
+                    data-lightbox-src="screenshots/lcoal-websites.png"
+                    data-lightbox-alt="Local websites page listing two static sites, www.nordicsnerd.com and www.mystuff.info, each with an Edit button.">
               <img src="screenshots/lcoal-websites.png" alt="Local websites page listing two static sites, www.nordicsnerd.com and www.mystuff.info, each with an Edit button." loading="lazy" width="1176" height="527" />
-            </div>
+            </button>
           </div>
         </div>
         <div class="tour-text">
@@ -386,31 +374,6 @@
     </div>
   </section>
 
-  <!-- ============ NOT FOR ENTERPRISE ============ -->
-  <section class="boundary">
-    <div class="container">
-      <div class="boundary-card reveal">
-        <div>
-          <p class="eyebrow">What this isn't</p>
-          <h2>Deliberately not for the enterprise</h2>
-          <p>
-            Selfie Proxy skips high availability, load balancing, role-based access, and
-            managed SaaS offerings. Those things matter for business continuity — and
-            they're notoriously easy to misconfigure. For a homelab, they're just bloat
-            waiting to bite you. If you're running this for a company, use a properly
-            supported commercial product instead.
-          </p>
-        </div>
-        <ul class="omit-list">
-          <li>High availability / clustering</li>
-          <li>Load balancing across replicas</li>
-          <li>Multi-user roles &amp; permissions</li>
-          <li>Managed, hosted SaaS offering</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
   <!-- ============ FAQ ============ -->
   <section class="faq" id="faq">
     <div class="container">
@@ -436,6 +399,75 @@
           <summary>I already run NGINX at home with a valid certificate — can Selfie Proxy just use that?</summary>
           <p>No. Point Selfie Proxy directly at the web application itself, over HTTP or HTTPS with a self-signed certificate — not at the NGINX reverse proxy in front of it. Connecting straight to the application is what lets Selfie Proxy manage certificates for you automatically and protect the app with its own login, neither of which is possible if it's only forwarding to another reverse proxy.</p>
         </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ARCHITECTURE ============ -->
+  <section class="architecture" id="architecture">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">Under the hood</p>
+        <h2>One outbound tunnel. Nothing opened at your router.</h2>
+        <p>For the curious: here's the whole connection, end to end.</p>
+      </div>
+
+      <div class="diagram-wrap reveal">
+        <div class="diagram-wrap-inner">
+        <svg viewBox="0 0 1000 290" role="img" aria-labelledby="diagram-title">
+          <title id="diagram-title">Diagram: your home network connects through one encrypted tunnel to your server, which exposes each app under its own friendly HTTPS address.</title>
+
+          <!-- home node -->
+          <rect x="40" y="100" width="130" height="100" rx="16" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>
+          <path d="M75,150 L105,122 L135,150" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M85,148 V180 H125 V148" fill="none" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="105" y="224" text-anchor="middle" class="diagram-node-label">YOUR HOME</text>
+          <text x="105" y="240" text-anchor="middle" class="diagram-node-sub">behind any router, any IP</text>
+
+          <!-- tunnel -->
+          <path id="tunnel-path" class="tunnel-line" d="M170,150 L430,150"/>
+          <text x="300" y="122" text-anchor="middle" class="diagram-node-sub">encrypted tunnel · outbound only</text>
+          <circle r="4" class="tunnel-pulse">
+            <animateMotion dur="2.6s" repeatCount="indefinite" path="M170,150 L430,150"/>
+          </circle>
+
+          <!-- server node -->
+          <rect x="430" y="100" width="130" height="100" rx="16" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>
+          <rect x="480" y="128" width="30" height="42" rx="3" fill="none" stroke="var(--text-dim)" stroke-width="1.5"/>
+          <line x1="485" y1="138" x2="505" y2="138" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="485" y1="148" x2="505" y2="148" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="485" y1="158" x2="505" y2="158" stroke="var(--text-dim)" stroke-width="1.5" stroke-linecap="round"/>
+          <text x="495" y="224" text-anchor="middle" class="diagram-node-label">YOUR SERVER</text>
+          <text x="495" y="240" text-anchor="middle" class="diagram-node-sub">any cheap VPS</text>
+
+          <!-- fan out -->
+          <path class="fan-line" d="M560,150 C605,150 610,60 650,60"/>
+          <path class="fan-line" d="M560,150 L650,150"/>
+          <path class="fan-line" d="M560,150 C605,150 610,235 650,235"/>
+
+          <!-- row 1 -->
+          <rect x="650" y="39" width="310" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <circle cx="672" cy="60" r="8" class="status-dot-glow"/>
+          <circle cx="672" cy="60" r="4" class="status-dot"/>
+          <text x="688" y="65" class="diagram-url">nas.yourdomain.com</text>
+          <path d="M932,53 h10 v13 h-10 z M934,53 v-4 a4,4 0 0 1 8,0 v4" fill="none" stroke="var(--text-faint)" stroke-width="1.3"/>
+
+          <!-- row 2 -->
+          <rect x="650" y="129" width="310" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <circle cx="672" cy="150" r="8" class="status-dot-glow"/>
+          <circle cx="672" cy="150" r="4" class="status-dot"/>
+          <text x="688" y="155" class="diagram-url">photos.yourdomain.com</text>
+          <path d="M932,143 h10 v13 h-10 z M934,143 v-4 a4,4 0 0 1 8,0 v4" fill="none" stroke="var(--text-faint)" stroke-width="1.3"/>
+
+          <!-- row 3 -->
+          <rect x="650" y="214" width="310" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+          <circle cx="672" cy="235" r="8" class="status-dot-glow"/>
+          <circle cx="672" cy="235" r="4" class="status-dot"/>
+          <text x="688" y="240" class="diagram-url">home.yourdomain.com</text>
+          <path d="M932,228 h10 v13 h-10 z M934,228 v-4 a4,4 0 0 1 8,0 v4" fill="none" stroke="var(--text-faint)" stroke-width="1.3"/>
+        </svg>
+        </div>
+        <p class="diagram-caption">One encrypted tunnel out. Everything else stays home.</p>
       </div>
     </div>
   </section>
@@ -471,6 +503,11 @@
     </ul>
   </div>
 </footer>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Close image">&times;</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="" />
+</div>
 
 <script src="js/main.js"></script>
 </body>

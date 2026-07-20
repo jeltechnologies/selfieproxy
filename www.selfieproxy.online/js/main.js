@@ -39,4 +39,45 @@
       item.classList.add("is-visible");
     });
   }
+
+  var lightbox = document.getElementById("lightbox");
+  var lightboxImg = document.getElementById("lightbox-img");
+  var lightboxClose = document.getElementById("lightbox-close");
+  var triggers = document.querySelectorAll(".shot-trigger");
+
+  if (lightbox && lightboxImg && lightboxClose && triggers.length) {
+    var openLightbox = function (src, alt) {
+      lightboxImg.src = src;
+      lightboxImg.alt = alt || "";
+      lightbox.hidden = false;
+      document.body.style.overflow = "hidden";
+      lightboxClose.focus();
+    };
+
+    var closeLightbox = function () {
+      lightbox.hidden = true;
+      lightboxImg.src = "";
+      document.body.style.overflow = "";
+    };
+
+    triggers.forEach(function (trigger) {
+      trigger.addEventListener("click", function () {
+        openLightbox(trigger.getAttribute("data-lightbox-src"), trigger.getAttribute("data-lightbox-alt"));
+      });
+    });
+
+    lightboxClose.addEventListener("click", closeLightbox);
+
+    lightbox.addEventListener("click", function (event) {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !lightbox.hidden) {
+        closeLightbox();
+      }
+    });
+  }
 })();

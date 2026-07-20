@@ -175,16 +175,10 @@ this section is the portal-side UI behavior.
 
 ## Backup and restore
 
-**Value to the user**: a single ZIP is the admin's entire setup made portable -- every Homelab,
-Application, and Local Website (including each site's actual files), captured in one download with
-no config files to hand-copy and nothing to reconstruct from memory. That ZIP is what turns two
-otherwise-scary situations into a routine one: recovering after this server is lost/corrupted, or
-deliberately standing up a brand new server (a VPS migration, a provider switch) without redoing
-every Homelab connection, Application, and Local Website by hand. The import side is designed so
-that "restoring" never feels like a leap of faith -- before anything is touched, the wizard shows,
-item by item, what's already on this server versus what's new, and warns exactly where something
-will actually change (a fresh Homelab secret, an Application/Local Website being overwritten) --
-so the admin always knows what a click of Finish is about to do.
+**Value to the user**: back up their configuration, or move it to another Selfie Proxy server.
+Everything below is how that's done -- a single ZIP covering every Homelab, Application, and Local
+Website (including each site's actual files), and an import wizard that reviews what's new versus
+what already exists, item by item, before anything is applied.
 
 "Export configuration" and "Import configuration" are two separate pages, each its own entry in
 the topbar's Settings menu (not a nav tab) -- exporting and importing are different enough

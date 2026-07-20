@@ -13,8 +13,8 @@ knowledge to configure.
 Selfie Proxy is scoped to a single use case: one person exposing their own home services
 through one small internet-facing server. You connect your home network to it, and every
 app you want to share gets its own HTTPS subdomain, managed from an admin portal instead
-of config files. No high availability, load balancing, or multi-user support — if you need
-those, use a commercial product instead.
+of config files. No high availability, load balancing, multi-user support, or auditing and
+enterprise compliance tooling — if you need those, use a commercial product instead.
 
 ## Features
 
@@ -24,9 +24,9 @@ those, use a commercial product instead.
 - Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
-- Export/import configuration as a single portable ZIP, including static website files — move
-  to a new server or recover from data loss, with a step-by-step review of what's new versus
-  what already exists before anything changes.
+- Back up your configuration, or move it to another Selfie Proxy server — a single portable ZIP
+  covering every homelab, application, and static website, with a step-by-step
+  review of what's new versus what already exists before anything changes.
 - Single Docker command to install and update.
 
 ## Background
