@@ -20,8 +20,8 @@ import online.selfieproxy.identityprovider.config.SsoProperties;
  * without it, every single-sign-on-protected domain's authorization round trip would
  * always re-show the login form here, even moments after authenticating for
  * a different domain. Now tracks who logged in and whether they're the
- * admin (rather than a bare boolean), since both AuthorizeController's
- * silent single-sign-on path and the /users pages need to know whose session it is, not
+ * admin (rather than a bare boolean), since AuthorizeController's
+ * silent single-sign-on path needs to know whose session it is, not
  * just that a session exists. In-memory-only, same no-DB/random-token style
  * as AuthorizationService. The session cookie's Max-Age is set to the
  * absolute cap (sessionMaxMinutes) so the browser retains it for the full
@@ -110,7 +110,7 @@ public class IdpSessionService {
 	private record Session(String username, boolean isAdmin, Instant idleExpiry, Instant maxExpiry) {
 	}
 
-	/** Who a still-valid session belongs to -- returned by validate() for both AuthorizeController's silent single-sign-on path and the /users pages' admin gate. */
+	/** Who a still-valid session belongs to -- returned by validate() for AuthorizeController's silent single-sign-on path. */
 	public record SessionInfo(String username, boolean isAdmin) {
 	}
 }

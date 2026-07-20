@@ -19,10 +19,6 @@ public record BoringProxyProperties(String domain, String adminSubdomain, String
 		return portalSubdomain + "." + domain;
 	}
 
-	public String authDomain() {
-		return authSubdomain + "." + domain;
-	}
-
 	public String restBaseUrl() {
 		return "https://" + adminDomain() + "/rest";
 	}

@@ -25,11 +25,11 @@ import tools.jackson.databind.json.JsonMapper;
  * existence is guaranteed by its own bootstrap.
  *
  * Username uniqueness against the admin's own username (Gap B) is a
- * cross-store concern UsersController checks before calling add()/rename(),
+ * cross-store concern InternalUsersController checks before calling add()/rename(),
  * since this store has no visibility into AdminUserStore. Uniqueness
  * *within this store*, though, is enforced right here, inside the same
  * synchronized read-modify-write add()/rename() already does -- a
- * check performed by the caller first (as UsersController's own
+ * check performed by the caller first (as InternalUsersController's own
  * pre-check does, for a fast, friendly error) is a separate, non-atomic
  * read, and two concurrent requests for the same username (a double
  * form submit, two open tabs) could both pass it and both write,

@@ -347,6 +347,13 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 
 .error { color: var(--danger); }
 
+.warning-strong {
+	color: var(--danger);
+	font-weight: 600;
+	font-size: 0.85rem;
+	margin: 0.75rem 0;
+}
+
 .errors {
 	color: var(--danger);
 	padding-left: 1.2rem;

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Users - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='users')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Users</h1>
+				<p class="muted">Users can log in to every application with single sign on. Only the admin user can make changes to Selfie Proxy through this portal.</p>
+			</div>
+			<a class="button" th:href="@{/users/new}">Add</a>
+		</section>
+
+		<table class="apps-table">
+			<thead>
+				<tr>
+					<th>Username</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td th:text="${adminUsername} + ' (admin)'"></td>
+					<td>
+						<a class="button-small" th:href="@{/users/{username}/edit(username=${adminUsername})}">Edit</a>
+					</td>
+				</tr>
+				<tr th:each="u : ${users}">
+					<td th:text="${u}"></td>
+					<td>
+						<a class="button-small" th:href="@{/users/{username}/edit(username=${u})}">Edit</a>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</main>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -32,17 +32,25 @@ container. After a successful login the user lands on the exposed applications p
   recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
   never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
 - The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds "Export configuration"
-  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Users" (links out
-  to `selfieproxy-identity-provider`'s `/users` list -- add/edit/remove non-admin Users and change
-  any user's password, hidden whenever an external IdP is configured, since Selfie Proxy no longer
-  controls who can authenticate in that case), and Logout. There is no separate "Change username /
-  password" entry: the admin's own username and password are changed from the Users page's admin
-  row (Edit / Change password) like any other row, rather than through a standalone self-service
-  page -- `selfieproxy-identity-provider`'s old `/account` page and `AccountController` were
-  removed once the Users page's admin row covered the same ground. Users are never included in a
-  configuration export/import (`BackupService`) -- they live entirely in
-  `selfieproxy-identity-provider`'s own data directory, the same treatment as the admin account
-  and its RSA signing key. The user-facing labels and URLs say
+  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Users" (`/users`,
+  `web/UsersController.java` -- add/edit/remove non-admin Users and change any user's password,
+  hidden whenever an external IdP is configured, since Selfie Proxy no longer controls who can
+  authenticate in that case), and Logout. The Users page shares the portal's own look/topbar/logo
+  like every other page here, but its data and validation (`UserStore`/`AdminUserStore`/
+  `PasswordPolicy`) still live in `selfieproxy-identity-provider` -- `UsersController` is a thin
+  client of `InternalUsersController`, identity-provider's own internal-only REST API, reached
+  through `IdentityProviderClient` over the Docker bridge network only (never the public domain;
+  see root `CLAUDE.md`'s "Running" section for how that API stays unreachable from the internet).
+  This split exists because identity-provider is the one that actually checks a User's/the admin's
+  credentials on login, so it has to remain the source of truth for that data; only the UI moved
+  here. There is no separate "Change username / password" entry: the admin's own username and
+  password are changed from the Users page's admin row (Edit / Change password) like any other
+  row, rather than through a standalone self-service page -- `selfieproxy-identity-provider`'s old
+  `/account` page and `AccountController` were removed once the Users page's admin row covered the
+  same ground. Users are never included in a configuration export/import (`BackupService`) -- the
+  underlying `users.json`/`admin-user.json` files live in `selfieproxy-identity-provider`'s own
+  data directory, the same treatment as the admin account and its RSA signing key. The user-facing
+  labels and URLs say
   "export"/"import configuration"; the Java domain types underneath (`BackupService`,
   `BackupController`, `RestoreSelection`, `RestoreResult`, templates named `backup.html`/
   `restore.html`/`restore-picker.html`) keep the shorter "backup"/"restore" naming (see "Backup

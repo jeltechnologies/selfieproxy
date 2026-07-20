@@ -22,7 +22,7 @@ import online.selfieproxy.identityprovider.domain.PasswordPolicy;
  * Forces a password change before completing login when
  * AdminUser.mustChangePassword() is set -- reached only via LoginController's
  * redirect, never authorizes a request on its own otherwise. Strength is
- * enforced via PasswordPolicy (shared with UsersController's admin-row
+ * enforced via PasswordPolicy (shared with InternalUsersController's admin-row
  * change-password handler). A successful change completes the login, so it
  * also starts this IdP's own login session (IdpSessionService) -- see
  * LoginController.

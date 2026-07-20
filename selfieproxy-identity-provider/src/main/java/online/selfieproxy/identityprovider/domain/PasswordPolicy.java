@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Shared password-strength rules, used by ChangePasswordController's forced
- * first-login flow and UsersController's add-user/edit-user handlers --
+ * first-login flow and InternalUsersController's add-user/edit-user handlers --
  * deliberately without a symbol-character requirement (those cause problems
  * on international keyboard layouts).
  */

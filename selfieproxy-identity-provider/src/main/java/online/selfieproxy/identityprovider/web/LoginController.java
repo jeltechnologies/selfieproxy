@@ -30,7 +30,8 @@ import online.selfieproxy.identityprovider.domain.UserStore;
  * given a pending authorization request (authz_id, see
  * AuthorizationService) to complete instead of a servlet session -- regular
  * Users have no such forced-change flow, since only an admin operator (via
- * UsersController) ever sets their password. A successful login of either
+ * selfieproxy-portal's Users page, which manages User/AdminUser records
+ * through InternalUsersController) ever sets their password. A successful login of either
  * kind also starts this IdP's own login session (IdpSessionService), so any
  * other single-sign-on-protected domain's authorization round trip is silent from here
  * on -- but boringproxy's HandleCallback still re-checks the ID token's
