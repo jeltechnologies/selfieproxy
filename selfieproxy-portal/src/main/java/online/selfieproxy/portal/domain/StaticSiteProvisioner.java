@@ -6,6 +6,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.util.List;
+import java.util.stream.Stream;
 import java.util.zip.ZipOutputStream;
 
 import org.slf4j.Logger;
@@ -113,9 +115,9 @@ public class StaticSiteProvisioner {
 		}
 		try {
 			ZipUtils.extract(zipData, stagingDir);
+			Path contentRoot = unwrapSingleRootDirectory(stagingDir);
 			ZipUtils.deleteRecursively(dir);
-			Files.move(stagingDir, dir);
-			stagingDir = null;
+			Files.move(contentRoot, dir);
 			// createTempDirectory defaults to owner-only (700) permissions -- fine for the portal
 			// container itself, but selfieproxy-local-websites' NGINX runs as a different user in
 			// its own container and needs to at least traverse into the directory to serve it.
@@ -124,10 +126,29 @@ public class StaticSiteProvisioner {
 			throw new IllegalStateException(
 					"Failed to extract uploaded ZIP for " + domain + " -- existing files were left untouched", e);
 		} finally {
-			if (stagingDir != null) {
-				deleteQuietly(stagingDir);
+			// Safe even when contentRoot was moved out from under extractedDir above
+			// (rename leaves extractedDir either gone or an empty husk) -- deleteRecursively
+			// no-ops on a path that no longer exists.
+			deleteQuietly(stagingDir);
+		}
+	}
+
+	/**
+	 * Many ZIP tools (and "Download ZIP" on GitHub, etc.) wrap a site's files
+	 * in a single named folder instead of zipping the files themselves at the
+	 * root. If the extracted upload contains exactly one top-level entry and
+	 * it's a directory, its contents become the site root instead of that
+	 * wrapper folder itself -- otherwise the site would be served at
+	 * /<wrapper-name>/index.html instead of /index.html.
+	 */
+	private static Path unwrapSingleRootDirectory(Path extractedDir) throws IOException {
+		try (Stream<Path> entries = Files.list(extractedDir)) {
+			List<Path> topLevel = entries.toList();
+			if (topLevel.size() == 1 && Files.isDirectory(topLevel.get(0))) {
+				return topLevel.get(0);
 			}
 		}
+		return extractedDir;
 	}
 
 	private void deleteQuietly(Path dir) {
