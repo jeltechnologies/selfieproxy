@@ -13,14 +13,16 @@ knowledge to configure.
 Selfie Proxy is scoped to a single use case: one person exposing their own home services
 through one small internet-facing server. You connect your home network to it, and every
 app you want to share gets its own HTTPS subdomain, managed from an admin portal instead
-of config files. No high availability, load balancing, multi-user support, or auditing and
-enterprise compliance tooling — if you need those, use a commercial product instead.
+of config files. No high availability, load balancing, role-based permissions, or auditing
+and enterprise compliance tooling — if you need those, use a commercial product instead.
 
 ## Features
 
 - Admin portal to manage every exposed app and website.
 - Automatic, auto-renewing HTTPS certificates.
 - Built-in login (single sign on) protecting the admin portal and, optionally, individual exposed apps.
+- Simple user management: one admin account runs the portal, plus any number of additional
+  Users who can only log in to the apps you've protected — nothing more.
 - Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
@@ -39,6 +41,7 @@ Anders Pitman, which is no longer actively maintained. On top of it we added:
 - Per-app authentication for exposed applications.
 - Centralized agent ("client") management from the admin portal.
 - Built-in single sign on login for the portal, with support for swapping in an external OIDC provider.
+- Admin-managed Users, so you can share login access to your apps without sharing the admin account.
 - Static website hosting.
 - Export/import configuration for every homelab, application, and static website.
 - Fixed tunnel authentication failing on modern OpenSSH (8.8+), which rejects the old

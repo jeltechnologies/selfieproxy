@@ -18,7 +18,7 @@ runtime config/volumes they use:
   that manages `boringproxy` tunnels/clients through its REST API. Has its own `CLAUDE.md` with
   the full product spec (login flow, homelabs, exposed apps, tunnel mapping). No login of its
   own anymore — see `selfieproxy-identity-provider/` below.
-- `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, single-user OIDC Identity Provider
+- `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, OIDC Identity Provider with simplified admin/User management
   (Java/Spring, same Maven/Dockerfile template as `selfieproxy-portal/`). Used by default to
   authenticate the admin portal and any exposed app with single sign on protection enabled; a BYO
   external IdP (Keycloak, Authentik, etc.) can be swapped in instead via
@@ -55,7 +55,7 @@ runtime config/volumes they use:
 ├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent (depends_on selfieproxy-reverseproxy)
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
-├── selfieproxy-identity-provider/ # bundled single-user OIDC Identity Provider — Java/Spring, same build template as selfieproxy-portal
+├── selfieproxy-identity-provider/ # bundled OIDC Identity Provider with simplified admin/User management — Java/Spring, same build template as selfieproxy-portal
 └── selfieproxy-localsites-webserver/ # self-reloading NGINX image for "Selfie Proxy hosts this" static sites
 ```
 
