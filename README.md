@@ -33,8 +33,11 @@ and enterprise compliance tooling — if you need those, use a commercial produc
 
 ## Background
 
-Selfie Proxy is a fork of [boringproxy](https://github.com/boringproxy/boringproxy) by
-Anders Pitman, which is no longer actively maintained. On top of it we added:
+Selfie Proxy's reverse tunnel engine (`selfieproxy-reverseproxy`) is a fork of
+[boringproxy](https://github.com/boringproxy/boringproxy) by Anders Pitman, which is no longer
+actively maintained. Selfie Proxy itself is a larger system built around that engine — the admin
+portal, identity provider, and other services are our own code, not part of the fork. On top of
+boringproxy we added:
 
 - A new admin portal aimed at home users instead of boringproxy's networking-first UI.
 - WebSocket support.

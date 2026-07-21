@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.1.0</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>online.selfieproxy</groupId>
+  <artifactId>selfieproxy-remote-console</artifactId>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
+
+  <name>Selfie Proxy Remote Console</name>
+  <description>Browser SSH/RDP/VNC console bridge, pairing Apache Guacamole's guacd with Selfie Proxy's AllowExternalTcp: false tunnels</description>
+
+  <properties>
+    <java.version>25</java.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-thymeleaf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-websocket</artifactId>
+    </dependency>
+    <!-- Apache Guacamole's own Java client library, consumed unmodified, see
+         THIRD-PARTY-NOTICES.md at the repo root. Provides GuacamoleConfiguration,
+         ConfiguredGuacamoleSocket, and GuacamoleTunnel, the standard server-side
+         bridge between a browser WebSocket and guacd. -->
+    <dependency>
+      <groupId>org.apache.guacamole</groupId>
+      <artifactId>guacamole-common</artifactId>
+      <version>1.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webmvc-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>selfieproxy-remote-console</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

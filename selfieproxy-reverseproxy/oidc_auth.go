@@ -45,13 +45,14 @@ var oidcAuthHolder atomic.Pointer[OidcAuthenticator]
 // and 600 minutes, matching Keycloak's own SSO Session Idle/Max defaults --
 // see setSessionCookie).
 type OidcAuthenticator struct {
-	verifier     *oidc.IDTokenVerifier
-	oauth2Config oauth2.Config
-	adminDomain  string
-	portalDomain string
-	signingKey   []byte
-	idleTTL      time.Duration
-	maxTTL       time.Duration
+	verifier      *oidc.IDTokenVerifier
+	oauth2Config  oauth2.Config
+	adminDomain   string
+	portalDomain  string
+	consoleDomain string
+	signingKey    []byte
+	idleTTL       time.Duration
+	maxTTL        time.Duration
 }
 
 // ssoClaims backs both the session cookie and the relay token -- both are
@@ -99,7 +100,7 @@ type ssoStateClaims struct {
 // Selfie Proxy deployment, where docker-compose.yaml always
 // computes a default pointing at the bundled server, but kept as an
 // escape hatch for anyone running the bare boringproxy binary directly.
-func StartOidcAuth(issuer, clientId, clientSecret, adminDomain, portalDomain string, idleTTL, maxTTL time.Duration) {
+func StartOidcAuth(issuer, clientId, clientSecret, adminDomain, portalDomain, consoleDomain string, idleTTL, maxTTL time.Duration) {
 	if issuer == "" {
 		log.Println("Single sign on disabled (-oidc-issuer not set)")
 		return
@@ -127,11 +128,12 @@ func StartOidcAuth(issuer, clientId, clientSecret, adminDomain, portalDomain str
 						RedirectURL:  fmt.Sprintf("https://%s/oidc/callback", adminDomain),
 						Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 					},
-					adminDomain:  adminDomain,
-					portalDomain: portalDomain,
-					signingKey:   signingKey,
-					idleTTL:      idleTTL,
-					maxTTL:       maxTTL,
+					adminDomain:   adminDomain,
+					portalDomain:  portalDomain,
+					consoleDomain: consoleDomain,
+					signingKey:    signingKey,
+					idleTTL:       idleTTL,
+					maxTTL:        maxTTL,
 				})
 				log.Printf("OIDC single sign on ready (issuer %s)\n", issuer)
 				return
@@ -296,11 +298,14 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// The is_admin claim only gates the portal domain -- an absent claim (any
-	// IdP other than the bundled selfieproxy-identity-provider) is treated as
-	// permissive, which is what scopes this whole restriction to the bundled
-	// IdP without oidc_auth.go needing to know which IdP is actually in use.
-	if claims.Domain == a.portalDomain {
+	// The is_admin claim only gates the portal and console domains -- an absent
+	// claim (any IdP other than the bundled selfieproxy-identity-provider) is
+	// treated as permissive, which is what scopes this whole restriction to the
+	// bundled IdP without oidc_auth.go needing to know which IdP is actually in
+	// use. The console domain (selfieproxy-remote-console) gets the same
+	// treatment as the portal domain since Remote Consoles are Homelab-management
+	// tooling, not something a login-only User should ever reach.
+	if claims.Domain == a.portalDomain || claims.Domain == a.consoleDomain {
 		var identityClaims struct {
 			IsAdmin *bool `json:"is_admin"`
 		}
@@ -309,7 +314,7 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if identityClaims.IsAdmin != nil && !*identityClaims.IsAdmin {
-			http.Error(w, "This account can only access exposed applications, not the Selfie Proxy portal.", http.StatusForbidden)
+			http.Error(w, "This account can only access exposed applications, not the Selfie Proxy portal or Remote Consoles.", http.StatusForbidden)
 			return
 		}
 	}

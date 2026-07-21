@@ -50,6 +50,8 @@ func Listen() {
 	portalPort := flagSet.Int("portal-port", 0, "Local port -portal-domain is proxied to")
 	ssoDomain := flagSet.String("sso-domain", "", "Domain reverse-proxied directly to -sso-port on localhost, without a Tunnel/Agent (Selfie Proxy's bundled OIDC IdP, selfieproxy-sso-server, which must be reachable before any agent exists)")
 	ssoPort := flagSet.Int("sso-port", 0, "Local port -sso-domain is proxied to")
+	consoleDomain := flagSet.String("console-domain", "", "Domain reverse-proxied directly to -console-port on localhost, without a Tunnel/Agent (Selfie Proxy's browser SSH/RDP/VNC console, selfieproxy-remote-console) -- always gated behind single sign on, like -portal-domain")
+	consolePort := flagSet.Int("console-port", 0, "Local port -console-domain is proxied to")
 	oidcIssuer := flagSet.String("oidc-issuer", "", "OIDC issuer URL boringproxy authenticates the portal domain and any tunnel protected with single sign on against; blank disables single sign on entirely")
 	oidcClientId := flagSet.String("oidc-client-id", "", "OIDC client ID boringproxy registers as with -oidc-issuer")
 	oidcClientSecret := flagSet.String("oidc-client-secret", "", "OIDC client secret, if the issuer requires one (blank for the bundled selfieproxy-sso-server, which trusts PKCE alone)")
@@ -174,7 +176,15 @@ func Listen() {
 		log.Print(fmt.Sprintf("Successfully acquired certificate for sso domain (%s)", *ssoDomain))
 	}
 
-	StartOidcAuth(*oidcIssuer, *oidcClientId, *oidcClientSecret, adminDomain, *portalDomain,
+	if *consoleDomain != "" && autoCerts {
+		err = certConfig.ManageSync(context.Background(), []string{*consoleDomain})
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print(fmt.Sprintf("Successfully acquired certificate for console domain (%s)", *consoleDomain))
+	}
+
+	StartOidcAuth(*oidcIssuer, *oidcClientId, *oidcClientSecret, adminDomain, *portalDomain, *consoleDomain,
 		time.Duration(*ssoIdleMinutes)*time.Minute, time.Duration(*ssoMaxMinutes)*time.Minute)
 
 	// Add admin user if it doesn't already exist
@@ -241,6 +251,26 @@ func Listen() {
 	tlsConfig := &tls.Config{
 		GetCertificate: getCertificate,
 		NextProtos:     []string{"h2", "acme-tls/1"},
+		// The console domain (selfieproxy-remote-console) is the only place in this
+		// product that ever needs a browser WebSocket -- proxyWebsocket (http_proxy.go)
+		// hijacks the raw TCP connection and only understands classic HTTP/1.1 Upgrade
+		// semantics. Over HTTP/2, modern browsers instead try to bootstrap a WebSocket
+		// via RFC 8441 extended CONNECT, which Go's stdlib HTTP/2 server doesn't support --
+		// the request gets rejected at the HTTP/2 framing layer before it ever reaches
+		// this process's own handler, so the browser just hangs with no visible error and
+		// nothing is logged. Advertising only "http/1.1" over ALPN for this one domain
+		// forces the browser to negotiate classic HTTP/1.1, where the existing Upgrade/
+		// hijack proxying already works correctly -- every other domain (portal, admin,
+		// ordinary tunnels) is untouched and keeps h2.
+		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			if *consoleDomain != "" && hello.ServerName == *consoleDomain {
+				return &tls.Config{
+					GetCertificate: getCertificate,
+					NextProtos:     []string{"http/1.1", "acme-tls/1"},
+				}, nil
+			}
+			return nil, nil
+		},
 	}
 	tlsListener := tls.NewListener(httpListener, tlsConfig)
 
@@ -389,6 +419,19 @@ func Listen() {
 			// behind single sign on itself -- it's the IdP the gate calls out to.
 			ssoTunnel := Tunnel{Domain: *ssoDomain}
 			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, *behindProxy)
+		} else if *consoleDomain != "" && hostDomain == *consoleDomain {
+			// Proxied directly to selfieproxy-remote-console, same carve-out
+			// shape as -portal-domain (fixed local address, no Tunnel/Agent) --
+			// always gated behind single sign on, admin-only just like the portal
+			// domain (see oidc_auth.go's is_admin check), since Remote Consoles
+			// are Homelab-management tooling, not something a login-only User
+			// should ever reach.
+			consoleTunnel := Tunnel{Domain: *consoleDomain}
+			if !requireSsoIfNeeded(w, r, consoleTunnel.Domain, true) {
+				return
+			}
+			r.Header.Set("X-Selfieproxy-Sso-Verified", "true")
+			proxyRequest(w, r, consoleTunnel, httpClient, "localhost", *consolePort, *behindProxy)
 		} else {
 
 			tunnel, exists := db.GetTunnel(hostDomain)

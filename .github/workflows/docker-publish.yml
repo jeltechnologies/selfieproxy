@@ -10,6 +10,7 @@ on:
       - "selfieproxy-identity-provider/**"
       - "selfieproxy-localsites-webserver/**"
       - "selfieproxy-check-prerequisites/**"
+      - "selfieproxy-remote-console/**"
       - ".github/workflows/docker-publish.yml"
   workflow_dispatch: {}
 
@@ -35,6 +36,8 @@ jobs:
             context: ./selfieproxy-localsites-webserver
           - image: selfieproxy-check-prerequisites
             context: ./selfieproxy-check-prerequisites
+          - image: selfieproxy-remote-console
+            context: ./selfieproxy-remote-console
     steps:
       - name: Checkout
         uses: actions/checkout@v4

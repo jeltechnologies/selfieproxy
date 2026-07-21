@@ -1,0 +1,47 @@
+html, body {
+	margin: 0;
+	height: 100%;
+	background: #1a1a1a;
+	color: #eee;
+	font-family: system-ui, sans-serif;
+}
+
+.toolbar {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 0.5rem 1rem;
+	background: #262626;
+	border-bottom: 1px solid #3a3a3a;
+}
+
+.console-name {
+	font-weight: 600;
+}
+
+.status {
+	margin-left: auto;
+	color: #aaa;
+	font-size: 0.9rem;
+}
+
+.toolbar button {
+	background: #3a3a3a;
+	color: #eee;
+	border: none;
+	padding: 0.4rem 0.8rem;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.toolbar button:hover {
+	background: #4a4a4a;
+}
+
+#display-container {
+	overflow: auto;
+	height: calc(100% - 48px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}

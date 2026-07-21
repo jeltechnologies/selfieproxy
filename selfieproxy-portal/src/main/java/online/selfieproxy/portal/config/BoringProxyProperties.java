@@ -3,15 +3,15 @@ package online.selfieproxy.portal.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * primaryDomain/adminSubdomain/portalSubdomain/authSubdomain come from the same
+ * primaryDomain/adminSubdomain/portalSubdomain/authSubdomain/consoleSubdomain come from the same
  * .env boringproxy itself uses (PRIMARY_DOMAIN, REVERSE_PROXY_LISTENER_SUBDOMAIN,
- * SELFPROXY_ADMIN_DOMAIN, SELFPROXY_AUTH_DOMAIN) -- see application.properties.
- * The primary domain can never be changed or removed -- it's needed to reach the
- * portal/identity-provider before any secondary domain (see DomainStore) exists.
+ * SELFPROXY_ADMIN_DOMAIN, SELFPROXY_AUTH_DOMAIN, SELFPROXY_CONSOLE_DOMAIN) -- see
+ * application.properties. The primary domain can never be changed or removed -- it's needed to
+ * reach the portal/identity-provider before any secondary domain (see DomainStore) exists.
  */
 @ConfigurationProperties(prefix = "boringproxy")
 public record BoringProxyProperties(String primaryDomain, String adminSubdomain, String portalSubdomain,
-		String authSubdomain) {
+		String authSubdomain, String consoleSubdomain) {
 
 	public String adminDomain() {
 		return adminSubdomain + "." + primaryDomain;
@@ -19,6 +19,11 @@ public record BoringProxyProperties(String primaryDomain, String adminSubdomain,
 
 	public String portalDomain() {
 		return portalSubdomain + "." + primaryDomain;
+	}
+
+	/** selfieproxy-remote-console's own SSO-gated domain -- see selfieproxy-reverseproxy's -console-domain. */
+	public String consoleDomain() {
+		return consoleSubdomain + "." + primaryDomain;
 	}
 
 	public String restBaseUrl() {

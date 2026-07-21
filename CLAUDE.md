@@ -35,11 +35,20 @@ runtime config/volumes they use:
   baked in via its own Dockerfile) that fails fast before anything else starts if `PRIMARY_DOMAIN` and a
   `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP (checked as the literal
   DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and future subdomain — the
-  fixed `proxylistener`/`selfieproxy`/`auth` subdomains and any exposed-app/tunnel subdomain created later
+  fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-app/tunnel subdomain created later
   — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites` service. This
   check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
   "Domains" section) is registered and DNS-checked entirely at runtime through the portal's own Domains
   settings page instead, since it's added long after this container has already started.
+- `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
+  template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
+  admin portal ("Remote consoles" nav tab, see `selfieproxy-portal/CLAUDE.md`) while this service itself
+  only serves the live browser session. Pairs with the `selfieproxy-guacd` service (the official,
+  unmodified `guacamole/guacd` Docker image — see `THIRD-PARTY-NOTICES.md`) to bridge a WebSocket
+  connection to a Homelab's SSH/RDP/VNC endpoint, reached over an `AllowExternalTcp: false` tunnel (never
+  internet-reachable — see this file's "Running" section). Reached via its own always-SSO-gated,
+  before-any-agent-exists domain carve-out (`-console-domain`/`-console-port`), the same shape as
+  `-portal-domain`/`-sso-domain` — see `selfieproxy-reverseproxy/CLAUDE.md`.
 
 ## Layout
 
@@ -51,17 +60,22 @@ runtime config/volumes they use:
 │   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
 │       │                            # local-websites.json (LocalWebsiteStore), domains.json (DomainStore --
 │       │                            # registered secondary domains only, the primary domain is never stored here),
+│       │                            # remote-consoles.json (RemoteConsoleStore) + remote-console-secret-key
+│       │                            # (self-provisioned, see selfieproxy-portal/CLAUDE.md's "Remote consoles"),
 │       │                            # selfieproxy-localsites-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
 │       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
 ├── selfieproxy-check-prerequisites/ # DNS pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
-├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent (depends_on selfieproxy-reverseproxy)
+├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent + selfieproxy-remote-console + selfieproxy-guacd (depends_on selfieproxy-reverseproxy)
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
 ├── selfieproxy-identity-provider/ # bundled OIDC Identity Provider with simplified admin/User management — Java/Spring, same build template as selfieproxy-portal
-└── selfieproxy-localsites-webserver/ # self-reloading NGINX image for "Selfie Proxy hosts this" static sites
+├── selfieproxy-remote-console/    # browser SSH/RDP/VNC console bridge — Java/Spring, same build template as selfieproxy-portal, pairs with the unmodified guacamole/guacd image
+├── selfieproxy-localsites-webserver/ # self-reloading NGINX image for "Selfie Proxy hosts this" static sites
+├── THIRD-PARTY-NOTICES.md         # attribution for third-party software distributed alongside this repo's own MIT-licensed code (currently: Apache Guacamole)
+└── licenses/                      # full license texts referenced from THIRD-PARTY-NOTICES.md
 ```
 
 ## Running
@@ -128,6 +142,30 @@ and `selfieproxy-localsites-agent` (`service_started`, the last service in every
 dependency chain), so the shared NGINX only comes up once everything upstream of it — DNS
 preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
 
+Two further services power the browser SSH/RDP/VNC console feature ("Remote consoles" in the
+portal, see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-guacd` (the official, unmodified
+`guacamole/guacd` Docker image — the one deliberate exception to every other service here
+carrying both `image:` and `build:`, since there is nothing of ours to build) and
+`selfieproxy-remote-console` (the WebSocket bridge between a browser and `guacd`, own
+Java/Spring module, same build template as `selfieproxy-portal`). Both run `network_mode: host`,
+like `selfieproxy-reverseproxy`/`selfieproxy-localsites-agent` — this is load-bearing, not just
+consistency: a Remote Console's underlying tunnel is created with `AllowExternalTcp: false`
+(see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section), which binds its listener to
+`127.0.0.1` on the server host rather than `0.0.0.0` — deliberately never reachable from the
+internet, only from a process sharing the host's own network namespace. `guacd` itself is
+further restricted to bind only `127.0.0.1:4822` (`GUACD_BIND_HOST`), since it has no
+authentication of its own and must never be reachable by anything but
+`selfieproxy-remote-console` on this same host. The two communicate over that same loopback
+interface; `selfieproxy-remote-console` reaches boringproxy's REST API (to create/delete a
+Remote Console's tunnel) over the ordinary public admin domain, and reads/decrypts credentials
+from `data/selfieproxy/remote-consoles.json`/`remote-console-secret-key`, both owned and
+self-provisioned by `selfieproxy-portal` (this service only ever reads them). The browser reaches
+`selfieproxy-remote-console` through its own always-SSO-gated, admin-only domain carve-out
+(`-console-domain`/`-console-port`, default subdomain `console`) — see
+`selfieproxy-reverseproxy/CLAUDE.md`. See `THIRD-PARTY-NOTICES.md` for how Apache Guacamole is
+consumed (unmodified Docker image, unmodified Maven dependency, unmodified vendored JS asset) --
+unlike `selfieproxy-reverseproxy`, it is not forked.
+
 The server host's `.env` (from `.env.example`) only needs `PRIMARY_DOMAIN` and
 `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_BOOTSTRAP_PASSWORD` — now consumed by `selfieproxy-identity-provider`
 (the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. `PRIMARY_DOMAIN` is
@@ -149,13 +187,14 @@ bootstrap: the file simply doesn't exist until the admin adds the first user. Li
 record, `data/selfieproxy/users.json` is never included in a configuration export/import, and is
 irrelevant whenever `OIDC_ISSUER_URL` is set — an external IdP means Selfie Proxy no longer
 controls who can authenticate at all, so the Users list itself is hidden from the Settings menu in
-that case. Four more
+that case. Five more
 vars are optional, poweruser-only overrides with sensible defaults baked into
 application.properties/docker-compose.yaml (both must agree, since they're not read from a
 single source of truth): `REVERSE_PROXY_LISTENER_SUBDOMAIN` (default
 `proxylistener`, the subdomain boringproxy's admin/tunnel-control plane listens on),
 `SELFPROXY_ADMIN_DOMAIN` (default `selfieproxy`, the portal's own subdomain),
-`SELFPROXY_AUTH_DOMAIN` (default `auth`, `selfieproxy-identity-provider`'s own subdomain), and
+`SELFPROXY_AUTH_DOMAIN` (default `auth`, `selfieproxy-identity-provider`'s own subdomain),
+`SELFPROXY_CONSOLE_DOMAIN` (default `console`, `selfieproxy-remote-console`'s own subdomain), and
 `DEFAULT_HOMELAB` (default `my-homelab`, the name selfieproxy-portal bootstraps a default
 agent under on first boot, see the Agents page). Separately, `OIDC_ISSUER_URL`/
 `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` (all blank by default) override the admin portal's OIDC

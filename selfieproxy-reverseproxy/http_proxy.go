@@ -192,6 +192,7 @@ func proxyWebsocket(w http.ResponseWriter, r *http.Request, tunnel Tunnel, addre
 		upstreamConn, err = net.Dial("tcp", upstreamAddr)
 	}
 	if err != nil {
+		log.Printf("proxyWebsocket dial upstream error: %s -> %s: %s", r.URL.Path, upstreamAddr, err)
 		errMessage := fmt.Sprintf("%s", err)
 		w.WriteHeader(502)
 		io.WriteString(w, errMessage)

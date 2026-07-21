@@ -19,7 +19,7 @@ services:
       - ./data/reverseproxy/runtime:/runtime
       - /root/.ssh:/root/.ssh
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
-    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${PRIMARY_DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-sso-idle-minutes", "${SSO_SESSION_IDLE_MINUTES:-30}", "-sso-max-minutes", "${SSO_SESSION_MAX_MINUTES:-600}", "-accept-ca-terms", "-acme-email", "${LETSENCRYPT_EMAIL:-}", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${DEBUG_MODE:-false}"]
+    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${PRIMARY_DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}", "-sso-port", "8082", "-console-domain", "${SELFPROXY_CONSOLE_DOMAIN:-console}.${PRIMARY_DOMAIN}", "-console-port", "8083", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-sso-idle-minutes", "${SSO_SESSION_IDLE_MINUTES:-30}", "-sso-max-minutes", "${SSO_SESSION_MAX_MINUTES:-600}", "-accept-ca-terms", "-acme-email", "${LETSENCRYPT_EMAIL:-}", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${DEBUG_MODE:-false}"]
     environment:
       USER: "root"
       HOME: "/root"
@@ -127,3 +127,50 @@ services:
       - ./data/selfieproxy:/selfieproxy-data:ro
       - ./data/reverseproxy/this-server-certmagic:/certmagic
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
+
+  selfieproxy-guacd:
+    # Unmodified upstream Apache Guacamole daemon -- the one deliberate exception to every
+    # other service here carrying both image: and build:, since there is nothing of ours to
+    # build. network_mode: host (like selfieproxy-reverseproxy/selfieproxy-localsites-agent)
+    # is required so it can dial an AllowExternalTcp: false tunnel's 127.0.0.1:<tunnel_port> --
+    # a plain bridge-network container cannot reach a strictly-127.0.0.1-bound host port.
+    # The image's own entrypoint.sh hardcodes "-b 0.0.0.0" with no env var to override it --
+    # there is no GUACD_BIND_HOST/GUACD_BIND_PORT (that was wrong; this image only supports
+    # LOG_LEVEL as an env var). It does append any extra command args after its own flags
+    # though, and guacd's own arg parser takes the *last* -b/-l wins, so passing them again
+    # here as `command:` overrides the hardcoded bind to 127.0.0.1 -- restricting this
+    # unauthenticated control port to this host only, since it must never be internet-reachable.
+    image: guacamole/guacd:1.6.0
+    container_name: selfieproxy-guacd
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    command: ["-b", "127.0.0.1", "-l", "4822"]
+    environment:
+      LOG_LEVEL: "info"
+
+  selfieproxy-remote-console:
+    image: ghcr.io/jeltechnologies/selfieproxy-remote-console:latest
+    build: ./selfieproxy-remote-console
+    container_name: selfieproxy-remote-console
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    depends_on:
+      selfieproxy-guacd:
+        condition: service_started
+      selfieproxy-reverseproxy:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: "8083"
+      GUACD_HOST: "127.0.0.1"
+      GUACD_PORT: "4822"
+    volumes:
+      - ./data/selfieproxy:/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8083' 2>/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+      start_interval: 1s

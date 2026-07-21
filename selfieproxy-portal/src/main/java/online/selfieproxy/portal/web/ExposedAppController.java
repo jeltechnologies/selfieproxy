@@ -197,6 +197,9 @@ public class ExposedAppController {
 			if (app.subdomain().equalsIgnoreCase(properties.authSubdomain())) {
 				errors.add("\"" + app.subdomain() + "\" is reserved for Selfie Proxy's bundled identity provider itself.");
 			}
+			if (app.subdomain().equalsIgnoreCase(properties.consoleSubdomain())) {
+				errors.add("\"" + app.subdomain() + "\" is reserved for Selfie Proxy's browser SSH/RDP/VNC console itself.");
+			}
 		}
 
 		String fqdn = tunnelMapper.fqdn(app);

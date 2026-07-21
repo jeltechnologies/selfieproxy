@@ -233,6 +233,44 @@ this section is the portal-side UI behavior.
   DNS correctness is already tracked centrally on the Domains settings page instead (see "Domains"
   above), exactly like an Exposed App.
 
+## Remote consoles
+
+Browser SSH/RDP/VNC access to a Homelab machine, protected by the same Selfieproxy login as
+everything else here — no separate credentials to remember, and (the whole point) the
+underlying SSH/RDP/VNC port is never reachable from the internet at all, unlike a Network
+Service exposed app. See root `CLAUDE.md`'s "Running" section for the `selfieproxy-guacd`/
+`selfieproxy-remote-console` infrastructure behind this feature (Apache Guacamole, consumed
+unmodified — see `THIRD-PARTY-NOTICES.md`); this section is the portal-side config behavior.
+
+- The nav has a "Remote consoles" tab. The list page shows every console's Name, Homelab (with
+  online/offline status, same convention as the Applications page), Protocol, and address within
+  the homelab, plus Connect (opens `https://console.<domain>/connect/<id>` in a new tab, served
+  by `selfieproxy-remote-console`, never by this portal), Edit, and Remove.
+- Adding one (`RemoteConsoleController`, `RemoteConsoleStore` — `data/selfieproxy/remote-consoles.json`,
+  independent of `ExposedAppStore`, same relationship Local Websites has to Exposed Apps): Name (a
+  free-text label, not a DNS-derived subdomain — there's no public FQDN to expose here at all),
+  Homelab (same dropdown as an Exposed App, minus "This Server"), Protocol (SSH/RDP/VNC), Host or
+  IP address, Port (defaulted per protocol: 22/3389/5900), Username (optional — VNC often has
+  none), and a credential (password, or for SSH a private key instead). Editing leaves the
+  credential field blank by default; submitting it blank keeps the previously stored credential
+  unchanged, so an admin can fix a typo'd hostname without having to re-enter the password.
+- Under the hood, adding one creates an ordinary boringproxy Tunnel exactly like a Network
+  Service exposed app (`tls-termination: passthrough`) with one deliberate difference:
+  `allow-external-tcp: false`. That's what keeps the raw SSH/RDP/VNC port off the public
+  internet — see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section on
+  `Tunnel.AllowExternalTcp`. The tunnel's domain is an internal, never-shown placeholder
+  (`rc-<uuid>.<primary domain>`, always the primary domain, generated the same way a Network
+  Service's hidden `svc-` subdomain is) — there is no user-facing FQDN/domain concept for a
+  Remote Console at all, unlike every other exposed thing in this portal.
+- Credentials are encrypted at rest (`RemoteConsoleCredentialCipher`, AES-256-GCM) with a key
+  Selfie Proxy self-provisions into `data/selfieproxy/remote-console-secret-key` the first time
+  it's needed — same idiom as `selfieproxy-identity-provider`'s `sso-signing-key.pem`.
+  Host-specific by design: like the admin account and that signing key, Remote Consoles are
+  **excluded from configuration export/import entirely** (`BackupService`) — an exported
+  ciphertext would be undecryptable on a different server's key.
+- Removing one deletes the underlying tunnel and the stored record — same irreversible-action
+  treatment as removing an Exposed App.
+
 ## Backup and restore
 
 **Value to the user**: back up their configuration, or move it to another Selfie Proxy server.

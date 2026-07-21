@@ -43,7 +43,11 @@ import tools.jackson.databind.json.JsonMapper;
  * ("servers"), and Local Websites (config + actual content files) -- see
  * selfieproxy-portal/CLAUDE.md's "Backup and restore" section for the full
  * product behavior and the deliberate exclusions (agent secrets,
- * identity-provider admin account).
+ * identity-provider admin account). Remote Consoles (RemoteConsoleStore) are
+ * excluded too, for the same host-specific-secret reason: their stored
+ * credentials are encrypted with a key that never leaves this server (see
+ * RemoteConsoleCredentialCipher), so an exported ciphertext would be
+ * undecryptable on a different one.
  */
 @Component
 public class BackupService {
