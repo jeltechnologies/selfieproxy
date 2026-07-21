@@ -13,9 +13,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * session (see IdpSessionService) -- the same SSO_SESSION_IDLE_MINUTES/
  * SSO_SESSION_MAX_MINUTES env vars that size boringproxy's per-app RP
  * cookie also size this session, since both represent the same "how long
- * am I logged in for" concept.
+ * am I logged in for" concept. primaryDomain: this deployment's own
+ * PRIMARY_DOMAIN (read directly from the same env var the rest of the stack
+ * bootstraps from, not prefixed with the auth/portal/proxylistener
+ * subdomain) -- see LogoutController, which is the only consumer: it uses
+ * this to make sure the public, unauthenticated /logged-out?return_to=
+ * endpoint can only link back into this deployment's own domain family, not
+ * an arbitrary attacker-supplied site.
  */
 @ConfigurationProperties(prefix = "sso")
 public record SsoProperties(String signingKeyPath, String issuerUrl, String clientRedirectUri,
-		long sessionIdleMinutes, long sessionMaxMinutes) {
+		long sessionIdleMinutes, long sessionMaxMinutes, String primaryDomain) {
 }
