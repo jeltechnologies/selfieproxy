@@ -16,7 +16,7 @@ RUN setcap cap_net_bind_service=+ep cmd/boringproxy/selfieproxy-reverseproxy
 # reuses this same image with a /bin/sh entrypoint wrapper that reads its
 # secret from a file before exec'ing the binary (boringproxy's own -secret
 # flag takes a literal value, not a file path).
-FROM alpine:3.20
+FROM alpine:3.24
 EXPOSE 80 443
 WORKDIR /storage
 COPY --from=builder /build/cmd/boringproxy/selfieproxy-reverseproxy /

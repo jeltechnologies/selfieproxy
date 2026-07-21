@@ -89,7 +89,7 @@ func Listen() {
 	if *publicIp != "" {
 		ip = *publicIp
 	} else {
-		ip, err = namedropClient.GetPublicIp()
+		ip, err = namedropClient.GetPublicIp("tcp")
 		if err != nil {
 			fmt.Printf("WARNING: Failed to determine public IP: %s\n", err.Error())
 		}
