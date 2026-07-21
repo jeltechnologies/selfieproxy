@@ -403,7 +403,7 @@ func Listen() {
 				return
 			}
 
-			proxyRequest(w, r, tunnel, httpClient, "localhost", tunnel.TunnelPort, *behindProxy)
+			proxyRequest(w, r, tunnel, httpClient, "127.0.0.1", tunnel.TunnelPort, *behindProxy)
 		}
 	})
 
@@ -474,7 +474,7 @@ func (p *Server) handleConnection(clientConn net.Conn, getCertificate func(*tls.
 
 func (p *Server) passthroughRequest(conn net.Conn, tunnel Tunnel) {
 
-	upstreamAddr := fmt.Sprintf("localhost:%d", tunnel.TunnelPort)
+	upstreamAddr := fmt.Sprintf("127.0.0.1:%d", tunnel.TunnelPort)
 	upstreamConn, err := net.Dial("tcp", upstreamAddr)
 
 	if err != nil {
