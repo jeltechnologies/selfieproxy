@@ -82,7 +82,8 @@
 					<select id="homelabName" name="homelabName" required>
 						<option th:if="${!#lists.contains(homelabs, app.homelabName())}" value=""
 								disabled="disabled" selected="selected">Select a homelab</option>
-						<option th:each="n : ${homelabs}" th:value="${n}" th:text="${n}"
+						<option th:each="n : ${homelabs}" th:value="${n}"
+								th:text="${n} + (${homelabOnline.get(n)} ? ' (Connected)' : ' (Not connected)')"
 								th:selected="${n == app.homelabName()}"></option>
 					</select>
 				</div>

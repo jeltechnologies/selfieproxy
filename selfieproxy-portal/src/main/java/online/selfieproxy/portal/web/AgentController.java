@@ -1,8 +1,5 @@
 package online.selfieproxy.portal.web;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import online.selfieproxy.portal.boringproxy.AgentStatusService;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.AgentStatusDto;
 import online.selfieproxy.portal.boringproxy.dto.TokenDataDto;
@@ -31,22 +29,15 @@ public class AgentController {
 	/** Selfie Proxy has exactly one boringproxy user; see selfieproxy-portal/CLAUDE.md. */
 	private static final String OWNER = "admin";
 
-	/**
-	 * An agent polls GET /api/tunnels every -poll-interval-ms (2000ms by
-	 * default) and boringproxy records that as its last-seen heartbeat.
-	 * Anything older than this is considered offline -- 2.5x the poll
-	 * interval, enough to absorb one missed poll plus jitter/latency
-	 * without flapping, while still surfacing a real disconnect quickly.
-	 */
-	private static final Duration ONLINE_THRESHOLD = Duration.ofSeconds(5);
-
 	private final BoringProxyClient boringProxyClient;
+	private final AgentStatusService agentStatusService;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final BoringProxyProperties boringProxyProperties;
 
-	public AgentController(BoringProxyClient boringProxyClient, ThisServerAgentProperties thisServerAgentProperties,
-			BoringProxyProperties boringProxyProperties) {
+	public AgentController(BoringProxyClient boringProxyClient, AgentStatusService agentStatusService,
+			ThisServerAgentProperties thisServerAgentProperties, BoringProxyProperties boringProxyProperties) {
 		this.boringProxyClient = boringProxyClient;
+		this.agentStatusService = agentStatusService;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.boringProxyProperties = boringProxyProperties;
 	}
@@ -171,22 +162,10 @@ public class AgentController {
 				continue;
 			}
 			int appCount = appCountsByHomelab.getOrDefault(name, 0L).intValue();
-			items.add(new AgentListItem(name, isOnline(entry.getValue()), appCount));
+			items.add(new AgentListItem(name, agentStatusService.isOnline(entry.getValue()), appCount));
 		}
 		items.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
 		return items;
-	}
-
-	private boolean isOnline(AgentStatusDto status) {
-		if (status == null || status.lastSeen() == null) {
-			return false;
-		}
-		try {
-			Instant lastSeen = Instant.parse(status.lastSeen());
-			return lastSeen.isAfter(Instant.now().minus(ONLINE_THRESHOLD));
-		} catch (DateTimeParseException e) {
-			return false;
-		}
 	}
 
 	private String secretFor(String name) {

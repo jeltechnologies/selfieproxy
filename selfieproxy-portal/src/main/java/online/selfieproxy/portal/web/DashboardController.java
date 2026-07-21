@@ -1,6 +1,8 @@
 package online.selfieproxy.portal.web;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
+import online.selfieproxy.portal.boringproxy.AgentStatusService;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
@@ -25,15 +28,17 @@ public class DashboardController {
 	private final ExposedAppStore exposedAppStore;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final DomainService domainService;
+	private final AgentStatusService agentStatusService;
 
 	public DashboardController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			ExposedAppStore exposedAppStore, ThisServerAgentProperties thisServerAgentProperties,
-			DomainService domainService) {
+			DomainService domainService, AgentStatusService agentStatusService) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.exposedAppStore = exposedAppStore;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.domainService = domainService;
+		this.agentStatusService = agentStatusService;
 	}
 
 	@GetMapping("/apps")
@@ -74,11 +79,32 @@ public class DashboardController {
 				.collect(Collectors.toMap(TunnelDto::domain, TunnelDto::certPending));
 		boolean hasPendingCerts = certPendingByDomain.values().stream().anyMatch(Boolean::booleanValue);
 
+		// Whether each app is actually reachable right now: its homelab connected and its
+		// domain's DNS actually pointing at this server. Absent from the map means fully OK
+		// (green dot, no column text); present means red, with the specific problem(s) named
+		// rather than one generic label -- see the Status column on dashboard.html.
+		Map<String, Boolean> onlineByAgent = agentStatusService.onlineByAgentName();
+		String serverIp = domainService.serverIp();
+		Map<String, String> appStatusMessage = new HashMap<>();
+		for (ExposedApp app : exposedApps) {
+			List<String> issues = new ArrayList<>();
+			if (!onlineByAgent.getOrDefault(app.homelabName(), false)) {
+				issues.add("Homelab " + app.homelabName() + " is disconnected.");
+			}
+			if (domainService.hasDnsMismatch(app.fqdn(), serverIp)) {
+				issues.add("Domain not correctly configured.");
+			}
+			if (!issues.isEmpty()) {
+				appStatusMessage.put(app.fqdn(), String.join(" ", issues));
+			}
+		}
+
 		model.addAttribute("homelabs", homelabs);
 		model.addAttribute("exposedApps", exposedApps);
 		model.addAttribute("hasOrphanedApps", hasOrphanedApps);
 		model.addAttribute("certPendingByDomain", certPendingByDomain);
 		model.addAttribute("hasPendingCerts", hasPendingCerts);
+		model.addAttribute("appStatusMessage", appStatusMessage);
 		model.addAttribute("tunnelMapper", tunnelMapper);
 		model.addAttribute("domainService", domainService);
 		model.addAttribute("domains", domainService.allDomains());

@@ -41,6 +41,7 @@
 			<thead>
 				<tr>
 					<th data-sort-key="name">Name</th>
+					<th>Status</th>
 					<th data-sort-key="domain">Domain</th>
 					<th data-sort-key="internet">Internet</th>
 					<th data-sort-key="homelab">Homelab</th>
@@ -54,6 +55,11 @@
 						<span th:text="${app.isNetworkService()} ? ${app.name()} : ${app.subdomain()}"></span>
 						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
 							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
+					</td>
+					<td>
+						<span class="status" th:title="${appStatusMessage.get(app.fqdn())}">
+							<span class="status-dot" th:classappend="${appStatusMessage.containsKey(app.fqdn())} ? 'status-dot-offline' : 'status-dot-online'"></span>
+						</span>
 					</td>
 					<td th:attr="data-sort-value=${app.domain()}">
 						<span th:text="${app.domain()}"></span>

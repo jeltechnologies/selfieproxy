@@ -423,8 +423,11 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 .status-badge-primary { background: transparent; border: 1px solid var(--border); color: var(--muted); }
 
 table[data-sortable] th[data-sort-key] { cursor: pointer; user-select: none; }
-table[data-sortable] th[data-sort-key]::after { content: ""; display: inline-block; width: 0.6em; }
-table[data-sortable] th.sorted-asc::after { content: "\25B2"; margin-left: 0.3em; font-size: 0.7em; }
-table[data-sortable] th.sorted-desc::after { content: "\25BC"; margin-left: 0.3em; font-size: 0.7em; }
+table[data-sortable] th[data-sort-key]:hover { color: var(--accent); }
+table[data-sortable] th[data-sort-key]::after {
+	content: "\21C5"; display: inline-block; margin-left: 0.35em; font-size: 0.75em; color: var(--muted);
+}
+table[data-sortable] th.sorted-asc::after { content: "\25B2"; color: var(--accent); }
+table[data-sortable] th.sorted-desc::after { content: "\25BC"; color: var(--accent); }
 .list-filter { margin-bottom: 0.75rem; }
 .list-filter label { margin-right: 0.4rem; }

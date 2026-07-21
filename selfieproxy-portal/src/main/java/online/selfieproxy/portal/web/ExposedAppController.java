@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
+import online.selfieproxy.portal.boringproxy.AgentStatusService;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
@@ -40,16 +41,19 @@ public class ExposedAppController {
 	private final ExposedAppStore exposedAppStore;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final DomainService domainService;
+	private final AgentStatusService agentStatusService;
 
 	public ExposedAppController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			BoringProxyProperties properties, ExposedAppStore exposedAppStore,
-			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService) {
+			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
+			AgentStatusService agentStatusService) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.properties = properties;
 		this.exposedAppStore = exposedAppStore;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.domainService = domainService;
+		this.agentStatusService = agentStatusService;
 	}
 
 	@GetMapping("/apps/new")
@@ -62,6 +66,7 @@ public class ExposedAppController {
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("homelabs", homelabs);
+		model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
 		return "edit-app";
 	}
 
@@ -72,6 +77,7 @@ public class ExposedAppController {
 		model.addAttribute("isNew", false);
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("homelabs", homelabs());
+		model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
 		model.addAttribute("certPending", tunnel.certPending());
 		return "edit-app";
 	}
@@ -88,6 +94,7 @@ public class ExposedAppController {
 			model.addAttribute("errors", errors);
 			model.addAttribute("domains", domainService.allDomains());
 			model.addAttribute("homelabs", homelabs());
+			model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
 			return "edit-app";
 		}
 
@@ -109,6 +116,7 @@ public class ExposedAppController {
 			model.addAttribute("errors", errors);
 			model.addAttribute("domains", domainService.allDomains());
 			model.addAttribute("homelabs", homelabs());
+			model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
 			return "edit-app";
 		}
 
