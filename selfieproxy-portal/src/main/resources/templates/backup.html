@@ -43,7 +43,7 @@
 			<fieldset th:unless="${#lists.isEmpty(manifest.exposedApps())}">
 				<legend>Applications</legend>
 				<label class="restore-item" th:each="app : ${manifest.exposedApps()}">
-					<input type="checkbox" name="exposedApps" th:value="${app.subdomain()}" checked>
+					<input type="checkbox" name="exposedApps" th:value="${app.fqdn()}" checked>
 					<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
 				</label>
 			</fieldset>
@@ -56,8 +56,8 @@
 			<fieldset th:unless="${#lists.isEmpty(manifest.localWebsites())}">
 				<legend>Local websites</legend>
 				<label class="restore-item" th:each="site : ${manifest.localWebsites()}">
-					<input type="checkbox" name="localWebsites" th:value="${site.domain()}" checked>
-					<span th:text="${site.domain()}"></span>
+					<input type="checkbox" name="localWebsites" th:value="${site.fqdn()}" checked>
+					<span th:text="${site.fqdn()}"></span>
 				</label>
 			</fieldset>
 

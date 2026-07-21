@@ -12,7 +12,8 @@ import java.util.List;
  * @param version        manifest schema version -- BackupService rejects any value it doesn't recognize
  * @param createdAt      ISO-8601 date-time (millisecond precision, with offset/zone) the backup was created, in the
  *                       browser's local timezone at download time -- see BackupController's {@code ?tz=} param, informational only
- * @param sourceDomain   the DOMAIN of the server the backup was taken from, informational only -- restore never depends on it, since subdomains are already relative
+ * @param sourcePrimaryDomain the primary domain of the server the backup was taken from, informational only -- restore
+ *                       never depends on it, since each item already carries its own domain (see ExposedApp.domain()/LocalWebsite.domain())
  * @param homelabs       every Homelab (Agent) name except the hidden "This Server" one -- see ThisServerAgentProperties
  * @param exposedApps    every Exposed App ("server"), the same merged view ExposedAppController itself shows/edits
  * @param localWebsites  every Local Website's config; its content files live in the ZIP under local-websites/&lt;fqdn&gt;/
@@ -20,7 +21,7 @@ import java.util.List;
 public record BackupManifest(
 		int version,
 		String createdAt,
-		String sourceDomain,
+		String sourcePrimaryDomain,
 		List<String> homelabs,
 		List<ExposedApp> exposedApps,
 		List<LocalWebsite> localWebsites) {

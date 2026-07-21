@@ -106,7 +106,7 @@ public class BackupService {
 			zip.closeEntry();
 
 			for (LocalWebsite site : manifest.localWebsites()) {
-				String fqdn = fqdn(site);
+				String fqdn = site.fqdn();
 				staticSiteProvisioner.writeEntries(fqdn, LOCAL_WEBSITES_PREFIX + fqdn + "/", zip);
 			}
 		}
@@ -132,7 +132,7 @@ public class BackupService {
 
 		String createdAt = ZonedDateTime.now(zone).truncatedTo(ChronoUnit.MILLIS).toString();
 		return new BackupManifest(BackupManifest.CURRENT_VERSION, createdAt,
-				boringProxyProperties.domain(), homelabNames(), exposedApps, localWebsiteStore.list());
+				boringProxyProperties.primaryDomain(), homelabNames(), exposedApps, localWebsiteStore.list());
 	}
 
 	/** Extracts zipData into a fresh staging directory and validates its manifest, without touching any live state. Returns the staging id for readStagedManifest/applyRestore/cancelStaged. */
@@ -165,12 +165,12 @@ public class BackupService {
 	public RestoreDiff diffManifest(BackupManifest manifest) {
 		Set<String> existingHomelabs = new HashSet<>(boringProxyClient.listAgents().keySet());
 		Set<String> existingExposedApps = manifest.exposedApps().stream()
-				.map(ExposedApp::subdomain)
-				.filter(subdomain -> exposedAppStore.find(subdomain) != null)
+				.map(ExposedApp::fqdn)
+				.filter(fqdn -> exposedAppStore.find(fqdn) != null)
 				.collect(Collectors.toSet());
 		Set<String> existingLocalWebsites = manifest.localWebsites().stream()
-				.map(LocalWebsite::domain)
-				.filter(domain -> localWebsiteStore.find(domain) != null)
+				.map(LocalWebsite::fqdn)
+				.filter(fqdn -> localWebsiteStore.find(fqdn) != null)
 				.collect(Collectors.toSet());
 		return new RestoreDiff(existingHomelabs, existingExposedApps, existingLocalWebsites);
 	}
@@ -178,12 +178,12 @@ public class BackupService {
 	/** Keeps only the homelabs/exposed apps/local websites selection picked -- what the backup page's checkbox tree narrows a backup ZIP down to. */
 	public BackupManifest filterManifest(BackupManifest manifest, RestoreSelection selection) {
 		Set<String> homelabs = new HashSet<>(selection.homelabs());
-		Set<String> exposedAppSubdomains = new HashSet<>(selection.exposedAppSubdomains());
-		Set<String> localWebsiteDomains = new HashSet<>(selection.localWebsiteDomains());
-		return new BackupManifest(manifest.version(), manifest.createdAt(), manifest.sourceDomain(),
+		Set<String> exposedAppFqdns = new HashSet<>(selection.exposedAppFqdns());
+		Set<String> localWebsiteFqdns = new HashSet<>(selection.localWebsiteFqdns());
+		return new BackupManifest(manifest.version(), manifest.createdAt(), manifest.sourcePrimaryDomain(),
 				manifest.homelabs().stream().filter(homelabs::contains).toList(),
-				manifest.exposedApps().stream().filter(app -> exposedAppSubdomains.contains(app.subdomain())).toList(),
-				manifest.localWebsites().stream().filter(site -> localWebsiteDomains.contains(site.domain())).toList());
+				manifest.exposedApps().stream().filter(app -> exposedAppFqdns.contains(app.fqdn())).toList(),
+				manifest.localWebsites().stream().filter(site -> localWebsiteFqdns.contains(site.fqdn())).toList());
 	}
 
 	/**
@@ -227,21 +227,28 @@ public class BackupService {
 			}
 		}
 
-		Map<String, ExposedApp> appsBySubdomain = manifest.exposedApps().stream()
-				.collect(Collectors.toMap(ExposedApp::subdomain, a -> a));
+		Map<String, ExposedApp> appsByFqdn = manifest.exposedApps().stream()
+				.collect(Collectors.toMap(ExposedApp::fqdn, a -> a));
 		int exposedAppsRestored = 0;
-		for (String subdomain : selection.exposedAppSubdomains()) {
-			ExposedApp app = appsBySubdomain.get(subdomain);
-			if (app == null) {
-				failures.add("Exposed app " + subdomain + ": not found in configuration export");
+		for (String fqdnKey : selection.exposedAppFqdns()) {
+			ExposedApp original = appsByFqdn.get(fqdnKey);
+			if (original == null) {
+				failures.add("Exposed app " + fqdnKey + ": not found in configuration export");
 				continue;
 			}
-			if (!DnsLabelValidator.isValid(subdomain)) {
-				failures.add("Exposed app " + subdomain + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
+			if (!DnsLabelValidator.isValid(original.subdomain())) {
+				failures.add("Exposed app " + fqdnKey + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}
 			try {
-				ensureHomelab(app.homelabName(), existingAgents);
+				ensureHomelab(original.homelabName(), existingAgents);
+				// Substitute the target domain the restore wizard's per-item <select> chose (default:
+				// the ZIP's own domain if it's still registered here, else the primary domain -- see
+				// BackupController) -- the tunnel is created/deleted at this domain, not the ZIP's.
+				String targetDomain = selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain());
+				ExposedApp app = new ExposedApp(original.subdomain(), original.name(), original.homelabName(),
+						original.type(), original.protocol(), original.host(), original.port(),
+						original.exposedPort(), original.tlsMode(), original.ssoProtected(), targetDomain);
 				String fqdn = tunnelMapper.fqdn(app);
 				deleteTunnelIgnoringMissing(fqdn);
 				sleep();
@@ -249,34 +256,36 @@ public class BackupService {
 				exposedAppStore.save(app);
 				exposedAppsRestored++;
 			} catch (Exception e) {
-				failures.add("Exposed app " + subdomain + ": " + e.getMessage());
+				failures.add("Exposed app " + fqdnKey + ": " + e.getMessage());
 			}
 		}
 
-		Map<String, LocalWebsite> sitesByDomain = manifest.localWebsites().stream()
-				.collect(Collectors.toMap(LocalWebsite::domain, s -> s));
+		Map<String, LocalWebsite> sitesByFqdn = manifest.localWebsites().stream()
+				.collect(Collectors.toMap(LocalWebsite::fqdn, s -> s));
 		int localWebsitesRestored = 0;
-		for (String domain : selection.localWebsiteDomains()) {
-			LocalWebsite site = sitesByDomain.get(domain);
-			if (site == null) {
-				failures.add("Local website " + domain + ": not found in configuration export");
+		for (String fqdnKey : selection.localWebsiteFqdns()) {
+			LocalWebsite original = sitesByFqdn.get(fqdnKey);
+			if (original == null) {
+				failures.add("Local website " + fqdnKey + ": not found in configuration export");
 				continue;
 			}
-			if (!site.ownDomain() && !DnsLabelValidator.isValid(domain)) {
-				failures.add("Local website " + domain + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
+			if (!DnsLabelValidator.isValid(original.label())) {
+				failures.add("Local website " + fqdnKey + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}
 			try {
-				String fqdn = fqdn(site);
+				LocalWebsite site = new LocalWebsite(original.label(),
+						selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain()));
+				String fqdn = site.fqdn();
 				deleteTunnelIgnoringMissing(fqdn);
 				sleep();
 				boringProxyClient.createTunnel(toLocalWebsiteTunnelRequest(fqdn));
 				staticSiteProvisioner.provision(fqdn);
-				restoreLocalWebsiteContent(stagingDir, fqdn);
+				restoreLocalWebsiteContent(stagingDir, fqdnKey, fqdn);
 				localWebsiteStore.save(site);
 				localWebsitesRestored++;
 			} catch (Exception e) {
-				failures.add("Local website " + domain + ": " + e.getMessage());
+				failures.add("Local website " + fqdnKey + ": " + e.getMessage());
 			}
 		}
 
@@ -334,17 +343,14 @@ public class BackupService {
 	}
 
 	/** Re-zips the staged local-websites/&lt;fqdn&gt;/ directory in memory and feeds it through StaticSiteProvisioner's existing atomic-swap upload path -- local sites are small enough that the extra round trip isn't worth a Path-based overload. */
-	private void restoreLocalWebsiteContent(Path stagingDir, String fqdn) throws IOException {
-		Path siteDir = stagingDir.resolve("local-websites").resolve(fqdn);
+	/** sourceFqdn is where the content lives in the staged ZIP (local-websites/&lt;sourceFqdn&gt;/); targetFqdn is where it's restored to -- they differ whenever the restore wizard retargeted the site to a different domain than the ZIP's own. */
+	private void restoreLocalWebsiteContent(Path stagingDir, String sourceFqdn, String targetFqdn) throws IOException {
+		Path siteDir = stagingDir.resolve("local-websites").resolve(sourceFqdn);
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
 			ZipUtils.writeDirectoryEntries(siteDir, "", zip);
 		}
-		staticSiteProvisioner.replaceContents(fqdn, new ByteArrayInputStream(buffer.toByteArray()));
-	}
-
-	private String fqdn(LocalWebsite site) {
-		return site.ownDomain() ? site.domain() : boringProxyProperties.fqdn(site.domain());
+		staticSiteProvisioner.replaceContents(targetFqdn, new ByteArrayInputStream(buffer.toByteArray()));
 	}
 
 	private BackupManifest readManifest(Path stagingDir) {

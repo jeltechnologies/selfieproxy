@@ -29,24 +29,38 @@
 			the background.
 		</p>
 
-		<table class="apps-table" th:if="${not #lists.isEmpty(exposedApps)}">
+		<div class="list-filter" th:if="${not #lists.isEmpty(exposedApps)}">
+			<label for="domainFilter">Filter by domain</label>
+			<select id="domainFilter">
+				<option value="">All domains</option>
+				<option th:each="d : ${domains}" th:value="${d.name()}" th:text="${d.name()}"></option>
+			</select>
+		</div>
+
+		<table class="apps-table" data-sortable th:if="${not #lists.isEmpty(exposedApps)}">
 			<thead>
 				<tr>
-					<th>Name</th>
-					<th>Internet</th>
-					<th>Homelab</th>
-					<th>Local address</th>
+					<th data-sort-key="name">Name</th>
+					<th data-sort-key="domain">Domain</th>
+					<th data-sort-key="internet">Internet</th>
+					<th data-sort-key="homelab">Homelab</th>
+					<th data-sort-key="localAddress">Local address</th>
 					<th></th>
 				</tr>
 			</thead>
 			<tbody>
-				<tr th:each="app : ${exposedApps}">
-					<td>
+				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}">
+					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : app.subdomain()}">
 						<span th:text="${app.isNetworkService()} ? ${app.name()} : ${app.subdomain()}"></span>
 						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
 							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
 					</td>
-					<td>
+					<td th:attr="data-sort-value=${app.domain()}">
+						<span th:text="${app.domain()}"></span>
+						<span th:if="${!domainService.exists(app.domain())}"
+							  class="warning-icon" title="This application's domain no longer exists">&#9888;</span>
+					</td>
+					<td th:attr="data-sort-value=${tunnelMapper.result(app)}">
 						<a th:if="${tunnelMapper.resultIsLink(app)}" th:href="${tunnelMapper.result(app)}"
 						   target="_blank" rel="noopener" th:text="${tunnelMapper.result(app)}"></a>
 						<span th:unless="${tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
@@ -55,9 +69,9 @@
 							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
 					</td>
 					<td th:text="${app.homelabName()}"></td>
-					<td th:text="${app.host()} + ':' + ${app.port()}"></td>
+					<td th:attr="data-sort-value=${app.host()} + ':' + ${app.port()}" th:text="${app.host()} + ':' + ${app.port()}"></td>
 					<td>
-						<a class="button-small" th:href="@{/apps/{subdomain}/edit(subdomain=${app.subdomain()})}">Edit</a>
+						<a class="button-small" th:href="@{/apps/{fqdn}/edit(fqdn=${app.fqdn()})}">Edit</a>
 					</td>
 				</tr>
 			</tbody>
@@ -67,6 +81,8 @@
 			No applications yet.
 		</p>
 	</main>
+
+	<script th:src="@{/js/sortable-table.js}"></script>
 
 	<footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>

@@ -5,12 +5,13 @@ package online.selfieproxy.portal.domain;
  * "Tunnel" by {@link TunnelMapper}. Deliberately avoids BoringProxy's own
  * vocabulary (Client/Tunnel) in field names, per selfieproxy-portal/CLAUDE.md.
  *
- * @param subdomain    the app's Selfie Proxy identifier -- the label suffixed with the shared DOMAIN
+ * @param subdomain    the app's Selfie Proxy identifier -- the label suffixed with {@link #domain} to form the FQDN
  * @param name         only meaningful when type is NETWORK_SERVICE -- a free-text label; not unique, not part of the domain
  * @param exposedPort  only set when type is NETWORK_SERVICE
  * @param protocol     only meaningful when type is WEB_APPLICATION (Network Service is always TCP)
  * @param tlsMode      only set when type is WEB_APPLICATION and protocol is HTTPS
  * @param ssoProtected whether boringproxy gates this app behind the configured OIDC issuer; only ever true when {@link #canProtectWithSso()} holds, since boringproxy only ever parses HTTP (and so can enforce single sign on) for "server"-termination tunnels -- see TlsMode.MANAGED
+ * @param domain       which registered domain (the primary domain or a secondary one, see DomainService) this app is exposed on
  */
 public record ExposedApp(
 		String subdomain,
@@ -22,7 +23,12 @@ public record ExposedApp(
 		int port,
 		Integer exposedPort,
 		TlsMode tlsMode,
-		boolean ssoProtected) {
+		boolean ssoProtected,
+		String domain) {
+
+	public String fqdn() {
+		return subdomain + "." + domain;
+	}
 
 	public boolean isWebApplication() {
 		return type == ExposedAppType.WEB_APPLICATION;

@@ -3,8 +3,8 @@ set -eu
 
 # Requires: curl, dig
 
-DOMAIN="${DOMAIN:?DOMAIN not set}"
-WILDCARD_FQDN="*.${DOMAIN}"
+PRIMARY_DOMAIN="${PRIMARY_DOMAIN:?PRIMARY_DOMAIN not set}"
+WILDCARD_FQDN="*.${PRIMARY_DOMAIN}"
 
 echo "=============================================================================="
 echo ""
@@ -16,26 +16,26 @@ if [ -z "$PUBLIC_IP" ]; then
     echo "ERROR: could not determine public IP"
     exit 1
 fi
-echo "Selfieproxy is accessible from the internet at: ${PUBLIC_IP}, which must match the DNS records of '*.${DOMAIN}'"
+echo "Selfieproxy is accessible from the internet at: ${PUBLIC_IP}, which must match the DNS records of '*.${PRIMARY_DOMAIN}'"
 
 check_domain() {
     name="$1"
     resolved_ip=$(dig +short "$name" | tail -n1)
 
     if [ -z "$resolved_ip" ]; then
-        echo "ERROR: ${name} does not resolve to ${PUBLIC_IP}. Please fix the DNS records of ${DOMAIN} before starting Selfieproxy."
+        echo "ERROR: ${name} does not resolve to ${PUBLIC_IP}. Please fix the DNS records of ${PRIMARY_DOMAIN} before starting Selfieproxy."
         exit 1
     fi
 
     if [ "$resolved_ip" != "$PUBLIC_IP" ]; then
-        echo "ERROR: ${name} resolves to ${resolved_ip}, expected ${PUBLIC_IP}. Please fix the DNS records of ${DOMAIN} before starting Selfieproxy."
+        echo "ERROR: ${name} resolves to ${resolved_ip}, expected ${PUBLIC_IP}. Please fix the DNS records of ${PRIMARY_DOMAIN} before starting Selfieproxy."
         exit 1
     fi
 
     echo "OK: ${name} -> ${resolved_ip}"
 }
 
-check_domain "$DOMAIN"
+check_domain "$PRIMARY_DOMAIN"
 check_domain "$WILDCARD_FQDN"
 
 echo "DNS check passed."

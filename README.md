@@ -81,7 +81,7 @@ Anders Pitman, which is no longer actively maintained. On top of it we added:
 3. Edit `.env`:
 
    ```
-   DOMAIN=example.com
+   PRIMARY_DOMAIN=example.com
    ADMIN_PORTAL_USERNAME=admin
    ADMIN_PORTAL_BOOTSTRAP_PASSWORD=change-me
    ```

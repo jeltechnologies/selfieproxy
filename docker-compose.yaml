@@ -19,12 +19,12 @@ services:
       - ./data/reverseproxy/runtime:/runtime
       - /root/.ssh:/root/.ssh
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
-    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-sso-idle-minutes", "${SSO_SESSION_IDLE_MINUTES:-30}", "-sso-max-minutes", "${SSO_SESSION_MAX_MINUTES:-600}", "-accept-ca-terms", "-acme-email", "${LETSENCRYPT_EMAIL:-}", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${DEBUG_MODE:-false}"]
+    command: ["server", "-admin-domain", "${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}", "-portal-domain", "${SELFPROXY_ADMIN_DOMAIN:-selfieproxy}.${PRIMARY_DOMAIN}", "-portal-port", "8081", "-sso-domain", "${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}", "-sso-port", "8082", "-oidc-issuer", "${OIDC_ISSUER_URL:-https://${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}}", "-oidc-client-id", "${OIDC_CLIENT_ID:-selfieproxy}", "-oidc-client-secret", "${OIDC_CLIENT_SECRET:-}", "-sso-idle-minutes", "${SSO_SESSION_IDLE_MINUTES:-30}", "-sso-max-minutes", "${SSO_SESSION_MAX_MINUTES:-600}", "-accept-ca-terms", "-acme-email", "${LETSENCRYPT_EMAIL:-}", "-cert-dir", "/storage/certmagic", "-runtime-dir", "/runtime", "-debug=${DEBUG_MODE:-false}"]
     environment:
       USER: "root"
       HOME: "/root"
     healthcheck:
-      test: ["CMD-SHELL", "wget -O /dev/null https://${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${DOMAIN}/ 2>&1 | grep -qE 'saved|HTTP/1.1'"]
+      test: ["CMD-SHELL", "wget -O /dev/null https://${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}/ 2>&1 | grep -qE 'saved|HTTP/1.1'"]
       interval: 60s
       timeout: 3s
       retries: 3
@@ -67,8 +67,8 @@ services:
         condition: service_completed_successfully
     env_file: .env
     environment:
-      SSO_ISSUER_URL: "https://${SELFPROXY_AUTH_DOMAIN:-auth}.${DOMAIN}"
-      SSO_CLIENT_REDIRECT_URI: "https://${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${DOMAIN}/oidc/callback"
+      SSO_ISSUER_URL: "https://${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}"
+      SSO_CLIENT_REDIRECT_URI: "https://${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}/oidc/callback"
       SSO_SIGNING_KEY_PATH: "/data/sso-signing-key.pem"
     volumes:
       - ./data/selfieproxy:/data
@@ -116,7 +116,7 @@ services:
       - >
         until [ -s /selfieproxy-data/selfieproxy-localsites-agent-secret ]; do sleep 1; done;
         exec /selfieproxy-reverseproxy agent
-        -server ${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${DOMAIN}
+        -server ${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}
         -secret "$$(cat /selfieproxy-data/selfieproxy-localsites-agent-secret)"
         -agent-name selfieproxy-internal-agent
         -user admin

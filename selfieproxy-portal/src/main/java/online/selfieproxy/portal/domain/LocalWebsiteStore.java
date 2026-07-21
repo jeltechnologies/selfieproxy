@@ -17,23 +17,24 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Selfie Proxy's own complete record of every LocalWebsite, keyed by domain.
- * Unlike ExposedAppStore, this is the sole source of truth -- there's no
- * boringproxy-side concept to reconcile against, since a Local Website's
- * Tunnel is entirely our own implementation detail (see
- * LocalWebsiteController), not something a user could have created any other
- * way.
+ * Selfie Proxy's own complete record of every LocalWebsite, keyed by its full
+ * FQDN (see LocalWebsite.fqdn()). Unlike ExposedAppStore, this is the sole
+ * source of truth -- there's no boringproxy-side concept to reconcile
+ * against, since a Local Website's Tunnel is entirely our own implementation
+ * detail (see LocalWebsiteController), not something a user could have
+ * created any other way.
  */
 @Component
 public class LocalWebsiteStore {
 
 	private final Path filePath;
-	// ownDomain is absent -- not merely null -- in local-websites.json entries
-	// written before it existed; without this, Jackson's default record
-	// deserialization treats an absent primitive-boolean property as an
-	// explicit null and throws instead of defaulting to false.
+	// Tolerates schema drift in persisted local-websites.json across releases: entries written
+	// before "Other domain" mode was removed still carry its now-unknown "ownDomain" key, and
+	// entries written before some future field exists would otherwise trip
+	// FAIL_ON_NULL_FOR_PRIMITIVES the same way -- neither should break loading the rest of the file.
 	private final ObjectMapper objectMapper = JsonMapper.builder()
 			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+			.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
 			.build();
 	private final Object lock = new Object();
 
@@ -44,29 +45,29 @@ public class LocalWebsiteStore {
 	public List<LocalWebsite> list() {
 		synchronized (lock) {
 			return readAll().values().stream()
-					.sorted(Comparator.comparing(LocalWebsite::domain))
+					.sorted(Comparator.comparing(LocalWebsite::fqdn))
 					.toList();
 		}
 	}
 
-	public LocalWebsite find(String domain) {
+	public LocalWebsite find(String fqdn) {
 		synchronized (lock) {
-			return readAll().get(domain);
+			return readAll().get(fqdn);
 		}
 	}
 
 	public void save(LocalWebsite website) {
 		synchronized (lock) {
 			Map<String, LocalWebsite> all = readAll();
-			all.put(website.domain(), website);
+			all.put(website.fqdn(), website);
 			writeAll(all);
 		}
 	}
 
-	public void delete(String domain) {
+	public void delete(String fqdn) {
 		synchronized (lock) {
 			Map<String, LocalWebsite> all = readAll();
-			if (all.remove(domain) != null) {
+			if (all.remove(fqdn) != null) {
 				writeAll(all);
 			}
 		}

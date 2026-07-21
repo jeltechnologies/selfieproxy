@@ -26,10 +26,15 @@
 				</div>
 				<div th:each="app : ${manifest.exposedApps()}">
 					<label class="restore-item">
-						<input type="checkbox" name="exposedApps" th:value="${app.subdomain()}">
+						<input type="checkbox" name="exposedApps" th:value="${app.fqdn()}">
 						<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
-						<span th:if="${existingExposedApps.contains(app.subdomain())}" class="status-badge status-badge-existing">Existing</span>
-						<span th:unless="${existingExposedApps.contains(app.subdomain())}" class="status-badge status-badge-new">New</span>
+						<span th:if="${existingExposedApps.contains(app.fqdn())}" class="status-badge status-badge-existing">Existing</span>
+						<span th:unless="${existingExposedApps.contains(app.fqdn())}" class="status-badge status-badge-new">New</span>
+						<select th:name="'domain__' + ${app.fqdn()}">
+							<option th:each="d : ${domains}" th:value="${d.name()}"
+									th:text="${d.primary()} ? ${d.name()} + ' (primary)' : ${d.name()}"
+									th:selected="${d.name() == targetDomainByFqdn.get(app.fqdn())}"></option>
+						</select>
 					</label>
 				</div>
 			</div>

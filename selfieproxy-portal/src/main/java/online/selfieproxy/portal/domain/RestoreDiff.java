@@ -10,6 +10,6 @@ import java.util.Set;
  */
 public record RestoreDiff(
 		Set<String> existingHomelabs,
-		Set<String> existingExposedAppSubdomains,
-		Set<String> existingLocalWebsiteDomains) {
+		Set<String> existingExposedAppFqdns,
+		Set<String> existingLocalWebsiteFqdns) {
 }

@@ -7,8 +7,12 @@ package online.selfieproxy.portal.domain;
  * selfieproxy-local-websites container via the hidden "This Server" homelab. See
  * LocalWebsiteController/StaticSiteProvisioner.
  *
- * @param domain    the label suffixed with the shared DOMAIN for the default (non-ownDomain) mode; when ownDomain is true this holds the complete FQDN verbatim instead
- * @param ownDomain true if domain already holds a complete domain the user owns (eg. "www.jeltechnologies.com"), rather than a label to suffix with the shared DOMAIN
+ * @param label  the subdomain label suffixed with {@link #domain} to form the FQDN
+ * @param domain which registered domain (the primary domain or a secondary one, see DomainService) label is suffixed onto
  */
-public record LocalWebsite(String domain, boolean ownDomain) {
+public record LocalWebsite(String label, String domain) {
+
+	public String fqdn() {
+		return label + "." + domain;
+	}
 }

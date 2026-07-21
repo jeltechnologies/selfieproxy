@@ -32,7 +32,8 @@ container. After a successful login the user lands on the exposed applications p
   recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
   never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
 - The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds "Export configuration"
-  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Users" (`/users`,
+  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Domains" (`/domains`,
+  `web/DomainsController.java` -- see "Domains" below, always shown, no hide condition), "Users" (`/users`,
   `web/UsersController.java` -- add/edit/remove non-admin Users and change any user's password,
   hidden whenever an external IdP is configured, since Selfie Proxy no longer controls who can
   authenticate in that case), and Logout. The Users page shares the portal's own look/topbar/logo
@@ -60,10 +61,41 @@ container. After a successful login the user lands on the exposed applications p
   a link back into the portal — which immediately requires logging in again, since both session
   and cookie are gone.
 
+## Domains
+
+- Selfie Proxy always has one **primary domain** (`PRIMARY_DOMAIN` in `.env`), fixed for the life of
+  the deployment — it's needed to reach the portal/identity-provider before anything else exists, so
+  it can never be renamed or removed. The admin can register any number of additional domains
+  afterward through the "Domains" Settings-menu page (`/domains`, `web/DomainsController.java`) --
+  called "secondary domains" internally (`DomainStore`/`DomainService`, `data/selfieproxy/domains.json`)
+  but never described as "secondary" anywhere in the UI, since the user only ever sees "a domain", not
+  a primary/secondary hierarchy.
+- The Domains list shows the primary domain first (labeled "Primary", no Edit control -- it's not a
+  row this page can act on), then every registered domain alphabetically, each with a status: **OK**
+  when its DNS resolves to this server's own address, **Error** otherwise (`DomainService.statusOf`,
+  reusing the same IP-resolution trick `check-prerequisites.sh` relies on at startup -- resolve the
+  primary domain to get "this server's IP", no external lookup needed). Adding a domain only checks
+  its syntax and uniqueness, not that its DNS is already correct -- that's exactly what the status
+  column is for after the fact.
+- Editing a domain's page shows a plain-language explanation of where its DNS currently points versus
+  where it should, above the rename field, whenever its status is Error (`DomainService.dnsExplanation`).
+  Renaming a domain **cascades**: every Exposed App/Local Website already using it gets its tunnel
+  recreated under the new domain (the same delete-tunnel-then-recreate-with-a-2s-wait pattern an
+  ordinary edit already uses, just applied in bulk -- brief downtime for the affected items, which is
+  accepted since this is a deliberate admin action), and a Local Website's content directory/NGINX
+  config moves with it. A failure on one item is recorded and never blocks the rest of the rename.
+  Removing a domain has **no cascade at all** -- any Exposed App/Local Website still using it keeps
+  working exactly as before, just flagged with a warning on its own list row (see "Exposed
+  applications"/"Local websites" below), since Selfie Proxy no longer tracks that domain but the
+  underlying tunnel is untouched.
+- Every place a domain is chosen (Add Application, Add Local Website's "Subdomain of ..." mode, the
+  import wizard's per-item domain picker) lists the primary domain first, labeled e.g.
+  `example.com (primary)`, then every other registered domain alphabetically with no special label.
+
 ## Homelabs
 
-- Selfie Proxy manages exactly one top-level domain (`DOMAIN` in `.env`). Each exposed web service
-  is bound to one subdomain, composing a FQDN automatically (subdomain `music` becomes
+- Each exposed web service is bound to one subdomain of whichever domain it's assigned to (see
+  "Domains" above), composing a FQDN automatically (subdomain `music` on domain `example.com` becomes
   `music.example.com`).
 - The Homelabs page and the Exposed Applications page are two views over related data, not two
   separate concepts: a Homelab corresponds to one Agent (see Agents page below) and is managed
@@ -96,10 +128,14 @@ container. After a successful login the user lands on the exposed applications p
 
 - The top of the page manages Homelab selection: a dropdown of Homelab names in alphabetical
   order, first one auto-selected. The user cannot add or delete Homelabs from this page.
-- Under the selected Homelab, exposed apps are listed sorted by subdomain, alphabetically. Each
-  row shows Name (the subdomain for a Web application; the user-entered Name for a Network
-  service, since its internal `svc-` subdomain is never shown), the URL (opens in a new tab), the
-  address within the homelab, and an Edit button.
+- Exposed apps are listed with sortable column headers (Name, Domain, Internet, Homelab, Local
+  address -- click any header to sort ascending/descending, plain client-side JS,
+  `static/js/sortable-table.js`, no server round-trip) and a domain-only filter dropdown above the
+  table (populated from every registered domain, see "Domains"). Each row shows Name (the subdomain
+  for a Web application; the user-entered Name for a Network service, since its internal `svc-`
+  subdomain is never shown), Domain (with a warning icon if that domain was since removed from the
+  Domains page -- the app keeps working, it's just orphaned from Selfie Proxy's own domain registry),
+  the URL (opens in a new tab), the Homelab, and the address within the homelab.
 
 ### Editing, adding, and removing an exposed app
 
@@ -113,9 +149,13 @@ The edit page fields, in order:
    **Name** (Network service only, required): a label shown in the list, not part of the domain,
    not unique — the actual subdomain toward boringproxy is a generated internal `svc-` value never
    shown to the user.
-   **Domain** (Web application only): the subdomain, composing the FQDN as `<subdomain>.DOMAIN`.
+   **Subdomain** (Web application only): the label, composing the FQDN as `<subdomain>.<domain>`.
+   **Domain**: a dropdown of every registered domain (see "Domains" above) -- the primary domain
+   first, labeled e.g. `example.com (primary)`, then every other domain alphabetically with no
+   special label. Applies to both Web application and Network service (a Network service's "Result"
+   is `<domain>:<port>`, not a subdomain-qualified URL, but it's still bound to one domain).
 3. The FQDN itself: a label (not a text field), shown immediately after the subdomain/exposed
-   port, updated live as the user edits the form. Not a hyperlink.
+   port, updated live as the user edits the form (including changing the domain dropdown). Not a hyperlink.
 4. Address within the homelab, all on one line: Protocol (HTTP/HTTPS dropdown for Web
    application, always TCP for Network service), host/IP (always shown, needed for both types),
    port (defaults to 80 for HTTP, 443 for HTTPS).
@@ -144,12 +184,15 @@ Connectivity options between Selfie Proxy and the homelab:
 Button panel: Cancel (returns to the list, no changes), OK (add/update), Remove (edit only, red
 background/white text, asks for confirmation in an overlay first).
 
-Validation: before adding, check the subdomain isn't already taken (case-insensitive) — this also
-applies to a Network service's generated internal subdomain, regenerated until it doesn't
-collide. `proxylistener`/`selfieproxy` (or their env overrides,
-`REVERSE_PROXY_LISTENER_SUBDOMAIN`/`SELFPROXY_ADMIN_DOMAIN`) are reserved and cannot be used for a
-user's own exposed apps. Updating an exposed app removes the boringproxy tunnel, waits 2 seconds,
-then recreates it with the new values (no in-place tunnel update).
+Validation: before adding, check the subdomain isn't already taken on the chosen domain
+(case-insensitive) — this also applies to a Network service's generated internal subdomain,
+regenerated until it doesn't collide. `proxylistener`/`selfieproxy`/`auth` (or their env overrides,
+`REVERSE_PROXY_LISTENER_SUBDOMAIN`/`SELFPROXY_ADMIN_DOMAIN`/`SELFPROXY_AUTH_DOMAIN`) are reserved and
+cannot be used for a user's own exposed apps -- but only when the primary domain is selected, since
+those reserved subdomains are hardcoded to the primary domain alone (`docker-compose.yaml`); the same
+label under any other registered domain is a perfectly ordinary, unreserved app. Updating an exposed
+app (including just changing its domain) removes the boringproxy tunnel, waits 2 seconds, then
+recreates it with the new values (no in-place tunnel update).
 
 ## Local websites
 
@@ -159,13 +202,18 @@ no user-run address behind them, no Homelab to pick, just a domain. See root `CL
 this section is the portal-side UI behavior.
 
 - The nav has a "Local websites" tab next to Applications. The list page shows every site's domain
-  (opens in a new tab), an Edit button, and a Download button (streams the content directory as a
-  ZIP, see `StaticSiteProvisioner.writeZip`).
-- Adding one: choose Subdomain (composes `<subdomain>.DOMAIN`, like an exposed app) or Own domain
-  (a domain you already separately control DNS for, e.g. `www.jeltechnologies.com` — typed in full
-  and used verbatim as the FQDN, no `.DOMAIN` suffix).
-- Renaming one: type a new domain on the edit page. The tunnel is recreated under the new domain
-  and the site's files are moved to the new domain's folder — nothing is lost.
+  (opens in a new tab, with a warning icon if its chosen domain was since removed from the Domains
+  page -- same treatment as the Applications page), an Edit button, and a Download button (streams
+  the content directory as a ZIP, see `StaticSiteProvisioner.writeZip`) -- with the same
+  sortable-column-headers and domain-filter treatment as the Applications page above.
+- Adding one: a subdomain-label text field plus a dropdown of every registered domain, same
+  ordering/labeling as an Exposed App's domain dropdown -- composes `<subdomain>.<chosen domain>`.
+  Exactly like an Exposed App, there's no way to point a Local Website at a domain that isn't
+  registered on the Domains page first -- if a user needs one on a domain Selfie Proxy doesn't
+  already know about, they register that domain there first, then add the website as a subdomain
+  of it.
+- Renaming one: change the subdomain and/or domain on the edit page. The tunnel is recreated under
+  the new FQDN and the site's files are moved to the new folder — nothing is lost.
 - Uploading a ZIP (add or edit page): replaces the site's entire content directory --
   `StaticSiteProvisioner.replaceContents` extracts the upload into a staging directory first and
   only swaps it in (a same-filesystem directory rename) once extraction fully succeeds, so a bad
@@ -176,20 +224,14 @@ this section is the portal-side UI behavior.
   domain again later starts from an empty folder.
 - Files live at `data/selfieproxy/sites/<domain>/` on the server, owned by the portal container's
   user — copy files in as root, or via `docker exec selfieproxy-portal`.
-- **Two independent warnings** on the list page (`LocalWebsiteController.list`), both recomputed
-  live on every page load, no caching: a cert-pending one (mirrors the Applications page's own,
-  but scoped to This Server's tunnels instead of excluding them, since every Local Website tunnel
-  belongs to the hidden "This Server" homelab) shown whenever boringproxy is still retrying Let's
-  Encrypt for a site (self-signed cert served in the meantime -- expected and fine, not itself a
-  bug); and a DNS-mismatch one, checked only for **Own domain** sites (`LocalWebsite.ownDomain`) by
-  resolving both the site's domain and `boringProxyProperties.domain()` (trusted correct already,
-  per check-prerequisites' startup wildcard check) and comparing IPs -- a **Subdomain** site never
-  needs this check, since `*.DOMAIN` is already guaranteed to resolve here. An Own domain site
-  whose DNS points elsewhere is *expected* to sit on a temporary self-signed certificate
-  indefinitely (Let's Encrypt's HTTP-01 challenge can never reach this server at that domain to
-  prove ownership) -- the DNS-mismatch warning explains why, the cert-pending warning is just a
-  symptom of it; neither is something to silently "fix" by removing the site, since a self-signed
-  fallback with both warnings visible is the deliberately correct behavior for that case.
+- **One warning** on the list page (`LocalWebsiteController.list`), recomputed live on every page
+  load, no caching: a cert-pending banner (mirrors the Applications page's own, but scoped to This
+  Server's tunnels instead of excluding them, since every Local Website tunnel belongs to the hidden
+  "This Server" homelab) shown whenever boringproxy is still retrying Let's Encrypt for a site
+  (self-signed cert served in the meantime -- expected and fine, not itself a bug). There's no
+  separate DNS-mismatch check here -- a Local Website's domain is always a registered one, so its
+  DNS correctness is already tracked centrally on the Domains settings page instead (see "Domains"
+  above), exactly like an Exposed App.
 
 ## Backup and restore
 
@@ -208,9 +250,11 @@ User-facing text says "export"/"import configuration", and their URLs follow sui
 -- see the "Login" section's note on this split. Together the two pages cover every Homelab,
 Exposed App ("server" in the picker's own wording), and Local Website (config *and* its actual
 content files) -- usable both for disaster recovery on the same server and for moving to a brand
-new one, since Exposed App subdomains and Local Website domains are already relative to whatever
-`DOMAIN` the target server has. `BackupService` does the work; `BackupController` is the thin web
-layer for both pages.
+new one. Each Exposed App/Local Website already carries its own domain (`ExposedApp.domain()`/
+`LocalWebsite.domain()`, see "Domains" above), so it flows into `manifest.json` for free; a restore
+onto a different server doesn't assume the two servers share the same domain -- see the Applications/
+Local Websites wizard steps' per-item domain picker below. `BackupService` does the work;
+`BackupController` is the thin web layer for both pages.
 
 - **Export configuration page** (`GET /export-configuration`): three flat checkbox lists over
   *live* server state, in a fixed order -- Homelabs, then Exposed Apps (each entry showing its own
@@ -261,7 +305,16 @@ layer for both pages.
   manifest for that category with a checkbox (unchecked by default -- the admin actively picks
   what to import, item by item, rather than starting from an implicit "everything selected") and a
   New/Existing status badge computed against live state (`BackupService.diffManifest`, against
-  `boringProxyClient.listAgents()`/`ExposedAppStore.find`/`LocalWebsiteStore.find`), plus a Select
+  `boringProxyClient.listAgents()`/`ExposedAppStore.find`/`LocalWebsiteStore.find`; this badge is
+  computed against the ZIP's own domain and doesn't live-update if the domain picker below is
+  changed, an accepted minor simplification). The Applications step and the Local Websites step
+  also show a per-item domain `<select>` (same ordering/labeling as
+  the Add Application page's -- primary domain first, then every other registered domain
+  alphabetically) defaulting to the ZIP's own domain if it's still registered on this server, else
+  the primary domain (`BackupController.targetDomainsForApps`/`targetDomainsForSites`) -- this is what
+  lets a restore land on a domain other than the one the export was originally taken from. Each
+  step's chosen domains are carried forward to the next as `domain__<fqdn>` hidden fields (the
+  wizard's stateless carry-forward idiom, extended one step further), plus a Select
   All/Select None button pair above the list (`restore-wizard.js`, mirrors the export page's own
   `backup.js` pattern, scoped to that step's own `#wizard-form`) -- the Homelabs and Applications
   steps show their list plain with no box around it, the Local Websites step still wraps its list
@@ -289,9 +342,12 @@ layer for both pages.
   Applying (`POST /import-configuration/{stagingId}/apply`, fed
   by the Overview step's hidden fields) recreates each selected Application/Local Website's tunnel
   (the same delete-then-recreate-with-a-2s-wait pattern an ordinary edit already uses, just applied
-  in bulk -- brief downtime for that homelab's users) and creates each selected new Homelab with a
-  fresh secret; existing Homelabs are left untouched. A failure importing one item is recorded and
-  never aborts the rest of the import. The staging directory is removed once the import completes
+  in bulk -- brief downtime for that homelab's users) at whichever domain its picker step chose
+  (`BackupService.doApplyRestore` substitutes the ZIP's own domain with the picked one before
+  building the tunnel request -- a Local Website's content directory, staged under the ZIP's
+  *original* domain, is restored to the *new* one if they differ) and creates each selected new
+  Homelab with a fresh secret; existing Homelabs are left untouched. A failure importing one item is
+  recorded and never aborts the rest of the import. The staging directory is removed once the import completes
   or is cancelled (`POST /import-configuration/{stagingId}/cancel`, available from every wizard
   step), and either action redirects back to `/import-configuration`.
 - **Download filename**: `selfieproxy-config-export-<domain>-<timestamp>.zip`, where the timestamp

@@ -32,11 +32,14 @@ runtime config/volumes they use:
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
 - `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + `check-prerequisites.sh`
-  baked in via its own Dockerfile) that fails fast before anything else starts if `DOMAIN` and a
-  `*.DOMAIN` wildcard record don't already resolve to the host's public IP (checked as the literal
-  DNS owner names `DOMAIN` and `*.DOMAIN`, covering every current and future subdomain — the fixed
-  `proxylistener`/`selfieproxy`/`auth` subdomains and any exposed-app/tunnel subdomain created later
-  — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites` service.
+  baked in via its own Dockerfile) that fails fast before anything else starts if `PRIMARY_DOMAIN` and a
+  `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP (checked as the literal
+  DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and future subdomain — the
+  fixed `proxylistener`/`selfieproxy`/`auth` subdomains and any exposed-app/tunnel subdomain created later
+  — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites` service. This
+  check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
+  "Domains" section) is registered and DNS-checked entirely at runtime through the portal's own Domains
+  settings page instead, since it's added long after this container has already started.
 
 ## Layout
 
@@ -46,7 +49,9 @@ runtime config/volumes they use:
 ├── data/                         # runtime volumes — not committed
 │   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
 │   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
-│       │                            # local-websites.json (LocalWebsiteStore), selfieproxy-localsites-agent-secret,
+│       │                            # local-websites.json (LocalWebsiteStore), domains.json (DomainStore --
+│       │                            # registered secondary domains only, the primary domain is never stored here),
+│       │                            # selfieproxy-localsites-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
 │       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
@@ -103,7 +108,7 @@ there, not in a compose file or `.env` template in this repo.
 The admin portal only runs alongside the server (it manages that server's tunnels via the
 boringproxy REST API), so it's defined as a second service in `docker-compose.yaml`
 rather than its own compose file, with `depends_on: selfieproxy-reverseproxy`. The
-`selfieproxy-reverseproxy` container's `-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`DOMAIN` and the
+`selfieproxy-reverseproxy` container's `-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`PRIMARY_DOMAIN` and the
 selfieproxy-portal's published port, `8081`) make the portal reachable at startup by reverse-proxying
 that domain directly to selfieproxy-portal, without going through any Agent/Tunnel — this is what lets
 a fresh deployment reach the portal to create its first agent, before any agent exists.
@@ -123,9 +128,15 @@ and `selfieproxy-localsites-agent` (`service_started`, the last service in every
 dependency chain), so the shared NGINX only comes up once everything upstream of it — DNS
 preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
 
-The server host's `.env` (from `.env.example`) only needs `DOMAIN` and
+The server host's `.env` (from `.env.example`) only needs `PRIMARY_DOMAIN` and
 `ADMIN_PORTAL_USERNAME`/`ADMIN_PORTAL_BOOTSTRAP_PASSWORD` — now consumed by `selfieproxy-identity-provider`
-(the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left.
+(the bundled OIDC IdP), not `selfieproxy-portal`, which has no login of its own left. `PRIMARY_DOMAIN` is
+fixed for the lifetime of the deployment — it's needed to reach the portal/identity-provider before
+anything else exists, so it can never be changed or removed once set. Additional domains ("secondary"
+domains internally, never called that in the UI) can be registered later entirely through the portal's
+own Domains settings page (`selfieproxy-portal/CLAUDE.md`'s "Domains" section) — they have no `.env`
+representation at all, since they're admin-managed runtime state (`data/selfieproxy/domains.json`,
+`DomainStore`), not server bootstrap configuration.
 `ADMIN_PORTAL_BOOTSTRAP_PASSWORD` is a one-time seed, not a live credential: `AdminUserStore`
 bcrypt-hashes it into a persisted admin record (`data/selfieproxy/admin-user.json`) only on first
 boot, when no record exists yet, and the first login is forced through a change-password screen
@@ -183,7 +194,7 @@ and selfieproxy-portal's `this-server.agent-name`) rather than even optionally e
 since the two must always match. Agent hosts are out of scope for this repo entirely — there's
 no compose file or `.env` template for them here. An agent connects with just a name and a
 server-generated secret (`AGENT_NAME`/`AGENT_SECRET`) issued from the admin portal's Agents
-page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER_SUBDOMAIN.DOMAIN` from this
+page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER_SUBDOMAIN.PRIMARY_DOMAIN` from this
 server's `.env`); the portal itself is the source of guidance for running that agent process.
 `docker-compose.yaml` passes `-acme-email "${LETSENCRYPT_EMAIL:-}"` to both boringproxy
 invocations (the main server and the colocated `selfieproxy-localsites-agent`, which does its

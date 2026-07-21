@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Domains')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='domains')}"></header>
+
+	<main class="page">
+		<section class="page-header">
+			<div>
+				<h1>Domains</h1>
+				<p class="page-subtitle">Domains you can expose applications and local websites on.</p>
+			</div>
+			<a class="button" th:href="@{/domains/new}">Add</a>
+		</section>
+
+		<div class="warning" th:if="${renameResult != null and renameResult.hasFailures()}">
+			<p><strong>Some applications or local websites could not be moved to the new domain:</strong></p>
+			<ul>
+				<li th:each="f : ${renameResult.failures()}" th:text="${f}"></li>
+			</ul>
+		</div>
+
+		<table class="apps-table">
+			<thead>
+				<tr>
+					<th>Domain</th>
+					<th>Status</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr th:each="d : ${domains}">
+					<td th:text="${d.name()}"></td>
+					<td>
+						<span th:if="${d.primary()}" class="status-badge status-badge-primary">Primary</span>
+						<span th:if="${!d.primary() and statusByDomain.get(d.name()).name() == 'OK'}"
+							  class="status-badge status-badge-ok">OK</span>
+						<span th:if="${!d.primary() and statusByDomain.get(d.name()).name() == 'ERROR'}"
+							  class="status-badge status-badge-error">Error</span>
+					</td>
+					<td>
+						<a th:unless="${d.primary()}" class="button-small"
+						   th:href="@{/domains/{name}/edit(name=${d.name()})}">Edit</a>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+	</main>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

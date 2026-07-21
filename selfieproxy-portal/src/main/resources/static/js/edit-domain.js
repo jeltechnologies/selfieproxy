@@ -1,23 +1,11 @@
 (function () {
 	"use strict";
 
-	var labelInput = document.getElementById("label");
-	var domainSelect = document.getElementById("domainSelect");
-	var resultInput = document.getElementById("result");
-
 	var removeButton = document.getElementById("remove-button");
 	var overlay = document.getElementById("confirm-overlay");
 	var confirmRemove = document.getElementById("confirm-remove");
 	var cancelRemove = document.getElementById("cancel-remove");
 	var deleteForm = document.getElementById("delete-form");
-
-	function updateResult() {
-		var label = labelInput.value || "(subdomain)";
-		resultInput.textContent = label + "." + domainSelect.value;
-	}
-
-	labelInput.addEventListener("input", updateResult);
-	domainSelect.addEventListener("change", updateResult);
 
 	if (removeButton) {
 		removeButton.addEventListener("click", function () {
@@ -30,6 +18,4 @@
 			deleteForm.submit();
 		});
 	}
-
-	updateResult();
 })();

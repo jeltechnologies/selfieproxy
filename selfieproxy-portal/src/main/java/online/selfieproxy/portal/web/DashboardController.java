@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
 import online.selfieproxy.portal.domain.TunnelMapper;
@@ -23,13 +24,16 @@ public class DashboardController {
 	private final TunnelMapper tunnelMapper;
 	private final ExposedAppStore exposedAppStore;
 	private final ThisServerAgentProperties thisServerAgentProperties;
+	private final DomainService domainService;
 
 	public DashboardController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
-			ExposedAppStore exposedAppStore, ThisServerAgentProperties thisServerAgentProperties) {
+			ExposedAppStore exposedAppStore, ThisServerAgentProperties thisServerAgentProperties,
+			DomainService domainService) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.exposedAppStore = exposedAppStore;
 		this.thisServerAgentProperties = thisServerAgentProperties;
+		this.domainService = domainService;
 	}
 
 	@GetMapping("/apps")
@@ -76,6 +80,8 @@ public class DashboardController {
 		model.addAttribute("certPendingByDomain", certPendingByDomain);
 		model.addAttribute("hasPendingCerts", hasPendingCerts);
 		model.addAttribute("tunnelMapper", tunnelMapper);
+		model.addAttribute("domainService", domainService);
+		model.addAttribute("domains", domainService.allDomains());
 		return "dashboard";
 	}
 }

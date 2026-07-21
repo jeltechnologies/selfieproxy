@@ -17,12 +17,6 @@
 			No local websites yet.
 		</p>
 
-		<p class="warning" th:if="${hasDnsMismatch}">
-			One or more local websites' DNS records do not point at this server -- Let's Encrypt can't verify
-			ownership over a domain that resolves elsewhere, so it will never obtain a trusted certificate here
-			until the domain's DNS is corrected.
-		</p>
-
 		<p class="warning" th:if="${hasPendingCerts}">
 			One or more local websites are temporarily using a self-signed certificate -- browsers will show a
 			security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can
@@ -30,32 +24,42 @@
 			the background.
 		</p>
 
-		<table class="apps-table" th:if="${not #lists.isEmpty(websites)}">
+		<div class="list-filter" th:if="${not #lists.isEmpty(websites)}">
+			<label for="domainFilter">Filter by domain</label>
+			<select id="domainFilter">
+				<option value="">All domains</option>
+				<option th:each="d : ${domains}" th:value="${d.name()}" th:text="${d.name()}"></option>
+			</select>
+		</div>
+
+		<table class="apps-table" data-sortable th:if="${not #lists.isEmpty(websites)}">
 			<thead>
 				<tr>
-					<th>Domain</th>
+					<th data-sort-key="fqdn">Domain</th>
 					<th></th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr th:each="website : ${websites}"
-					th:with="fqdn=${website.ownDomain() ? website.domain() : boringProxyProperties.fqdn(website.domain())}">
-					<td>
+					th:with="fqdn=${website.fqdn()}" th:attr="data-domain=${website.domain()}">
+					<td th:attr="data-sort-value=${fqdn}">
 						<a th:href="'https://' + ${fqdn}" target="_blank" rel="noopener" th:text="${fqdn}"></a>
-						<span th:if="${dnsMismatchByDomain.get(fqdn)}"
-							  class="warning-icon" title="This domain's DNS does not point at this server">&#9888;</span>
+						<span th:if="${!domainService.exists(website.domain())}"
+							  class="warning-icon" title="This local website's domain no longer exists">&#9888;</span>
 						<span th:if="${certPendingByDomain.get(fqdn)}"
 							  class="cert-pending-badge"
 							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
 					</td>
 					<td>
-						<a class="button-small" th:href="@{/local-websites/{domain}/edit(domain=${website.domain()})}">Edit</a>
-						<a class="button-small" th:href="@{/local-websites/{domain}/download(domain=${website.domain()})}">Download</a>
+						<a class="button-small" th:href="@{/local-websites/{fqdn}/edit(fqdn=${fqdn})}">Edit</a>
+						<a class="button-small" th:href="@{/local-websites/{fqdn}/download(fqdn=${fqdn})}">Download</a>
 					</td>
 				</tr>
 			</tbody>
 		</table>
 	</main>
+
+	<script th:src="@{/js/sortable-table.js}"></script>
 
 	<footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>

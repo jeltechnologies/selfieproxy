@@ -57,7 +57,6 @@ class BackupServiceTest {
 
 	private final BoringProxyProperties boringProxyProperties =
 			new BoringProxyProperties("example.com", "proxylistener", "selfieproxy", "auth");
-	private final TunnelMapper tunnelMapper = new TunnelMapper(boringProxyProperties);
 	private final ThisServerAgentProperties thisServerAgentProperties =
 			new ThisServerAgentProperties("selfieproxy-internal-agent", "/dev/null");
 	private final SitesWebserverProperties sitesWebserverProperties =
@@ -65,6 +64,9 @@ class BackupServiceTest {
 
 	private BackupService newService() {
 		BackupProperties backupProperties = new BackupProperties(tempDir.resolve("staging").toString());
+		DomainStore domainStore = new DomainStore(tempDir.resolve("domains.json").toString());
+		DomainService domainService = new DomainService(domainStore, boringProxyProperties);
+		TunnelMapper tunnelMapper = new TunnelMapper(domainService, exposedAppStore);
 		return new BackupService(boringProxyClient, tunnelMapper, boringProxyProperties, exposedAppStore,
 				localWebsiteStore, staticSiteProvisioner, sitesWebserverProperties, thisServerAgentProperties,
 				backupProperties);
@@ -77,11 +79,11 @@ class BackupServiceTest {
 				"127.0.0.1", 8080, false, "server", false, false, "admin", "lab1", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", tunnel));
 		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", false)));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com")));
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
-		RestoreSelection selection = new RestoreSelection(List.of("lab1"), List.of("blog"), List.of("blogsite"));
+		RestoreSelection selection = new RestoreSelection(List.of("lab1"), List.of("blog.example.com"), List.of("blogsite.example.com"), Map.of());
 		service.writeBackup(backupBytes, ZoneOffset.UTC, selection);
 
 		String stagingId = service.stageRestore(new ByteArrayInputStream(backupBytes.toByteArray()));
@@ -91,7 +93,7 @@ class BackupServiceTest {
 		assertEquals(1, manifest.exposedApps().size());
 		assertEquals("blog", manifest.exposedApps().get(0).subdomain());
 		assertEquals(1, manifest.localWebsites().size());
-		assertEquals("blogsite", manifest.localWebsites().get(0).domain());
+		assertEquals("blogsite.example.com", manifest.localWebsites().get(0).fqdn());
 	}
 
 	@Test
@@ -103,11 +105,11 @@ class BackupServiceTest {
 				"127.0.0.1", 8081, false, "server", false, false, "admin", "lab2", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", blogTunnel, "shop.example.com", shopTunnel));
 		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", false), new LocalWebsite("shopsite", false)));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("shopsite", "example.com")));
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
-		RestoreSelection selection = new RestoreSelection(List.of("lab1"), List.of("blog"), List.of("blogsite"));
+		RestoreSelection selection = new RestoreSelection(List.of("lab1"), List.of("blog.example.com"), List.of("blogsite.example.com"), Map.of());
 		service.writeBackup(backupBytes, ZoneOffset.UTC, selection);
 
 		String stagingId = service.stageRestore(new ByteArrayInputStream(backupBytes.toByteArray()));
@@ -117,7 +119,7 @@ class BackupServiceTest {
 		assertEquals(1, manifest.exposedApps().size());
 		assertEquals("blog", manifest.exposedApps().get(0).subdomain());
 		assertEquals(1, manifest.localWebsites().size());
-		assertEquals("blogsite", manifest.localWebsites().get(0).domain());
+		assertEquals("blogsite.example.com", manifest.localWebsites().get(0).fqdn());
 	}
 
 	@Test
@@ -147,7 +149,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreCreatesHomelabWithFreshSecretAndRecreatesExposedAppTunnel() throws IOException {
 		ExposedApp app = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8080, null, null, false);
+				"127.0.0.1", 8080, null, null, false, "example.com");
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1"), List.of(app), List.of());
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -165,7 +167,7 @@ class BackupServiceTest {
 		String stagingId = service.stageRestore(new ByteArrayInputStream(zipBytes.toByteArray()));
 
 		RestoreResult result = service.applyRestore(stagingId,
-				new RestoreSelection(List.of("lab1"), List.of("blog"), List.of()));
+				new RestoreSelection(List.of("lab1"), List.of("blog.example.com"), List.of(), Map.of()));
 
 		assertEquals(1, result.homelabsRestored());
 		assertEquals(1, result.exposedAppsRestored());
@@ -181,24 +183,24 @@ class BackupServiceTest {
 	@Test
 	void diffManifestFlagsExistingItemsAgainstLiveState() {
 		ExposedApp existingApp = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8080, null, null, false);
+				"127.0.0.1", 8080, null, null, false, "example.com");
 		ExposedApp newApp = new ExposedApp("shop", null, "lab2", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8081, null, null, false);
+				"127.0.0.1", 8081, null, null, false, "example.com");
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingApp, newApp),
-				List.of(new LocalWebsite("blogsite", false), new LocalWebsite("newsite", false)));
+				List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("newsite", "example.com")));
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
-		when(exposedAppStore.find("blog")).thenReturn(existingApp);
-		when(exposedAppStore.find("shop")).thenReturn(null);
-		when(localWebsiteStore.find("blogsite")).thenReturn(new LocalWebsite("blogsite", false));
-		when(localWebsiteStore.find("newsite")).thenReturn(null);
+		when(exposedAppStore.find("blog.example.com")).thenReturn(existingApp);
+		when(exposedAppStore.find("shop.example.com")).thenReturn(null);
+		when(localWebsiteStore.find("blogsite.example.com")).thenReturn(new LocalWebsite("blogsite", "example.com"));
+		when(localWebsiteStore.find("newsite.example.com")).thenReturn(null);
 
 		BackupService service = newService();
 		RestoreDiff diff = service.diffManifest(manifest);
 
 		assertEquals(Set.of("lab1"), diff.existingHomelabs());
-		assertEquals(Set.of("blog"), diff.existingExposedAppSubdomains());
-		assertEquals(Set.of("blogsite"), diff.existingLocalWebsiteDomains());
+		assertEquals(Set.of("blog.example.com"), diff.existingExposedAppFqdns());
+		assertEquals(Set.of("blogsite.example.com"), diff.existingLocalWebsiteFqdns());
 	}
 }

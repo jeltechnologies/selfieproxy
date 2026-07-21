@@ -15,8 +15,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Selfie Proxy's own complete record of every ExposedApp, keyed by subdomain,
- * held alongside (not instead of) BoringProxy's own Tunnel database. Two
+ * Selfie Proxy's own complete record of every ExposedApp, keyed by its full
+ * FQDN (subdomain + domain -- see ExposedApp.fqdn()), held alongside (not
+ * instead of) BoringProxy's own Tunnel database. Keying by FQDN rather than
+ * bare subdomain means two apps can share a label under different domains
+ * without colliding, and the key is literally identical to BoringProxy's own
+ * Tunnel.domain. Two
  * purposes: (1) BoringProxy's Tunnel schema can't reliably represent some
  * fields we care about -- eg. the homelab's protocol is only
  * recoverable by convention (an "https://" prefix on client_address) that
@@ -50,22 +54,22 @@ public class ExposedAppStore {
 	public void save(ExposedApp app) {
 		synchronized (lock) {
 			Map<String, ExposedApp> all = readAll();
-			all.put(app.subdomain(), app);
+			all.put(app.fqdn(), app);
 			writeAll(all);
 		}
 	}
 
-	public void delete(String subdomain) {
+	public void delete(String fqdn) {
 		synchronized (lock) {
 			Map<String, ExposedApp> all = readAll();
-			if (all.remove(subdomain) != null) {
+			if (all.remove(fqdn) != null) {
 				writeAll(all);
 			}
 		}
 	}
 
 	/**
-	 * If we have no record for fromBoringProxy's subdomain yet, persists it
+	 * If we have no record for fromBoringProxy's FQDN yet, persists it
 	 * as-is (a best-effort full snapshot, capturing apps that only ever
 	 * existed via the legacy BoringProxy UI) and returns it unchanged.
 	 * Otherwise leaves the existing record untouched and overlays our own
@@ -77,22 +81,23 @@ public class ExposedAppStore {
 	public ExposedApp reconcile(ExposedApp fromBoringProxy) {
 		synchronized (lock) {
 			Map<String, ExposedApp> all = readAll();
-			ExposedApp stored = all.get(fromBoringProxy.subdomain());
+			ExposedApp stored = all.get(fromBoringProxy.fqdn());
 			if (stored == null) {
-				all.put(fromBoringProxy.subdomain(), fromBoringProxy);
+				all.put(fromBoringProxy.fqdn(), fromBoringProxy);
 				writeAll(all);
 				return fromBoringProxy;
 			}
 			return new ExposedApp(fromBoringProxy.subdomain(), stored.name(),
 					fromBoringProxy.homelabName(), fromBoringProxy.type(), stored.protocol(), fromBoringProxy.host(),
-					fromBoringProxy.port(), fromBoringProxy.exposedPort(), stored.tlsMode(), stored.ssoProtected());
+					fromBoringProxy.port(), fromBoringProxy.exposedPort(), stored.tlsMode(), stored.ssoProtected(),
+					fromBoringProxy.domain());
 		}
 	}
 
-	/** The stored record for subdomain, or null if none exists yet (eg. a tunnel that's never been through reconcile/save). */
-	public ExposedApp find(String subdomain) {
+	/** The stored record for fqdn, or null if none exists yet (eg. a tunnel that's never been through reconcile/save). */
+	public ExposedApp find(String fqdn) {
 		synchronized (lock) {
-			return readAll().get(subdomain);
+			return readAll().get(fqdn);
 		}
 	}
 

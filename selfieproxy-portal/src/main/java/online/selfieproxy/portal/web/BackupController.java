@@ -10,6 +10,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,6 +26,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.domain.BackupManifest;
 import online.selfieproxy.portal.domain.BackupService;
+import online.selfieproxy.portal.domain.DomainService;
+import online.selfieproxy.portal.domain.ExposedApp;
+import online.selfieproxy.portal.domain.LocalWebsite;
 import online.selfieproxy.portal.domain.RestoreDiff;
 import online.selfieproxy.portal.domain.RestoreResult;
 import online.selfieproxy.portal.domain.RestoreSelection;
@@ -44,12 +49,17 @@ public class BackupController {
 
 	private static final DateTimeFormatter FILENAME_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmm");
 
+	private static final String DOMAIN_OVERRIDE_PREFIX = "domain__";
+
 	private final BackupService backupService;
 	private final BoringProxyProperties boringProxyProperties;
+	private final DomainService domainService;
 
-	public BackupController(BackupService backupService, BoringProxyProperties boringProxyProperties) {
+	public BackupController(BackupService backupService, BoringProxyProperties boringProxyProperties,
+			DomainService domainService) {
 		this.backupService = backupService;
 		this.boringProxyProperties = boringProxyProperties;
+		this.domainService = domainService;
 	}
 
 	/** Export configuration page: flat Homelabs/Exposed Apps/Local Websites checkbox lists over live server state, everything pre-checked, submitting a GET to /export-configuration/download. */
@@ -77,11 +87,12 @@ public class BackupController {
 			HttpServletResponse response) throws IOException {
 		ZoneId zone = resolveZone(tz);
 		String timestamp = ZonedDateTime.now(zone).format(FILENAME_TIMESTAMP);
-		String safeDomain = boringProxyProperties.domain().replaceAll("[^A-Za-z0-9.-]", "_");
+		String safeDomain = boringProxyProperties.primaryDomain().replaceAll("[^A-Za-z0-9.-]", "_");
 		String filename = "selfieproxy-config-export-" + safeDomain + "-" + timestamp + ".zip";
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps), nullToEmpty(localWebsites));
+		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps),
+				nullToEmpty(localWebsites), Map.of());
 		backupService.writeBackup(response.getOutputStream(), zone, selection);
 	}
 
@@ -130,16 +141,19 @@ public class BackupController {
 		model.addAttribute("manifest", manifest);
 		model.addAttribute("stagingId", stagingId);
 		model.addAttribute("selectedHomelabs", selectedHomelabs);
-		model.addAttribute("existingExposedApps", diff.existingExposedAppSubdomains());
+		model.addAttribute("existingExposedApps", diff.existingExposedAppFqdns());
+		model.addAttribute("domains", domainService.allDomains());
+		model.addAttribute("targetDomainByFqdn", targetDomainsForApps(manifest));
 		addWizardNav(model, "exposed-apps", stagingId, manifest, selectedHomelabs, List.of());
 		return "restore-exposed-apps";
 	}
 
-	/** Wizard step (local websites): carries homelabs + exposed apps forward; its own local websites are unchecked on every render. Skipped when the export has no local websites. */
+	/** Wizard step (local websites): carries homelabs + exposed apps (+ the exposed apps step's own domain choices) forward; its own local websites are unchecked on every render. Skipped when the export has no local websites. */
 	@GetMapping("/import-configuration/{stagingId}/local-websites")
 	public String localWebsitesStep(@PathVariable String stagingId,
 			@RequestParam(required = false) List<String> homelabs,
-			@RequestParam(required = false) List<String> exposedApps, Model model) {
+			@RequestParam(required = false) List<String> exposedApps,
+			@RequestParam Map<String, String> allParams, Model model) {
 		BackupManifest manifest = backupService.readStagedManifest(stagingId);
 		RestoreDiff diff = backupService.diffManifest(manifest);
 		List<String> selectedHomelabs = nullToEmpty(homelabs);
@@ -148,7 +162,10 @@ public class BackupController {
 		model.addAttribute("stagingId", stagingId);
 		model.addAttribute("selectedHomelabs", selectedHomelabs);
 		model.addAttribute("selectedExposedApps", selectedExposedApps);
-		model.addAttribute("existingLocalWebsites", diff.existingLocalWebsiteDomains());
+		model.addAttribute("existingLocalWebsites", diff.existingLocalWebsiteFqdns());
+		model.addAttribute("domains", domainService.allDomains());
+		model.addAttribute("targetDomainByFqdn", targetDomainsForSites(manifest));
+		model.addAttribute("carriedDomainOverrides", domainOverrides(allParams));
 		addWizardNav(model, "local-websites", stagingId, manifest, selectedHomelabs, selectedExposedApps);
 		return "restore-local-websites";
 	}
@@ -158,7 +175,8 @@ public class BackupController {
 	public String overviewStep(@PathVariable String stagingId,
 			@RequestParam(required = false) List<String> homelabs,
 			@RequestParam(required = false) List<String> exposedApps,
-			@RequestParam(required = false) List<String> localWebsites, Model model) {
+			@RequestParam(required = false) List<String> localWebsites,
+			@RequestParam Map<String, String> allParams, Model model) {
 		BackupManifest manifest = backupService.readStagedManifest(stagingId);
 		RestoreDiff diff = backupService.diffManifest(manifest);
 		List<String> selectedHomelabs = nullToEmpty(homelabs);
@@ -169,8 +187,9 @@ public class BackupController {
 		model.addAttribute("selectedExposedApps", selectedExposedApps);
 		model.addAttribute("selectedLocalWebsites", nullToEmpty(localWebsites));
 		model.addAttribute("existingHomelabs", diff.existingHomelabs());
-		model.addAttribute("existingExposedApps", diff.existingExposedAppSubdomains());
-		model.addAttribute("existingLocalWebsites", diff.existingLocalWebsiteDomains());
+		model.addAttribute("existingExposedApps", diff.existingExposedAppFqdns());
+		model.addAttribute("existingLocalWebsites", diff.existingLocalWebsiteFqdns());
+		model.addAttribute("carriedDomainOverrides", domainOverrides(allParams));
 		addWizardNav(model, "overview", stagingId, manifest, selectedHomelabs, selectedExposedApps);
 		return "restore-overview";
 	}
@@ -180,11 +199,35 @@ public class BackupController {
 			@RequestParam(required = false) List<String> homelabs,
 			@RequestParam(required = false) List<String> exposedApps,
 			@RequestParam(required = false) List<String> localWebsites,
+			@RequestParam Map<String, String> allParams,
 			RedirectAttributes redirectAttributes) {
-		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps), nullToEmpty(localWebsites));
+		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps),
+				nullToEmpty(localWebsites), domainOverrides(allParams));
 		RestoreResult result = backupService.applyRestore(stagingId, selection);
 		redirectAttributes.addFlashAttribute("result", result);
 		return "redirect:/import-configuration";
+	}
+
+	/** Per-item default target domain: the ZIP's own domain if it's still registered on this server, else the primary domain -- same fallback rule for both categories below. */
+	private Map<String, String> targetDomainsForApps(BackupManifest manifest) {
+		return manifest.exposedApps().stream()
+				.collect(Collectors.toMap(ExposedApp::fqdn, app -> defaultTargetDomain(app.domain())));
+	}
+
+	private Map<String, String> targetDomainsForSites(BackupManifest manifest) {
+		return manifest.localWebsites().stream()
+				.collect(Collectors.toMap(LocalWebsite::fqdn, site -> defaultTargetDomain(site.domain())));
+	}
+
+	private String defaultTargetDomain(String zipDomain) {
+		return domainService.exists(zipDomain) ? zipDomain : domainService.primaryDomain();
+	}
+
+	/** Every request param named domain__&lt;fqdn&gt; (the per-item domain <select>s on the exposed-apps/local-websites steps), keyed back to the bare fqdn -- carried forward as hidden fields step to step (see restore-local-websites.html/restore-overview.html) since the wizard otherwise stays stateless. */
+	private Map<String, String> domainOverrides(Map<String, String> allParams) {
+		return allParams.entrySet().stream()
+				.filter(e -> e.getKey().startsWith(DOMAIN_OVERRIDE_PREFIX))
+				.collect(Collectors.toMap(e -> e.getKey().substring(DOMAIN_OVERRIDE_PREFIX.length()), Map.Entry::getValue));
 	}
 
 	@PostMapping("/import-configuration/{stagingId}/cancel")

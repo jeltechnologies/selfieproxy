@@ -418,3 +418,13 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 .status-badge { display: inline-block; margin-left: 0.5rem; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; }
 .status-badge-new { background: rgba(46, 158, 79, 0.15); border: 1px solid var(--success); color: var(--success); }
 .status-badge-existing { background: var(--warning-bg); border: 1px solid var(--warning-border); }
+.status-badge-ok { background: rgba(46, 158, 79, 0.15); border: 1px solid var(--success); color: var(--success); }
+.status-badge-error { background: rgba(192, 57, 43, 0.12); border: 1px solid var(--danger); color: var(--danger); }
+.status-badge-primary { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+
+table[data-sortable] th[data-sort-key] { cursor: pointer; user-select: none; }
+table[data-sortable] th[data-sort-key]::after { content: ""; display: inline-block; width: 0.6em; }
+table[data-sortable] th.sorted-asc::after { content: "\25B2"; margin-left: 0.3em; font-size: 0.7em; }
+table[data-sortable] th.sorted-desc::after { content: "\25BC"; margin-left: 0.3em; font-size: 0.7em; }
+.list-filter { margin-bottom: 0.75rem; }
+.list-filter label { margin-right: 0.4rem; }

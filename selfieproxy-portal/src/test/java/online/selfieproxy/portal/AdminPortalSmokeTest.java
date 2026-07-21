@@ -40,7 +40,8 @@ import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
  * then reuses the resulting HttpSession like a real browser would.
  */
 @SpringBootTest(properties = {
-		"selfieproxy.exposed-apps-path=${java.io.tmpdir}/selfieproxy-smoke-test-exposed-apps.json"})
+		"selfieproxy.exposed-apps-path=${java.io.tmpdir}/selfieproxy-smoke-test-exposed-apps.json",
+		"selfieproxy.domains-path=${java.io.tmpdir}/selfieproxy-smoke-test-domains.json"})
 @AutoConfigureMockMvc
 class AdminPortalSmokeTest {
 
@@ -85,7 +86,7 @@ class AdminPortalSmokeTest {
 
 		when(boringProxyClient.getTunnel(eq("music.example.com"))).thenReturn(webTunnel);
 
-		mockMvc.perform(get("/apps/music/edit").session(session))
+		mockMvc.perform(get("/apps/music.example.com/edit").session(session))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("music")));
 
@@ -121,7 +122,7 @@ class AdminPortalSmokeTest {
 				.andExpect(status().is3xxRedirection())
 				.andExpect(redirectedUrl("/apps"));
 
-		mockMvc.perform(post("/apps/ssh/delete").session(session))
+		mockMvc.perform(post("/apps/ssh.example.com/delete").session(session))
 				.andExpect(status().is3xxRedirection())
 				.andExpect(redirectedUrl("/apps"));
 	}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add domain - Selfie Proxy' : 'Edit domain - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='domains')}"></header>
+
+	<main class="page">
+		<h1 th:text="${isNew} ? 'Add domain' : 'Edit ' + ${name}"></h1>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<p class="warning" th:if="${dnsExplanation != null}" th:text="${dnsExplanation}"></p>
+
+		<form id="domain-form" method="post"
+			  th:action="${isNew} ? @{/domains} : @{/domains/{name}(name=${name})}">
+
+			<div class="field">
+				<label for="name">Domain</label>
+				<input type="text" id="name" name="name" th:value="${name}" required autofocus
+					   placeholder="example.com">
+			</div>
+
+			<div class="button-panel">
+				<button type="submit" class="button">OK</button>
+				<button type="button" id="remove-button" class="button button-danger" th:unless="${isNew}">Remove</button>
+				<a class="button button-cancel" th:href="@{/domains}">Cancel</a>
+			</div>
+		</form>
+
+		<form id="delete-form" method="post" th:unless="${isNew}"
+			  th:action="@{/domains/{name}/delete(name=${name})}">
+		</form>
+	</main>
+
+	<div id="confirm-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>Remove this domain? Applications and local websites already using it will keep working, but will
+				show a warning until you assign them to a different domain. This cannot be undone.</p>
+			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
+			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<script th:src="@{/js/edit-domain.js}"></script>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

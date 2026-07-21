@@ -18,7 +18,7 @@
 		</p>
 
 		<form id="app-form" method="post"
-			  th:action="${isNew} ? @{/apps} : @{/apps/{subdomain}(subdomain=${app.subdomain()})}">
+			  th:action="${isNew} ? @{/apps} : @{/apps/{fqdn}(fqdn=${app.fqdn()})}">
 
 			<div class="field">
 				<label for="type">Type</label>
@@ -49,6 +49,15 @@
 					<input type="text" id="subdomain" name="subdomain" th:value="${app.subdomain()}"
 						   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen">
+				</div>
+
+				<div class="field" id="domain-field">
+					<label for="domain">Domain</label>
+					<select id="domain" name="domain">
+						<option th:each="d : ${domains}" th:value="${d.name()}"
+								th:text="${d.primary()} ? ${d.name()} + ' (primary)' : ${d.name()}"
+								th:selected="${d.name() == app.domain()}"></option>
+					</select>
 				</div>
 
 				<div class="field">
@@ -131,7 +140,7 @@
 		</form>
 
 		<form id="delete-form" method="post"
-			  th:action="${isNew} ? '' : @{/apps/{subdomain}/delete(subdomain=${app.subdomain()})}">
+			  th:action="${isNew} ? '' : @{/apps/{fqdn}/delete(fqdn=${app.fqdn()})}">
 		</form>
 	</main>
 
@@ -145,7 +154,6 @@
 
 	<script th:inline="javascript">
 		window.selfieProxy = {
-			domain: /*[[${domain}]]*/ 'example.com',
 			isNew: /*[[${isNew}]]*/ false
 		};
 	</script>

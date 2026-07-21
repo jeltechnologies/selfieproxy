@@ -12,20 +12,23 @@
 		</ul>
 
 		<form id="website-form" method="post" enctype="multipart/form-data"
-			  th:action="${isNew} ? @{/local-websites} : @{/local-websites/{domain}(domain=${website.domain()})}">
-
-			<div class="field" id="domain-mode-field">
-				<label>Domain</label>
-				<label><input type="radio" name="ownDomain" value="false" th:checked="${!website.ownDomain()}"> <span th:text="'Subdomain of ' + ${domain}"></span></label>
-				<label><input type="radio" name="ownDomain" value="true" th:checked="${website.ownDomain()}"> Other domain</label>
-			</div>
+			  th:action="${isNew} ? @{/local-websites} : @{/local-websites/{fqdn}(fqdn=${website.fqdn()})}">
 
 			<div class="field-row">
-				<div class="field" id="domain-field">
-					<label for="domain">Subdomain</label>
-					<input type="text" id="domain" name="domain" th:value="${website.domain()}" required
-						   th:pattern="${website.ownDomain()} ? '\S*' : '[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?'"
-						   th:title="${website.ownDomain()} ? 'Domain cannot contain a space' : 'Only letters, numbers, and hyphens -- cannot start or end with a hyphen'">
+				<div class="field" id="label-field">
+					<label for="label">Subdomain</label>
+					<input type="text" id="label" name="label" th:value="${website.label()}"
+						   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen">
+				</div>
+
+				<div class="field" id="domain-select-field">
+					<label for="domainSelect">Of domain</label>
+					<select id="domainSelect" name="domain">
+						<option th:each="d : ${domains}" th:value="${d.name()}"
+								th:text="${d.primary()} ? ${d.name()} + ' (primary)' : ${d.name()}"
+								th:selected="${d.name() == website.domain()}"></option>
+					</select>
 				</div>
 
 				<div class="field">
@@ -48,7 +51,7 @@
 		</form>
 
 		<form id="delete-form" method="post" th:unless="${isNew}"
-			  th:action="@{/local-websites/{domain}/delete(domain=${website.domain()})}">
+			  th:action="@{/local-websites/{fqdn}/delete(fqdn=${website.fqdn()})}">
 		</form>
 	</main>
 
@@ -60,11 +63,6 @@
 		</div>
 	</div>
 
-	<script th:inline="javascript">
-		window.selfieProxy = {
-			domain: /*[[${domain}]]*/ 'example.com'
-		};
-	</script>
 	<script th:src="@{/js/local-websites.js}"></script>
 
 	<footer th:replace="~{fragments/layout :: footer}"></footer>

@@ -1,7 +1,6 @@
 (function () {
 	"use strict";
 
-	var domain = (window.selfieProxy && window.selfieProxy.domain) || "";
 	var isNew = !!(window.selfieProxy && window.selfieProxy.isNew);
 	var ssoUserTouched = false;
 	// null until the first updateVisibility() run, then tracks whether single sign on protection was
@@ -13,6 +12,7 @@
 	var typeSelect = document.getElementById("type");
 	var protocolSelect = document.getElementById("protocol");
 	var subdomainInput = document.getElementById("subdomain");
+	var domainSelect = document.getElementById("domain");
 	var nameInput = document.getElementById("name");
 	var exposedPortInput = document.getElementById("exposedPort");
 	var portInput = document.getElementById("port");
@@ -91,6 +91,7 @@
 	}
 
 	function updateResult() {
+		var domain = domainSelect.value;
 		if (isNetworkService()) {
 			var port = exposedPortInput.value;
 			resultInput.textContent = domain + (port ? ":" + port : "");
@@ -111,6 +112,7 @@
 		refresh();
 	});
 	subdomainInput.addEventListener("input", refresh);
+	domainSelect.addEventListener("change", updateResult);
 	exposedPortInput.addEventListener("input", updateResult);
 	tlsModeRadios.forEach(function (radio) {
 		radio.addEventListener("change", updateVisibility);
