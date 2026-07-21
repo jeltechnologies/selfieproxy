@@ -120,7 +120,9 @@ forwarding through another reverse proxy breaks both.
 
 **Is this secure?** The homelab-to-server tunnel is encrypted, the server is under your own
 control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
-app) sits behind login. It's open source.
+app) sits behind login. Repeated failed login attempts are throttled with an increasing
+delay, capped at 15 minutes, so password-guessing scripts get slower with every attempt
+without ever locking a legitimate user out for longer than that. It's open source.
 
 **What's in a configuration export?** Every homelab, application, and static website —
 including website files — in a single ZIP you can store safely or move to a new server.
