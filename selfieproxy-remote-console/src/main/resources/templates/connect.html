@@ -11,13 +11,17 @@
 	<link rel="icon" type="image/png" sizes="16x16" th:href="@{/img/favicon/favicon-16x16.png}">
 	<link rel="icon" type="image/png" sizes="32x32" th:href="@{/img/favicon/favicon-32x32.png}">
 	<link rel="apple-touch-icon" sizes="180x180" th:href="@{/img/favicon/apple-touch-icon.png}">
-	<link rel="manifest" th:href="@{/site.webmanifest}">
+	<!-- crossorigin="use-credentials" -- without it, browsers fetch the manifest without
+	     cookies even same-origin, so it never carries the SSO session cookie; since every
+	     request to this always-SSO-gated domain gets redirected into the OIDC flow without
+	     a valid session, the credential-less fetch bounces into a cross-origin redirect with
+	     no CORS headers, which the browser then blocks and logs as a CORS error. -->
+	<link rel="manifest" th:href="@{/site.webmanifest}" crossorigin="use-credentials">
 	<meta name="theme-color" content="#ffffff">
 </head>
 <body>
 	<header class="toolbar">
 		<span class="console-name" th:text="${console.name()} + ' (' + ${console.mode()} + ')'"></span>
-		<span class="rdp-hint" th:if="${console.mode().name() == 'RDP'}">Switch to fullscreen mode if you see nothing on this screen</span>
 		<span id="status" class="status">Connecting...</span>
 		<button type="button" id="fullscreen-button">Fullscreen</button>
 		<button type="button" id="disconnect-button">Disconnect</button>
@@ -33,7 +37,8 @@
 		// this comment used /* */ and quoted the inlining syntax inside it, which
 		// closed the comment early and broke the whole script.)
 		window.selfieProxyConsole = {
-			fqdn: /*[[${fqdn}]]*/ ""
+			fqdn: /*[[${fqdn}]]*/ "",
+			mode: /*[[${console.mode().name()}]]*/ ""
 		};
 		window.selfieProxyConsole.wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://")
 			+ window.location.host + "/connect/" + window.selfieProxyConsole.fqdn + "/ws";

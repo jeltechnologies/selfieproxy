@@ -1,9 +1,12 @@
 package online.selfieproxy.remoteconsole.ws;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.SubProtocolCapable;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketMessage;
@@ -38,7 +41,7 @@ import online.selfieproxy.remoteconsole.security.RemoteConsoleCredentialCipher;
  * model.
  */
 @Component
-public class GuacamoleWebSocketHandler implements WebSocketHandler {
+public class GuacamoleWebSocketHandler implements WebSocketHandler, SubProtocolCapable {
 
 	private static final Logger log = LoggerFactory.getLogger(GuacamoleWebSocketHandler.class);
 	private static final String TUNNEL_ATTRIBUTE = "guacamoleTunnel";
@@ -128,6 +131,21 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 		return false;
 	}
 
+	/**
+	 * guacamole-common-js always opens its WebSocket with "guacamole" as the
+	 * requested subprotocol (the second argument to the native WebSocket
+	 * constructor). Per RFC 6455 4.2.2, if a client requests a subprotocol the
+	 * server's 101 response must echo one back, or the client must fail the
+	 * connection -- Spring's DefaultHandshakeHandler only does that echoing
+	 * for handlers that declare themselves SubProtocolCapable, so without this
+	 * every real browser (which enforces the spec) rejects the handshake
+	 * outright, even though the raw byte-level upgrade otherwise succeeds.
+	 */
+	@Override
+	public List<String> getSubProtocols() {
+		return List.of("guacamole");
+	}
+
 	private GuacamoleTunnel tunnelOf(WebSocketSession session) {
 		return (GuacamoleTunnel) session.getAttributes().get(TUNNEL_ATTRIBUTE);
 	}
@@ -204,16 +222,14 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 				// just silently ignores the resize request rather than erroring -- there is
 				// no unsafe fallback case here, only "dynamic resize doesn't happen."
 				config.setParameter("resize-method", "display-update");
-				// Against this same xrdp target, the RDPGFX graphics pipeline (guacd's
-				// AVC420/444/Progressive-codec path) reliably fails to paint anything on
-				// first connect -- the cursor (a separate, always-on channel) moves fine,
-				// but the desktop framebuffer itself stays solid black until a
-				// display-update resize forces guacd to tear down and rebuild the GFX
-				// surface, at which point it paints once, then goes blank again on the
-				// next resize. Falling back to guacd's classic (pre-GFX) bitmap-update
-				// rendering avoids that surface-binding bug entirely -- more bandwidth,
-				// but it paints immediately and doesn't depend on a resize to "kick" it.
-				config.setParameter("disable-gfx", "true");
+				// disable-gfx deliberately left unset -- guacd's default (modern
+				// RDPGFX/AVC pipeline) is used, matching Termix's own guacd defaults
+				// (Termix-SSH/Termix's guacamole-server.ts doesn't set it either). An
+				// earlier investigation on 2026-07-22 concluded this flag needed to stay
+				// on, but that conclusion was confounded by an unrelated bug (see
+				// GuacamoleWebSocketHandler's SubProtocolCapable implementation and
+				// selfieproxy-remote-console/CLAUDE.md) -- once that was fixed, GFX
+				// worked fine against the same target.
 			}
 			case VNC -> {
 				if (console.username() != null) {

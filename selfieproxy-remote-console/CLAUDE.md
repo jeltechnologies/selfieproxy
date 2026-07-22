@@ -90,16 +90,84 @@ Its own always-SSO-gated domain carve-out in `selfieproxy-reverseproxy`
 Homelab-management tooling, never reachable by a login-only User). See
 `selfieproxy-reverseproxy/CLAUDE.md`'s "Console domain" section.
 
-## Known limitation: RDP sometimes needs a resize to "kick" the first paint
+## Fixed: browser WebSocket handshake was rejected outright (missing subprotocol echo)
 
-Investigated 2026-07-22 against a real Kubuntu/xrdp target. Symptom: right after connecting
-(and again after leaving fullscreen), the display can render solid blank/black — but the
-session is genuinely alive the whole time (status shows "Connected", and if you move the
-mouse you see the remote cursor icon move over the blank area). Toggling fullscreen once
-reliably makes the desktop actually paint.
+Found 2026-07-22, and unrelated to the RDP-specific issue below even though it produced
+similar-looking symptoms: `GuacamoleWebSocketHandler` never implemented Spring's
+`SubProtocolCapable`, so Spring's `DefaultHandshakeHandler` never echoed a
+`Sec-WebSocket-Protocol` response header even though guacamole-common-js always opens its
+tunnel requesting the `"guacamole"` subprotocol. Per RFC 6455 §4.2.2, a client that requests a
+subprotocol must fail the connection if the server's 101 response doesn't confirm one back —
+every real, spec-compliant browser (verified against both Chrome and Brave) rejected the
+handshake instantly as a result, every single time, regardless of network, browser, or any
+RDP-side setting. This is why the connection appeared to die right around
+`RDPDR user logged on` in guacd's logs: that's guacd's *own* FreeRDP-side negotiation thread
+continuing independently after the browser had already aborted the WebSocket entirely, not
+guacd itself failing. A raw scripted WebSocket client doesn't validate this RFC requirement,
+which is why every scripted reproduction during this investigation appeared to work fine and
+initially pointed away from the real cause. Fixed by having
+`GuacamoleWebSocketHandler` implement `SubProtocolCapable` and return `List.of("guacamole")`.
 
-What was ruled out / fixed along the way (all still in place, all correct — this section is
-about the one remaining gap, not a to-do list):
+This also means two conclusions reached earlier in this same investigation, before the
+subprotocol bug was found, were confounded by it and are **not reliable**:
+- The conclusion that `disable-gfx=true` "must stay on" (a same-target guacd test with it
+  removed reproduced the exact same hang-at-RDPDR symptom) was actually just this subprotocol
+  bug again, present in both configurations tested. Whether GFX vs classic bitmap rendering
+  actually matters against this target is still genuinely unresolved -- `disable-gfx=true` is
+  left in place below since it's the last known-working setting, not because it was re-verified
+  against a clean baseline.
+- A reverseproxy-layer fix (skipping the SSO sliding-idle cookie refresh for WebSocket upgrade
+  requests, since staging a `Set-Cookie` header on a `ResponseWriter` about to be hijacked was
+  suspected of corrupting the handshake) was reverted -- it never actually addressed a real
+  bug, it only appeared to help because, again, none of the scripted tests validated the
+  subprotocol requirement either way.
+
+## Fixed: RDP rendered solid blank/black until a manual fullscreen toggle
+
+Investigated 2026-07-22 against a real Kubuntu/xrdp target, once the subprotocol bug above was
+separately fixed and connections could actually stay alive. Symptom: right after connecting
+(and again after leaving fullscreen), the display could render solid blank/black — but the
+session was genuinely alive the whole time (status shows "Connected", and if you move the
+mouse you see the remote cursor icon move over the blank area, and keyboard/mouse input
+worked normally). Toggling fullscreen once reliably made the desktop actually paint.
+
+This was **not** the xrdp/RandR-level "won't repaint without a resolution change" quirk it
+initially looked like (that theory, and a citation of upstream xrdp/Guacamole issues about it,
+was wrong -- left here as a note against re-treading it). Live testing ruled it out directly:
+- `client.sendSize()` calls of every kind were tried against the real target -- a 2px-short
+  connect immediately corrected up, the exact same size re-sent, a small placeholder (640x480)
+  jumped to the true size, at multiple delays (0ms, 100ms, 300ms, 4000ms) -- and **none of them
+  ever made it paint** in the normal (non-fullscreen) window.
+- A genuine, large, manual **OS-level window resize** (dragging the browser window itself
+  bigger/smaller, no fullscreen involved) also never fixed it.
+- Only the Fullscreen API transition itself ever did -- despite calling the exact same
+  `client.sendSize()` as every other path.
+
+Since resizing (of any size, magnitude, or timing) never helped except via Fullscreen
+specifically, the real cause was a **browser-side canvas compositing issue**, not a
+server/xrdp-side repaint quirk: RDPGFX/AVC-decoded frames land in a GPU-composited canvas
+layer, and that layer can get stuck showing nothing until the browser is forced to recomposite
+it. Entering fullscreen forces exactly that (tearing down and rebuilding the element's render
+layer as a side effect of the Fullscreen API transition) -- the resize that happens to
+accompany it is incidental, not the actual fix.
+
+Confirmed by comparing against [Termix-SSH/Termix](https://github.com/Termix-SSH/Termix)'s own
+guacd-based RDP viewer (`src/ui/features/guacamole/GuacamoleDisplay.tsx`): it never asks the
+server to match the window size at all. It fits the canvas to its container purely client-side,
+via `Guacamole.Display.scale()` -- a CSS **transform**, not a resize/layout change. A `display:
+none`/`''` toggle (forcing a full layout-tree removal) was tried here first and did **not**
+fix it -- browsers treat transform changes very differently from layout removal for
+GPU-composited content. Nudging `Display.scale()` away from and back to `1` (an effectively
+invisible, momentary transform change) forces the same recomposite Termix gets from its own
+scale-to-fit logic, live-verified working against the real target.
+
+`connect.js`'s `forceRepaint()` does this nudge (`display.scale(0.999999)` then, on the next
+animation frame, `display.scale(1)`), called once right after the tunnel reaches Connected, and
+again after every real `sendSize()` from `requestRemoteResize()` (window resize/fullscreenchange,
+including leaving fullscreen back to the windowed view) for consistency. SSH/VNC don't have
+this bug and are untouched.
+
+What was ruled out / fixed along the way getting here (all still in place, all correct):
 
 - `resize-method=reconnect` (a first attempt at making `client.sendSize()` do anything for
   RDP) was **actively harmful**, not just ineffective: it sent guacd's internal FreeRDP client
@@ -107,8 +175,7 @@ about the one remaining gap, not a to-do list):
   of whether the browser ever resized — RDPDR channel renegotiation failing on every cycle,
   the same fragility tracked upstream as
   [GUACAMOLE-876](https://issues.apache.org/jira/browse/GUACAMOLE-876)/
-  [GUACAMOLE-900](https://issues.apache.org/jira/browse/GUACAMOLE-900). That alone produced
-  most of what looked like "blank until fullscreen" at the time. Replaced with
+  [GUACAMOLE-900](https://issues.apache.org/jira/browse/GUACAMOLE-900). Replaced with
   `resize-method=display-update` (RDP's own Display Control channel, no reconnect involved) —
   confirmed working cleanly against this xrdp target (`Display update channel will be used
   for display size changes` / `Server resized display to WxH` in guacd's logs, no storm).
@@ -124,23 +191,12 @@ about the one remaining gap, not a to-do list):
 - A guard in `connect.js`'s `requestRemoteResize()` discards any `sendSize()` call where
   width or height reads below 100px — exiting fullscreen can report a transient near-zero
   `clientWidth`/`clientHeight` before the browser finishes reflowing `display-container` back
-  into the page, and sending that straight through blanks the display with nothing afterward
-  to correct it (no further resize/repaint is ever triggered on its own once
-  `fullscreenchange` has already fired once).
-- `disable-gfx=true` (forcing guacd's classic pre-GFX bitmap-update rendering instead of the
-  AVC420/444/Progressive-codec RDPGFX pipeline) was tried on the theory that RDPGFX surface
-  binding was the culprit, since the cursor (a separate, always-on channel) renders while the
-  framebuffer doesn't. **Did not fix it** — ruled out, left disabled again would be a wasted
-  bandwidth trade for no benefit, but the flag itself is harmless if re-enabled later for
-  other reasons.
+  into the page.
+- `disable-gfx` is deliberately left **unset** (guacd's default modern RDPGFX/AVC pipeline),
+  matching Termix's own guacd defaults, which don't set it either. An earlier "live test" had
+  concluded this flag needed to stay on, but that was confounded by the subprotocol bug above
+  (present with the flag either way) -- once that was fixed, GFX worked fine against this
+  target with the flag removed.
 
-Still open: something about the very first framebuffer after connect (and again after the
-post-fullscreen-exit reconnect-via-display-update) doesn't reach the canvas until a
-`display-update` resize forces guacd to rebuild/redraw. Whether that's an xrdp-side quirk on
-this particular Homelab (eg. a compositor not repainting for a hidden/off-screen virtual
-display until RandR reports a mode change) or something in guacd's own repaint-after-resize
-path wasn't isolated — `disable-gfx` ruled out the GFX pipeline specifically, but nothing else
-was tested (eg. `enable-desktop-composition`, forcing a synthetic `client.sendSize()` call
-immediately post-connect as a deliberate "kick" rather than a real resize, or a different
-target xrdp version). The known-working workaround for a user hitting this is simply:
-toggle fullscreen once after connecting.
+Live-verified 2026-07-22, working end to end: connects and paints immediately in the normal
+windowed view, no manual fullscreen toggle needed, GFX pipeline enabled (no `disable-gfx`).

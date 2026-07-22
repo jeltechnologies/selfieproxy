@@ -43,6 +43,8 @@
 		return n - (n % 2);
 	}
 
+	var isRdp = window.selfieProxyConsole.mode === "RDP";
+
 	// Reported display size/DPI -- the server-side connection details
 	// (protocol/host/port/credentials) are already fully configured by
 	// selfieproxy-remote-console's GuacamoleConfiguration, so this connect()
@@ -52,6 +54,42 @@
 		"&height=" + evenDown(displayContainer.clientHeight) +
 		"&dpi=96"
 	);
+
+	// Live testing narrowed this down further than the CLAUDE.md history below
+	// suggests: neither a marginal nor a dramatic resize (of any timing) ever
+	// made RDP paint in the normal (non-fullscreen) window, but the Fullscreen
+	// API transition always did -- even though both paths call the identical
+	// client.sendSize(). A display:none/'' toggle (forcing a full layout-tree
+	// removal/re-add) didn't help either. Comparing against Termix-SSH/Termix's
+	// own guacd-based RDP viewer (GuacamoleDisplay.tsx) found the actual
+	// difference: it never relies on the server matching the window size at
+	// all -- it fits the canvas to the container via Guacamole.Display's own
+	// scale() method, a CSS *transform*, not a layout change. Browsers handle
+	// transform changes very differently from display:none for GPU-composited
+	// canvas content (which is exactly what the RDPGFX/AVC decode path
+	// produces) -- a transform nudge can force a recomposite that a layout
+	// removal doesn't. Nudging the scale away from and back to 1 forces that
+	// same recomposite without actually changing the visual size.
+	function forceRepaint() {
+		var display = client.getDisplay();
+		display.scale(0.999999);
+		requestAnimationFrame(function () {
+			display.scale(1);
+		});
+	}
+
+	if (isRdp) {
+		var kicked = false;
+		client.onstatechange = (function (original) {
+			return function (state) {
+				original(state);
+				if (state === 3 && !kicked) {
+					kicked = true;
+					forceRepaint();
+				}
+			};
+		})(client.onstatechange);
+	}
 
 	window.addEventListener("beforeunload", function () {
 		client.disconnect();
@@ -85,6 +123,9 @@
 				return;
 			}
 			client.sendSize(width, height);
+			if (isRdp) {
+				forceRepaint();
+			}
 		}, 100);
 	}
 	window.addEventListener("resize", requestRemoteResize);

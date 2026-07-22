@@ -19,15 +19,6 @@ html, body {
 	font-weight: 600;
 }
 
-/* See selfieproxy-remote-console/CLAUDE.md's "Known limitation" section -- an RDP session can
-   render solid blank/black right after connect (and again after leaving fullscreen) until a
-   resize forces guacd to repaint; toggling fullscreen is the known workaround. */
-.rdp-hint {
-	color: #aaa;
-	font-size: 0.85rem;
-	font-style: italic;
-}
-
 .status {
 	margin-left: auto;
 	color: #aaa;
