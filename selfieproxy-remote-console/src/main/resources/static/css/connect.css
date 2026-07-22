@@ -45,3 +45,11 @@ html, body {
 	align-items: center;
 	justify-content: center;
 }
+
+/* The toolbar isn't part of the fullscreen element (only #display-container
+   is made fullscreen, not the whole page), so the 48px reserved for it above
+   doesn't apply here -- keeping that subtraction while fullscreen requested a
+   remote resolution 48px shorter than the real screen on every resize. */
+#display-container:fullscreen {
+	height: 100%;
+}

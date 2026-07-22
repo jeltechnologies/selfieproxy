@@ -9,17 +9,30 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.server.HandshakeInterceptor;
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Spring's WebSocketHandlerRegistry has no built-in path-variable binding
  * (unlike @GetMapping's {id}), so this interceptor pulls the console id out
  * of the upgrade request's own path (/connect/{id}/ws) and stashes it into
- * the session attributes GuacamoleWebSocketHandler reads from.
+ * the session attributes GuacamoleWebSocketHandler reads from. Also captures
+ * the width/height/dpi query params connect.js's initial client.connect(...)
+ * call sends -- Guacamole.WebSocketTunnel only ever appends these to the WS
+ * URL's query string, it never becomes part of the actual Guacamole wire
+ * protocol on its own, so without reading them here and feeding them into
+ * GuacamoleConfiguration before the ConfiguredGuacamoleSocket handshake, the
+ * session starts at whatever default resolution guacd/FreeRDP falls back to
+ * regardless of the browser's actual window size -- for RDP specifically this
+ * rendered as a blank display until the first later client.sendSize() call
+ * (eg. from a fullscreen toggle) forced a real resize.
  */
 @Component
 public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
 
 	public static final String CONSOLE_ID_ATTRIBUTE = "consoleId";
+	public static final String DISPLAY_WIDTH_ATTRIBUTE = "displayWidth";
+	public static final String DISPLAY_HEIGHT_ATTRIBUTE = "displayHeight";
+	public static final String DISPLAY_DPI_ATTRIBUTE = "displayDpi";
 
 	private static final Pattern PATH_PATTERN = Pattern.compile("/connect/([^/]+)/ws$");
 
@@ -30,7 +43,22 @@ public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
 		if (matcher.find()) {
 			attributes.put(CONSOLE_ID_ATTRIBUTE, matcher.group(1));
 		}
+
+		Map<String, java.util.List<String>> query = UriComponentsBuilder.fromUri(request.getURI())
+				.build().getQueryParams();
+		putIfPresent(attributes, DISPLAY_WIDTH_ATTRIBUTE, query, "width");
+		putIfPresent(attributes, DISPLAY_HEIGHT_ATTRIBUTE, query, "height");
+		putIfPresent(attributes, DISPLAY_DPI_ATTRIBUTE, query, "dpi");
+
 		return true;
+	}
+
+	private void putIfPresent(Map<String, Object> attributes, String attributeName,
+			Map<String, java.util.List<String>> query, String paramName) {
+		java.util.List<String> values = query.get(paramName);
+		if (values != null && !values.isEmpty()) {
+			attributes.put(attributeName, values.get(0));
+		}
 	}
 
 	@Override

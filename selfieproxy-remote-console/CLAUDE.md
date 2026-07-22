@@ -84,3 +84,58 @@ Its own always-SSO-gated domain carve-out in `selfieproxy-reverseproxy`
 `-portal-domain`, including the admin-only `is_admin` check (Remote Consoles are
 Homelab-management tooling, never reachable by a login-only User). See
 `selfieproxy-reverseproxy/CLAUDE.md`'s "Console domain" section.
+
+## Known limitation: RDP sometimes needs a resize to "kick" the first paint
+
+Investigated 2026-07-22 against a real Kubuntu/xrdp target. Symptom: right after connecting
+(and again after leaving fullscreen), the display can render solid blank/black — but the
+session is genuinely alive the whole time (status shows "Connected", and if you move the
+mouse you see the remote cursor icon move over the blank area). Toggling fullscreen once
+reliably makes the desktop actually paint.
+
+What was ruled out / fixed along the way (all still in place, all correct — this section is
+about the one remaining gap, not a to-do list):
+
+- `resize-method=reconnect` (a first attempt at making `client.sendSize()` do anything for
+  RDP) was **actively harmful**, not just ineffective: it sent guacd's internal FreeRDP client
+  into a repeated disconnect/reconnect storm for ~30s after every single connect, independent
+  of whether the browser ever resized — RDPDR channel renegotiation failing on every cycle,
+  the same fragility tracked upstream as
+  [GUACAMOLE-876](https://issues.apache.org/jira/browse/GUACAMOLE-876)/
+  [GUACAMOLE-900](https://issues.apache.org/jira/browse/GUACAMOLE-900). That alone produced
+  most of what looked like "blank until fullscreen" at the time. Replaced with
+  `resize-method=display-update` (RDP's own Display Control channel, no reconnect involved) —
+  confirmed working cleanly against this xrdp target (`Display update channel will be used
+  for display size changes` / `Server resized display to WxH` in guacd's logs, no storm).
+- Odd-pixel width/height (eg. a browser content-box height landing on an odd number) is
+  fixed client-side by flooring to the nearest even number before both the initial
+  `client.connect()` call and every `client.sendSize()` (`evenDown()` in `connect.js`) — RDP's
+  GFX/AVC pipeline chroma-subsamples in 2x2 blocks and can silently fail to decode an odd
+  dimension into any visible frame.
+- The `#display-container:fullscreen` CSS override (`height: 100%`, not the windowed view's
+  `calc(100% - 48px)`) fixes a real aspect-ratio bug: the toolbar isn't part of the
+  fullscreen element, so subtracting its height while fullscreen requested a resolution 48px
+  shorter than the true screen.
+- A guard in `connect.js`'s `requestRemoteResize()` discards any `sendSize()` call where
+  width or height reads below 100px — exiting fullscreen can report a transient near-zero
+  `clientWidth`/`clientHeight` before the browser finishes reflowing `display-container` back
+  into the page, and sending that straight through blanks the display with nothing afterward
+  to correct it (no further resize/repaint is ever triggered on its own once
+  `fullscreenchange` has already fired once).
+- `disable-gfx=true` (forcing guacd's classic pre-GFX bitmap-update rendering instead of the
+  AVC420/444/Progressive-codec RDPGFX pipeline) was tried on the theory that RDPGFX surface
+  binding was the culprit, since the cursor (a separate, always-on channel) renders while the
+  framebuffer doesn't. **Did not fix it** — ruled out, left disabled again would be a wasted
+  bandwidth trade for no benefit, but the flag itself is harmless if re-enabled later for
+  other reasons.
+
+Still open: something about the very first framebuffer after connect (and again after the
+post-fullscreen-exit reconnect-via-display-update) doesn't reach the canvas until a
+`display-update` resize forces guacd to rebuild/redraw. Whether that's an xrdp-side quirk on
+this particular Homelab (eg. a compositor not repainting for a hidden/off-screen virtual
+display until RandR reports a mode change) or something in guacd's own repaint-after-resize
+path wasn't isolated — `disable-gfx` ruled out the GFX pipeline specifically, but nothing else
+was tested (eg. `enable-desktop-composition`, forcing a synthetic `client.sendSize()` call
+immediately post-connect as a deliberate "kick" rather than a real resize, or a different
+target xrdp version). The known-working workaround for a user hitting this is simply:
+toggle fullscreen once after connecting.

@@ -66,9 +66,10 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 		}
 
 		try {
+			GuacamoleConfiguration config = buildConfiguration(console, session);
 			GuacamoleSocket socket = new ConfiguredGuacamoleSocket(
 					new InetGuacamoleSocket(guacdProperties.host(), guacdProperties.port()),
-					buildConfiguration(console));
+					config);
 			GuacamoleTunnel tunnel = new SimpleGuacamoleTunnel(socket);
 			session.getAttributes().put(TUNNEL_ATTRIBUTE, tunnel);
 			startRelayThread(session, tunnel);
@@ -156,11 +157,21 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 	 * own text directly (Guacamole's ssh-agent/private-key parameter accepts the
 	 * key contents, not a file path).
 	 */
-	private GuacamoleConfiguration buildConfiguration(RemoteConsole console) {
+	private GuacamoleConfiguration buildConfiguration(RemoteConsole console, WebSocketSession session) {
 		GuacamoleConfiguration config = new GuacamoleConfiguration();
 		config.setProtocol(console.protocol().name().toLowerCase());
 		config.setParameter("hostname", "127.0.0.1");
 		config.setParameter("port", String.valueOf(console.tunnelPort()));
+
+		// The browser's initial client.connect("width=...&height=...&dpi=...")
+		// call only ever reaches us as this WebSocket's own query string (see
+		// ConsoleIdHandshakeInterceptor's javadoc) -- feed it into the
+		// configuration so the session starts at a real resolution from the
+		// first frame, instead of relying on a later client.sendSize() (eg. a
+		// fullscreen toggle) to fix it up after the fact.
+		setIfPresent(config, "width", session, ConsoleIdHandshakeInterceptor.DISPLAY_WIDTH_ATTRIBUTE);
+		setIfPresent(config, "height", session, ConsoleIdHandshakeInterceptor.DISPLAY_HEIGHT_ATTRIBUTE);
+		setIfPresent(config, "dpi", session, ConsoleIdHandshakeInterceptor.DISPLAY_DPI_ATTRIBUTE);
 
 		String secret = cipher.decrypt(console.encryptedSecret());
 
@@ -184,6 +195,28 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 				}
 				config.setParameter("ignore-cert", String.valueOf(console.ignoreCertificate()));
 				config.setParameter("security", "any");
+				// "reconnect" was tried and reverted -- against a real xrdp target it sent
+				// guacd's internal FreeRDP client into a repeated disconnect/reconnect storm
+				// for ~30s after every single connect (RDPDR channel renegotiation failing
+				// each time), independent of whether the browser ever actually resized --
+				// the same RDPDR/reconnect fragility tracked upstream as GUACAMOLE-876/900.
+				// "display-update" asks the server to resize the existing session in place
+				// over RDP's own Display Control channel instead of tearing the connection
+				// down, so it doesn't hit that failure mode. Per Guacamole's own docs, a
+				// server that doesn't support it (older non-xrdp/non-Windows-8.1+ targets)
+				// just silently ignores the resize request rather than erroring -- there is
+				// no unsafe fallback case here, only "dynamic resize doesn't happen."
+				config.setParameter("resize-method", "display-update");
+				// Against this same xrdp target, the RDPGFX graphics pipeline (guacd's
+				// AVC420/444/Progressive-codec path) reliably fails to paint anything on
+				// first connect -- the cursor (a separate, always-on channel) moves fine,
+				// but the desktop framebuffer itself stays solid black until a
+				// display-update resize forces guacd to tear down and rebuild the GFX
+				// surface, at which point it paints once, then goes blank again on the
+				// next resize. Falling back to guacd's classic (pre-GFX) bitmap-update
+				// rendering avoids that surface-binding bug entirely -- more bandwidth,
+				// but it paints immediately and doesn't depend on a resize to "kick" it.
+				config.setParameter("disable-gfx", "true");
 			}
 			case VNC -> {
 				if (console.username() != null) {
@@ -196,5 +229,13 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 		}
 
 		return config;
+	}
+
+	private void setIfPresent(GuacamoleConfiguration config, String parameterName, WebSocketSession session,
+			String attributeName) {
+		Object value = session.getAttributes().get(attributeName);
+		if (value != null) {
+			config.setParameter(parameterName, value.toString());
+		}
 	}
 }

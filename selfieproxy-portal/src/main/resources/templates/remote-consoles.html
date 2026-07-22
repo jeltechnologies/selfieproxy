@@ -36,7 +36,8 @@
 					<td th:attr="data-sort-value=${console.host()}" th:text="${console.host()} + ':' + ${console.port()}"></td>
 					<td>
 						<a class="button-small" th:href="'https://' + ${consoleDomain} + '/connect/' + ${console.id()}"
-						   target="_blank" rel="noopener">Connect</a>
+						   target="_blank" rel="noopener"
+						   onclick="window.open(this.href, '_blank', 'noopener'); return false;">Connect</a>
 						<a class="button-small" th:href="@{/remote-consoles/{id}/edit(id=${console.id()})}">Edit</a>
 					</td>
 				</tr>
