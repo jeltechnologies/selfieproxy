@@ -45,6 +45,17 @@
 
 	var isRdp = window.selfieProxyConsole.mode === "RDP";
 
+	// RDP/VNC's own OS clipboard sync (cliprdr et al) only updates the remote
+	// clipboard's *contents* -- unlike guacd's SSH terminal support, it never
+	// auto-inserts that text anywhere. The focused remote application still
+	// needs the actual Ctrl+V keystroke delivered to it so its own native
+	// Paste command fires and reads back the clipboard guacd just updated.
+	// SSH is the opposite: guacd's terminal emulation inserts received
+	// clipboard text into the pty directly on its own, so forwarding the
+	// literal keystroke there instead shows up as a stray ^V (readline's
+	// quoted-insert) -- see the keyboard handlers below.
+	var forwardPasteKeystroke = window.selfieProxyConsole.mode !== "SSH";
+
 	// Reported display size/DPI -- the server-side connection details
 	// (protocol/host/port/credentials) are already fully configured by
 	// selfieproxy-remote-console's GuacamoleConfiguration, so this connect()
@@ -136,20 +147,25 @@
 
 	var keyboard = new Guacamole.Keyboard(document);
 	keyboard.onkeydown = function (keysym) {
-		// Let Ctrl+V through as the browser's own native paste shortcut instead
-		// of forwarding it as a literal keystroke: returning true here (rather
-		// than the implicit undefined/falsy every other key returns) tells
-		// Guacamole.Keyboard not to preventDefault() this keydown, which is what
-		// was suppressing the browser's paste action entirely -- forwarding it
-		// as a keystroke too just showed up as a stray ^V (readline's
-		// quoted-insert) in the terminal, since paste itself was never firing.
+		// Always let Ctrl+V through as the browser's own native paste shortcut
+		// (never preventDefault it) -- that's what lets the "paste" listener
+		// below actually fire and push the clipboard text to guacd. On top of
+		// that, RDP/VNC also need the literal keystroke forwarded so the
+		// remote's own focused application performs its native paste; SSH
+		// does not (see forwardPasteKeystroke above).
 		if (keyboard.modifiers.ctrl && keysym === KEYSYM_V) {
+			if (forwardPasteKeystroke) {
+				client.sendKeyEvent(1, keysym);
+			}
 			return true;
 		}
 		client.sendKeyEvent(1, keysym);
 	};
 	keyboard.onkeyup = function (keysym) {
 		if (keyboard.modifiers.ctrl && keysym === KEYSYM_V) {
+			if (forwardPasteKeystroke) {
+				client.sendKeyEvent(0, keysym);
+			}
 			return true;
 		}
 		client.sendKeyEvent(0, keysym);
@@ -173,12 +189,15 @@
 		client.sendMouseState(state);
 	};
 
-	// Clipboard: paste into the session (browser -> remote) and copying *out*
-	// of it both work uniformly for SSH/RDP/VNC. Copy needs no client-side
-	// text-selection layer at all -- guacd's SSH support tracks mouse-drag
-	// selection server-side (using the same mouse events forwarded below) and
-	// sends the selected text back as a "clipboard" instruction, which
-	// client.onclipboard below already receives.
+	// Clipboard: copying *out* of the session works uniformly for SSH/RDP/VNC
+	// and needs no client-side text-selection layer at all -- guacd's SSH
+	// support tracks mouse-drag selection server-side (using the same mouse
+	// events forwarded below) and sends the selected text back as a
+	// "clipboard" instruction, which client.onclipboard below already
+	// receives. Pasting *in* (browser -> remote) shares this same
+	// sendClipboardText/paste-listener plumbing across all three protocols,
+	// but RDP/VNC additionally need the literal Ctrl+V keystroke forwarded
+	// too -- see forwardPasteKeystroke above.
 	function sendClipboardText(text) {
 		if (!text) {
 			return;
