@@ -1,0 +1,5 @@
+xterm.js 6.0.0 + @xterm/addon-fit 0.11.0
+Source: https://registry.npmjs.org/@xterm/xterm/-/xterm-6.0.0.tgz (lib/xterm.js)
+        https://registry.npmjs.org/@xterm/addon-fit/-/addon-fit-0.11.0.tgz (lib/addon-fit.js, renamed xterm-addon-fit.js)
+File:   xterm.js, xterm-addon-fit.js, and ../../css/vendor/xterm/xterm.css, all unmodified.
+License: MIT -- see LICENSE in this directory, and /THIRD-PARTY-NOTICES.md at the repo root.

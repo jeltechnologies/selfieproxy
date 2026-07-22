@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import online.selfieproxy.remoteconsole.domain.RemoteConsole;
+import online.selfieproxy.remoteconsole.domain.RemoteConsoleProtocol;
 import online.selfieproxy.remoteconsole.domain.RemoteConsoleStore;
 
 @Controller
@@ -25,6 +26,8 @@ public class ConnectController {
 		}
 		model.addAttribute("fqdn", fqdn);
 		model.addAttribute("console", console);
-		return "connect";
+		// SSH is bridged directly (xterm.js, see SshWebSocketHandler) rather than
+		// through guacd -- RDP/VNC keep the existing Guacamole-canvas page.
+		return console.mode() == RemoteConsoleProtocol.SSH ? "connect-terminal" : "connect";
 	}
 }

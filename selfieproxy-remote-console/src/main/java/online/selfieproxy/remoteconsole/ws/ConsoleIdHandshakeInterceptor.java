@@ -14,17 +14,22 @@ import org.springframework.web.util.UriComponentsBuilder;
 /**
  * Spring's WebSocketHandlerRegistry has no built-in path-variable binding
  * (unlike @GetMapping's {fqdn}), so this interceptor pulls the app's FQDN out
- * of the upgrade request's own path (/connect/{fqdn}/ws) and stashes it into
- * the session attributes GuacamoleWebSocketHandler reads from. Also captures
- * the width/height/dpi query params connect.js's initial client.connect(...)
- * call sends -- Guacamole.WebSocketTunnel only ever appends these to the WS
- * URL's query string, it never becomes part of the actual Guacamole wire
- * protocol on its own, so without reading them here and feeding them into
- * GuacamoleConfiguration before the ConfiguredGuacamoleSocket handshake, the
- * session starts at whatever default resolution guacd/FreeRDP falls back to
- * regardless of the browser's actual window size -- for RDP specifically this
- * rendered as a blank display until the first later client.sendSize() call
- * (eg. from a fullscreen toggle) forced a real resize.
+ * of the upgrade request's own path -- shared by both the guacd bridge
+ * (/connect/{fqdn}/ws) and the direct-SSH terminal bridge
+ * (/connect/{fqdn}/term, see SshWebSocketHandler) -- and stashes it into the
+ * session attributes each handler reads from. Also captures whichever
+ * per-protocol initial-size query params the browser side sent: width/height/
+ * dpi from connect.js's initial client.connect(...) call (Guacamole.WebSocketTunnel
+ * only ever appends these to the WS URL's query string, it never becomes part
+ * of the actual Guacamole wire protocol on its own, so without reading them
+ * here and feeding them into GuacamoleConfiguration before the
+ * ConfiguredGuacamoleSocket handshake, the session starts at whatever default
+ * resolution guacd/FreeRDP falls back to regardless of the browser's actual
+ * window size -- for RDP specifically this rendered as a blank display until
+ * the first later client.sendSize() call, eg. from a fullscreen toggle,
+ * forced a real resize), and cols/rows from terminal.js's initial connect for
+ * the same reason (so the PTY starts at the real terminal size instead of
+ * whatever default MINA SSHD falls back to).
  */
 @Component
 public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
@@ -33,8 +38,10 @@ public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
 	public static final String DISPLAY_WIDTH_ATTRIBUTE = "displayWidth";
 	public static final String DISPLAY_HEIGHT_ATTRIBUTE = "displayHeight";
 	public static final String DISPLAY_DPI_ATTRIBUTE = "displayDpi";
+	public static final String TERMINAL_COLS_ATTRIBUTE = "terminalCols";
+	public static final String TERMINAL_ROWS_ATTRIBUTE = "terminalRows";
 
-	private static final Pattern PATH_PATTERN = Pattern.compile("/connect/([^/]+)/ws$");
+	private static final Pattern PATH_PATTERN = Pattern.compile("/connect/([^/]+)/(?:ws|term)$");
 
 	@Override
 	public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
@@ -49,6 +56,8 @@ public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
 		putIfPresent(attributes, DISPLAY_WIDTH_ATTRIBUTE, query, "width");
 		putIfPresent(attributes, DISPLAY_HEIGHT_ATTRIBUTE, query, "height");
 		putIfPresent(attributes, DISPLAY_DPI_ATTRIBUTE, query, "dpi");
+		putIfPresent(attributes, TERMINAL_COLS_ATTRIBUTE, query, "cols");
+		putIfPresent(attributes, TERMINAL_ROWS_ATTRIBUTE, query, "rows");
 
 		return true;
 	}

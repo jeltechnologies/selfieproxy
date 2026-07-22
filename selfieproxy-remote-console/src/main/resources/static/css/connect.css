@@ -53,3 +53,20 @@ html, body {
 #display-container:fullscreen {
 	height: 100%;
 }
+
+/* xterm.js's own terminal.open() fills whatever container it's given -- unlike
+   #display-container, no flex-centering is wanted here, the terminal should
+   just fill the available space edge to edge. */
+#terminal-container {
+	height: calc(100% - 48px);
+	padding: 0.5rem;
+	box-sizing: border-box;
+}
+
+#terminal-container:fullscreen {
+	height: 100%;
+}
+
+#terminal-container .xterm {
+	height: 100%;
+}

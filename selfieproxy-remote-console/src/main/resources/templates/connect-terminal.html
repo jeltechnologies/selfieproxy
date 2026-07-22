@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${console.name()} + ' - Selfie Proxy Console'">Selfie Proxy Console</title>
+	<link rel="stylesheet" th:href="@{/css/connect.css}">
+	<link rel="stylesheet" th:href="@{/css/vendor/xterm/xterm.css}">
+
+	<link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+	<link rel="icon" th:href="@{/favicon.ico}" sizes="any">
+	<link rel="icon" type="image/png" sizes="16x16" th:href="@{/img/favicon/favicon-16x16.png}">
+	<link rel="icon" type="image/png" sizes="32x32" th:href="@{/img/favicon/favicon-32x32.png}">
+	<link rel="apple-touch-icon" sizes="180x180" th:href="@{/img/favicon/apple-touch-icon.png}">
+	<!-- crossorigin="use-credentials" -- see connect.html's own copy of this comment: without it
+	     the manifest fetch never carries the SSO session cookie, and gets blocked as a CORS error. -->
+	<link rel="manifest" th:href="@{/site.webmanifest}" crossorigin="use-credentials">
+	<meta name="theme-color" content="#ffffff">
+</head>
+<body>
+	<header class="toolbar">
+		<span class="console-name" th:text="${console.name()} + ' (' + ${console.mode()} + ')'"></span>
+		<span id="status" class="status">Connecting...</span>
+		<button type="button" id="fullscreen-button">Fullscreen</button>
+		<button type="button" id="disconnect-button">Disconnect</button>
+	</header>
+	<main id="terminal-container"></main>
+
+	<script th:inline="javascript">
+		// See connect.html's own copy of this comment -- built as two separate
+		// statements deliberately, Thymeleaf's JS inlining silently drops any text
+		// concatenated onto the same statement as an inlined placeholder.
+		window.selfieProxyConsole = {
+			fqdn: /*[[${fqdn}]]*/ "",
+			mode: /*[[${console.mode().name()}]]*/ ""
+		};
+		window.selfieProxyConsole.wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://")
+			+ window.location.host + "/connect/" + window.selfieProxyConsole.fqdn + "/term";
+	</script>
+	<script th:src="@{/js/vendor/xterm/xterm.js}"></script>
+	<script th:src="@{/js/vendor/xterm/xterm-addon-fit.js}"></script>
+	<script th:src="@{/js/terminal.js}"></script>
+</body>
+</html>

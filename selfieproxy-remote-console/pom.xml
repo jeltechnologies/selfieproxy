@@ -45,6 +45,15 @@
       <artifactId>guacamole-common</artifactId>
       <version>1.6.0</version>
     </dependency>
+    <!-- SSH client used for the direct SSH terminal path (xterm.js in the browser,
+         see terminal.js/SshWebSocketHandler). Unlike RDP/VNC, SSH is no longer bridged
+         through guacd at all, this dials the tunnel port directly. Apache-licensed, see
+         THIRD-PARTY-NOTICES.md; sshd-common comes in transitively via sshd-core. -->
+    <dependency>
+      <groupId>org.apache.sshd</groupId>
+      <artifactId>sshd-core</artifactId>
+      <version>2.19.0</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
