@@ -176,10 +176,14 @@ The edit page fields, in order:
      there's no public FQDN concept for them. Selecting one of these three reveals, inside the
      "Address in the homelab" fieldset (see below): **Username** (optional -- VNC often has none)
      and **Password** side by side on one line, always a real `<input type="password">` with no
-     view/reveal button and no placeholder text -- there is no private-key auth option, every mode
-     authenticates with a password only -- and **Accept a self-signed certificate on the target**
-     (RDP/VNC only). Port defaults per mode when Mode is changed (22/3389/5900), the same auto-fill
-     idiom the Protocol dropdown already has for HTTP/HTTPS. Leaving the password field blank on an
+     view/reveal button -- there is no private-key auth option, every mode authenticates with a
+     password only -- and **Accept a self-signed certificate on the target** (RDP/VNC only). On
+     edit, the password field shows a `••••••••` placeholder when a credential is already stored
+     (a fixed decoy, not the real password -- `<input placeholder>` is never submitted and never
+     puts the actual secret in the page) and no placeholder when adding or when none is stored yet,
+     so it's visually obvious whether a credential exists without ever exposing it. Port defaults
+     per mode when Mode is changed (22/3389/5900), the same auto-fill idiom the Protocol dropdown
+     already has for HTTP/HTTPS. Leaving the password field blank on an
      edit keeps the previously stored one unchanged; leaving it blank when adding is allowed too
      (eg. a VNC target with no password) -- see "Connecting" below for what happens then.
    **Subdomain** (Web application only): the label, composing the FQDN as `<subdomain>.<domain>`.

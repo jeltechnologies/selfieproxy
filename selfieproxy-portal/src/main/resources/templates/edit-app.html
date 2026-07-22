@@ -125,7 +125,8 @@
 
 					<div class="field" id="secret-field" style="display:none">
 						<label for="secret">Password</label>
-						<input type="password" id="secret" name="secret">
+						<input type="password" id="secret" name="secret"
+						   th:placeholder="${app.encryptedSecret() != null} ? '••••••••'">
 					</div>
 				</div>
 

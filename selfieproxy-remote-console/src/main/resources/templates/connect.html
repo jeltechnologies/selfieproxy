@@ -17,6 +17,7 @@
 <body>
 	<header class="toolbar">
 		<span class="console-name" th:text="${console.name()} + ' (' + ${console.mode()} + ')'"></span>
+		<span class="rdp-hint" th:if="${console.mode().name() == 'RDP'}">Switch to fullscreen mode if you see nothing on this screen</span>
 		<span id="status" class="status">Connecting...</span>
 		<button type="button" id="fullscreen-button">Fullscreen</button>
 		<button type="button" id="disconnect-button">Disconnect</button>
