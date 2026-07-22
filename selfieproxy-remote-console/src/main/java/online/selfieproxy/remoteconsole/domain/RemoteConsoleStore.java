@@ -14,25 +14,39 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Read-only view of remote-consoles.json (selfieproxy-portal owns writing
- * it -- see that module's RemoteConsoleStore/RemoteConsoleController). Reread
- * on every find() rather than cached, since the portal can add/edit/remove a
- * console at any time and this service has no way to be notified of that.
+ * Read-only view of exposed-apps.json (selfieproxy-portal owns writing it -- see that module's
+ * ExposedAppStore/ExposedAppController), keyed by FQDN exactly as that module writes it, filtered
+ * to SSH/RDP/VNC-mode Network Services -- every other entry (a Web Application, or a RAW_TCP
+ * Network Service) isn't something this service ever bridges. Reread on every find() rather than
+ * cached, since the portal can add/edit/remove an app at any time and this service has no way to
+ * be notified of that.
  */
 @Component
 public class RemoteConsoleStore {
 
+	private static final String NETWORK_SERVICE = "NETWORK_SERVICE";
+
 	private final Path filePath;
+	// Unknown properties (subdomain, protocol, tlsMode, ssoProtected, domain, Jackson's own
+	// derived isX()-style properties, and any future addition) are expected and ignored --
+	// this is a deliberately partial mirror of ExposedApp, see RemoteConsole's own javadoc.
 	private final ObjectMapper objectMapper = JsonMapper.builder()
 			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+			.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
 			.build();
 
-	public RemoteConsoleStore(@Value("${selfieproxy.remote-consoles-path}") String path) {
+	public RemoteConsoleStore(@Value("${selfieproxy.exposed-apps-path}") String path) {
 		this.filePath = Path.of(path);
 	}
 
-	public RemoteConsole find(String id) {
-		return readAll().get(id);
+	public RemoteConsole find(String fqdn) {
+		RemoteConsole app = readAll().get(fqdn);
+		return isRemoteAccessApp(app) ? app : null;
+	}
+
+	private boolean isRemoteAccessApp(RemoteConsole app) {
+		return app != null && NETWORK_SERVICE.equals(app.type()) && app.mode() != null
+				&& app.mode() != RemoteConsoleProtocol.RAW_TCP;
 	}
 
 	private Map<String, RemoteConsole> readAll() {

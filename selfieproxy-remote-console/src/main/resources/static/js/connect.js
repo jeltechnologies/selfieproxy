@@ -177,7 +177,7 @@
 	disconnectButton.addEventListener("click", function () {
 		client.disconnect();
 		// Only succeeds if this tab was opened via window.open() from script
-		// (see remote-consoles.html's Connect link) -- browsers refuse
+		// (see dashboard.html's Connect link) -- browsers refuse
 		// script-initiated close() on a tab that was opened by an ordinary
 		// link/direct navigation.
 		window.close();

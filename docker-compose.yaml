@@ -165,6 +165,7 @@ services:
       SERVER_PORT: "8083"
       GUACD_HOST: "127.0.0.1"
       GUACD_PORT: "4822"
+      DEBUG_MODE: "${DEBUG_MODE:-false}"
     volumes:
       - ./data/selfieproxy:/data
     healthcheck:

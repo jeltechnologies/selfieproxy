@@ -13,8 +13,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Spring's WebSocketHandlerRegistry has no built-in path-variable binding
- * (unlike @GetMapping's {id}), so this interceptor pulls the console id out
- * of the upgrade request's own path (/connect/{id}/ws) and stashes it into
+ * (unlike @GetMapping's {fqdn}), so this interceptor pulls the app's FQDN out
+ * of the upgrade request's own path (/connect/{fqdn}/ws) and stashes it into
  * the session attributes GuacamoleWebSocketHandler reads from. Also captures
  * the width/height/dpi query params connect.js's initial client.connect(...)
  * call sends -- Guacamole.WebSocketTunnel only ever appends these to the WS
@@ -29,7 +29,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
 
-	public static final String CONSOLE_ID_ATTRIBUTE = "consoleId";
+	public static final String CONSOLE_FQDN_ATTRIBUTE = "consoleFqdn";
 	public static final String DISPLAY_WIDTH_ATTRIBUTE = "displayWidth";
 	public static final String DISPLAY_HEIGHT_ATTRIBUTE = "displayHeight";
 	public static final String DISPLAY_DPI_ATTRIBUTE = "displayDpi";
@@ -41,7 +41,7 @@ public class ConsoleIdHandshakeInterceptor implements HandshakeInterceptor {
 			Map<String, Object> attributes) {
 		Matcher matcher = PATH_PATTERN.matcher(request.getURI().getPath());
 		if (matcher.find()) {
-			attributes.put(CONSOLE_ID_ATTRIBUTE, matcher.group(1));
+			attributes.put(CONSOLE_FQDN_ATTRIBUTE, matcher.group(1));
 		}
 
 		Map<String, java.util.List<String>> query = UriComponentsBuilder.fromUri(request.getURI())

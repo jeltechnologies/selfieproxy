@@ -149,7 +149,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreCreatesHomelabWithFreshSecretAndRecreatesExposedAppTunnel() throws IOException {
 		ExposedApp app = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8080, null, null, false, "example.com");
+				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1"), List.of(app), List.of());
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -183,9 +183,9 @@ class BackupServiceTest {
 	@Test
 	void diffManifestFlagsExistingItemsAgainstLiveState() {
 		ExposedApp existingApp = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8080, null, null, false, "example.com");
+				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);
 		ExposedApp newApp = new ExposedApp("shop", null, "lab2", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8081, null, null, false, "example.com");
+				"127.0.0.1", 8081, null, null, false, "example.com", null, null, null, false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingApp, newApp),
 				List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("newsite", "example.com")));

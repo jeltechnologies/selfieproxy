@@ -303,8 +303,9 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 	// treated as permissive, which is what scopes this whole restriction to the
 	// bundled IdP without oidc_auth.go needing to know which IdP is actually in
 	// use. The console domain (selfieproxy-remote-console) gets the same
-	// treatment as the portal domain since Remote Consoles are Homelab-management
-	// tooling, not something a login-only User should ever reach.
+	// treatment as the portal domain since the browser SSH/RDP/VNC console it
+	// serves is Homelab-management tooling, not something a login-only User
+	// should ever reach.
 	if claims.Domain == a.portalDomain || claims.Domain == a.consoleDomain {
 		var identityClaims struct {
 			IsAdmin *bool `json:"is_admin"`
@@ -314,7 +315,7 @@ func (a *OidcAuthenticator) HandleCallback(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if identityClaims.IsAdmin != nil && !*identityClaims.IsAdmin {
-			http.Error(w, "This account can only access exposed applications, not the Selfie Proxy portal or Remote Consoles.", http.StatusForbidden)
+			http.Error(w, "This account can only access exposed applications, not the Selfie Proxy portal or its browser console feature.", http.StatusForbidden)
 			return
 		}
 	}

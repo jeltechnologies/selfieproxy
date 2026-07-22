@@ -17,13 +17,13 @@ public class ConnectController {
 		this.remoteConsoleStore = remoteConsoleStore;
 	}
 
-	@GetMapping("/connect/{id}")
-	public String connect(@PathVariable String id, Model model) {
-		RemoteConsole console = remoteConsoleStore.find(id);
+	@GetMapping("/connect/{fqdn}")
+	public String connect(@PathVariable String fqdn, Model model) {
+		RemoteConsole console = remoteConsoleStore.find(fqdn);
 		if (console == null) {
 			return "console-not-found";
 		}
-		model.addAttribute("id", id);
+		model.addAttribute("fqdn", fqdn);
 		model.addAttribute("console", console);
 		return "connect";
 	}

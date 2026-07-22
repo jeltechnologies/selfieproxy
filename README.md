@@ -121,7 +121,7 @@ point it directly at the application (HTTP, or HTTPS with a self-signed cert). C
 straight to the app is what lets Selfie Proxy manage certificates and auth for it;
 forwarding through another reverse proxy breaks both.
 
-**Why is my Remote Console screen blank when I connect (RDP)?** Some RDP servers (this has
+**Why is my desktop console screen blank when I connect (RDP)?** Some RDP servers (this has
 been seen with xrdp on Linux desktops) don't fully redraw the screen until something changes
 the window size. If you connect and see a blank screen, click Fullscreen once — the desktop
 should then appear. If it goes blank again after leaving fullscreen, click Fullscreen once

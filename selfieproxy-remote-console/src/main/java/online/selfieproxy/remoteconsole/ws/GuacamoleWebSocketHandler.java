@@ -19,13 +19,12 @@ import org.apache.guacamole.protocol.GuacamoleConfiguration;
 
 import online.selfieproxy.remoteconsole.config.GuacdProperties;
 import online.selfieproxy.remoteconsole.domain.RemoteConsole;
-import online.selfieproxy.remoteconsole.domain.RemoteConsoleAuthMode;
 import online.selfieproxy.remoteconsole.domain.RemoteConsoleStore;
 import online.selfieproxy.remoteconsole.security.RemoteConsoleCredentialCipher;
 
 /**
  * The actual browser <-> guacd bridge: on connect, loads the RemoteConsole
- * record (id comes from ConsoleIdHandshakeInterceptor, stashed into the
+ * record (fqdn comes from ConsoleIdHandshakeInterceptor, stashed into the
  * session attributes since Spring's WebSocketHandler has no built-in path
  * variable binding), decrypts its credential, opens a
  * ConfiguredGuacamoleSocket against selfieproxy-guacd (127.0.0.1:4822, both
@@ -57,11 +56,11 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 
 	@Override
 	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-		String id = (String) session.getAttributes().get(ConsoleIdHandshakeInterceptor.CONSOLE_ID_ATTRIBUTE);
-		RemoteConsole console = id == null ? null : remoteConsoleStore.find(id);
+		String fqdn = (String) session.getAttributes().get(ConsoleIdHandshakeInterceptor.CONSOLE_FQDN_ATTRIBUTE);
+		RemoteConsole console = fqdn == null ? null : remoteConsoleStore.find(fqdn);
 		if (console == null) {
-			log.warn("No RemoteConsole record found for id={}", id);
-			session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Unknown remote console"));
+			log.warn("No SSH/RDP/VNC-mode application found for fqdn={}", fqdn);
+			session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Unknown console"));
 			return;
 		}
 
@@ -74,10 +73,10 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 			session.getAttributes().put(TUNNEL_ATTRIBUTE, tunnel);
 			startRelayThread(session, tunnel);
 		} catch (GuacamoleException e) {
-			log.warn("Failed to open guacd connection for remote console {}", id, e);
+			log.warn("Failed to open guacd connection for {}", fqdn, e);
 			session.close(CloseStatus.SERVER_ERROR.withReason("Failed to connect"));
 		} catch (RuntimeException e) {
-			log.error("Unexpected error opening remote console {}", id, e);
+			log.error("Unexpected error opening console session for {}", fqdn, e);
 			throw e;
 		}
 	}
@@ -153,13 +152,12 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 	/**
 	 * Per-protocol Guacamole parameter names, per Guacamole's own protocol
 	 * reference. ignore-cert defaults to the console's own stored preference for
-	 * RDP/VNC; SSH has no certificate concept. private-key carries the SSH key's
-	 * own text directly (Guacamole's ssh-agent/private-key parameter accepts the
-	 * key contents, not a file path).
+	 * RDP/VNC; SSH has no certificate concept. Every mode authenticates with a
+	 * password only -- there is no private-key auth option.
 	 */
 	private GuacamoleConfiguration buildConfiguration(RemoteConsole console, WebSocketSession session) {
 		GuacamoleConfiguration config = new GuacamoleConfiguration();
-		config.setProtocol(console.protocol().name().toLowerCase());
+		config.setProtocol(console.mode().name().toLowerCase());
 		config.setParameter("hostname", "127.0.0.1");
 		config.setParameter("port", String.valueOf(console.tunnelPort()));
 
@@ -175,14 +173,13 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler {
 
 		String secret = cipher.decrypt(console.encryptedSecret());
 
-		switch (console.protocol()) {
+		switch (console.mode()) {
+			case RAW_TCP -> throw new IllegalStateException("RAW_TCP is never bridged here -- RemoteConsoleStore.find already filters it out");
 			case SSH -> {
 				if (console.username() != null) {
 					config.setParameter("username", console.username());
 				}
-				if (console.authMode() == RemoteConsoleAuthMode.PRIVATE_KEY) {
-					config.setParameter("private-key", secret);
-				} else if (secret != null) {
+				if (secret != null) {
 					config.setParameter("password", secret);
 				}
 			}

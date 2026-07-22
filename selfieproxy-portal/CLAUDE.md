@@ -128,14 +128,27 @@ container. After a successful login the user lands on the exposed applications p
 
 - The top of the page manages Homelab selection: a dropdown of Homelab names in alphabetical
   order, first one auto-selected. The user cannot add or delete Homelabs from this page.
-- Exposed apps are listed with sortable column headers (Name, Domain, Internet, Homelab, Local
-  address -- click any header to sort ascending/descending, plain client-side JS,
+- Exposed apps are listed with sortable column headers (Name, Domain, Homelab, Local address --
+  click any header to sort ascending/descending, plain client-side JS,
   `static/js/sortable-table.js`, no server round-trip) and a domain-only filter dropdown above the
   table (populated from every registered domain, see "Domains"). Each row shows Name (the subdomain
   for a Web application; the user-entered Name for a Network service, since its internal `svc-`
   subdomain is never shown), Domain (with a warning icon if that domain was since removed from the
-  Domains page -- the app keeps working, it's just orphaned from Selfie Proxy's own domain registry),
-  the URL (opens in a new tab), the Homelab, and the address within the homelab.
+  Domains page -- the app keeps working, it's just orphaned from Selfie Proxy's own domain
+  registry; always the primary domain for an SSH/RDP/VNC-mode app, which still shows normally here
+  like any other domain, warning icon included, rather than being special-cased -- see
+  `ExposedAppController.toExposedApp`), the Homelab, the address within the homelab, and a
+  right-most unlabeled, unsortable column right before the Edit button: a **Connect** button
+  (opening the app's URL in a new tab) for a Web application, `domain:port` as plain text for a
+  TCP-mode Network Service (nothing to open -- it's just an address, not a page), or a **Connect**
+  button for an SSH/RDP/VNC-mode one (see "Connecting to an SSH/RDP/VNC-mode application" below)
+  -- there is no separate "not exposed to the internet" indicator anywhere on this list, since the
+  Connect button itself already makes that mode's nature obvious without needing to spell it out.
+  Whenever that row's Status dot is red (`appStatusMessage` -- homelab disconnected and/or a DNS
+  mismatch, see DashboardController), its Connect button stays visible but is disabled
+  (`aria-disabled="true"` + `tabindex="-1"`, `.button-small[aria-disabled="true"]` in style.css --
+  an `<a>` has no native disabled state, and removing `href` instead would also drop its title/
+  styling context) rather than hidden, so the row still reads the same at a glance either way.
 
 ### Editing, adding, and removing an exposed app
 
@@ -143,22 +156,60 @@ The edit page fields, in order:
 
 1. **Type**: Web application (default) or Network service. Selecting Network service shows a
    warning: "Use this at your own risk. Anyone on the internet who scans your domain can see that
-   port is open and attempt to connect to it."
-2. **Exposed port** (Network service only): ports 1-1023 are reserved for system services (SSH on
-   22, HTTPS on 443) and cannot be exposed; a port can only be exposed by one app at a time.
-   **Name** (Network service only, required): a label shown in the list, not part of the domain,
-   not unique — the actual subdomain toward boringproxy is a generated internal `svc-` value never
-   shown to the user.
+   port is open and attempt to connect to it." (this warning, and the port-scanning risk itself,
+   only really applies to TCP mode below -- shown for every Network Service mode anyway,
+   since Selecting Network Service is the one action that turns on a whole extra section of the form).
+2. **Mode** (Network service only): one of four --
+   - **TCP** (default, label deliberately terse -- "Protocol: TCP" is already implied and no
+     longer separately shown, see point 4 below) -- today's original behavior, internet-reachable
+     at a chosen **Exposed port** (ports 1-1023 are reserved for system services and cannot be
+     exposed; a port can only be exposed by one app at a time), on a subdomain of a chosen
+     **Domain** (dropdown of every registered domain, primary first -- same ordering/labeling as a
+     Web application's Domain field). The subdomain itself is never shown to the user -- a
+     generated internal `svc-` value, exactly like every mode below.
+   - **Terminal Access: SSH**, **Desktop Access: RDP**, **Desktop Access: VNC** -- a browser
+     SSH/RDP/VNC session instead, reached through a **Connect** action on the Applications list
+     (see below) rather than a public URL: the underlying tunnel is created with
+     `allow-external-tcp: false` (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section
+     on `Tunnel.AllowExternalTcp`) and always lives on an internal, never-shown subdomain of the
+     *primary* domain -- there is no Domain/Exposed port field for these modes at all, since
+     there's no public FQDN concept for them. Selecting one of these three reveals, inside the
+     "Address in the homelab" fieldset (see below): **Username** (optional -- VNC often has none)
+     and **Password** side by side on one line, always a real `<input type="password">` with no
+     view/reveal button and no placeholder text -- there is no private-key auth option, every mode
+     authenticates with a password only -- and **Accept a self-signed certificate on the target**
+     (RDP/VNC only). Port defaults per mode when Mode is changed (22/3389/5900), the same auto-fill
+     idiom the Protocol dropdown already has for HTTP/HTTPS. Leaving the password field blank on an
+     edit keeps the previously stored one unchanged; leaving it blank when adding is allowed too
+     (eg. a VNC target with no password) -- see "Connecting" below for what happens then.
    **Subdomain** (Web application only): the label, composing the FQDN as `<subdomain>.<domain>`.
-   **Domain**: a dropdown of every registered domain (see "Domains" above) -- the primary domain
-   first, labeled e.g. `example.com (primary)`, then every other domain alphabetically with no
-   special label. Applies to both Web application and Network service (a Network service's "Result"
-   is `<domain>:<port>`, not a subdomain-qualified URL, but it's still bound to one domain).
-3. The FQDN itself: a label (not a text field), shown immediately after the subdomain/exposed
-   port, updated live as the user edits the form (including changing the domain dropdown). Not a hyperlink.
-4. Address within the homelab, all on one line: Protocol (HTTP/HTTPS dropdown for Web
-   application, always TCP for Network service), host/IP (always shown, needed for both types),
-   port (defaults to 80 for HTTP, 443 for HTTPS).
+3. The FQDN itself (Web application and TCP mode only): a label (not a text field), shown
+   immediately after the subdomain/exposed port, updated live as the user edits the form
+   (including changing the domain dropdown). Not a hyperlink.
+4. The "Address in the homelab" fieldset: **Name** (Network service only, required, for every
+   mode -- a label shown in the list, not part of the domain, not unique), Homelab, then a row with
+   Protocol (HTTP/HTTPS dropdown, Web application only -- no equivalent field for a Network
+   Service, since Mode already says TCP/SSH/RDP/VNC and repeating "Protocol: TCP" next to it added
+   nothing), host/IP (always shown, needed for every type/mode), and port (defaults to 80 for HTTP,
+   443 for HTTPS, or the SSH/RDP/VNC mode's own default above), then (SSH/RDP/VNC mode only) a
+   second row with Username and Password side by side, then Accept a self-signed certificate --
+   see Mode above for these last three.
+
+### Connecting to an SSH/RDP/VNC-mode application
+
+The Applications list shows a **Connect** action (alongside Edit) for any app in one of these
+three modes, opening `https://console.<domain>/connect/<fqdn>` in a new tab -- a live browser
+session served by the separate `selfieproxy-remote-console` service (Apache Guacamole, consumed
+unmodified -- see `THIRD-PARTY-NOTICES.md`), paired with the `selfieproxy-guacd` container. If no
+credential has ever been stored for that app (left blank when adding, or arrived via a
+configuration import -- imports never carry a password, see "Backup and restore" below), Connect
+instead opens a portal page prompting for one; submitting it encrypts and saves the credential
+(`NetworkServiceCredentialCipher`, AES-256-GCM, key self-provisioned into
+`data/selfieproxy/network-service-secret-key` the first time it's needed, same idiom as
+`selfieproxy-identity-provider`'s `sso-signing-key.pem`) and proceeds straight into the session --
+every later Connect skips that prompt. `selfieproxy-remote-console` only ever reads
+`exposed-apps.json`/that key (shared `/data` volume) at connect time, never writes either --
+credential entry always goes through the portal, keeping a single writer for the whole file.
 
 When HTTPS is selected as the homelab-side protocol, an "Advanced settings" button reveals three
 Connectivity options between Selfie Proxy and the homelab:
@@ -233,44 +284,6 @@ this section is the portal-side UI behavior.
   DNS correctness is already tracked centrally on the Domains settings page instead (see "Domains"
   above), exactly like an Exposed App.
 
-## Remote consoles
-
-Browser SSH/RDP/VNC access to a Homelab machine, protected by the same Selfieproxy login as
-everything else here — no separate credentials to remember, and (the whole point) the
-underlying SSH/RDP/VNC port is never reachable from the internet at all, unlike a Network
-Service exposed app. See root `CLAUDE.md`'s "Running" section for the `selfieproxy-guacd`/
-`selfieproxy-remote-console` infrastructure behind this feature (Apache Guacamole, consumed
-unmodified — see `THIRD-PARTY-NOTICES.md`); this section is the portal-side config behavior.
-
-- The nav has a "Remote consoles" tab. The list page shows every console's Name, Homelab (with
-  online/offline status, same convention as the Applications page), Protocol, and address within
-  the homelab, plus Connect (opens `https://console.<domain>/connect/<id>` in a new tab, served
-  by `selfieproxy-remote-console`, never by this portal), Edit, and Remove.
-- Adding one (`RemoteConsoleController`, `RemoteConsoleStore` — `data/selfieproxy/remote-consoles.json`,
-  independent of `ExposedAppStore`, same relationship Local Websites has to Exposed Apps): Name (a
-  free-text label, not a DNS-derived subdomain — there's no public FQDN to expose here at all),
-  Homelab (same dropdown as an Exposed App, minus "This Server"), Protocol (SSH/RDP/VNC), Host or
-  IP address, Port (defaulted per protocol: 22/3389/5900), Username (optional — VNC often has
-  none), and a credential (password, or for SSH a private key instead). Editing leaves the
-  credential field blank by default; submitting it blank keeps the previously stored credential
-  unchanged, so an admin can fix a typo'd hostname without having to re-enter the password.
-- Under the hood, adding one creates an ordinary boringproxy Tunnel exactly like a Network
-  Service exposed app (`tls-termination: passthrough`) with one deliberate difference:
-  `allow-external-tcp: false`. That's what keeps the raw SSH/RDP/VNC port off the public
-  internet — see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section on
-  `Tunnel.AllowExternalTcp`. The tunnel's domain is an internal, never-shown placeholder
-  (`rc-<uuid>.<primary domain>`, always the primary domain, generated the same way a Network
-  Service's hidden `svc-` subdomain is) — there is no user-facing FQDN/domain concept for a
-  Remote Console at all, unlike every other exposed thing in this portal.
-- Credentials are encrypted at rest (`RemoteConsoleCredentialCipher`, AES-256-GCM) with a key
-  Selfie Proxy self-provisions into `data/selfieproxy/remote-console-secret-key` the first time
-  it's needed — same idiom as `selfieproxy-identity-provider`'s `sso-signing-key.pem`.
-  Host-specific by design: like the admin account and that signing key, Remote Consoles are
-  **excluded from configuration export/import entirely** (`BackupService`) — an exported
-  ciphertext would be undecryptable on a different server's key.
-- Removing one deletes the underlying tunnel and the stored record — same irreversible-action
-  treatment as removing an Exposed App.
-
 ## Backup and restore
 
 **Value to the user**: back up their configuration, or move it to another Selfie Proxy server.
@@ -304,16 +317,22 @@ Local Websites wizard steps' per-item domain picker below. `BackupService` does 
   narrows it down to the submitted selection before it's serialized and zipped.
 - **What's included** in a selected item: Homelab names; each selected Exposed App's full settings
   (the same merged view `ExposedAppController` itself edits: `TunnelMapper.toExposedApp` overlaid
-  with `ExposedAppStore.reconcile`); each selected Local Website's settings (`LocalWebsiteStore`)
-  plus its content directory, zipped under `local-websites/<fqdn>/` alongside a root-level
-  `manifest.json` describing everything else. `manifest.json` is pretty-printed (Jackson
-  `INDENT_OUTPUT`) since it's meant to be readable/hand-editable before an import, not just
-  machine-consumed.
+  with `ExposedAppStore.reconcile`) -- including, for an SSH/RDP/VNC-mode app, its username, but
+  never its stored credential (see below); each selected Local Website's settings
+  (`LocalWebsiteStore`) plus its content directory, zipped under `local-websites/<fqdn>/` alongside
+  a root-level `manifest.json` describing everything else. `manifest.json` is pretty-printed
+  (Jackson `INDENT_OUTPUT`) since it's meant to be readable/hand-editable before an import, not
+  just machine-consumed.
 - **What's deliberately excluded, always**: a Homelab's secret (its boringproxy access token) is
   never exported. Importing a Homelab that doesn't already exist on the target server always mints
   it a **brand-new** secret -- the import wizard's Homelabs step warns about this per item (only
   for the ones flagged New, see below), and the operator must re-paste the new secret into that
-  homelab's `.env` afterward. Also excluded:
+  homelab's `.env` afterward. An SSH/RDP/VNC-mode Network Service's encrypted credential is never
+  exported either (`ExposedApp.withoutSecret`, `BackupService.buildManifest`) -- it's encrypted
+  with a key that never leaves this server (`NetworkServiceCredentialCipher`), so an exported
+  ciphertext would be undecryptable elsewhere; importing one of these apps lands it in the same
+  "no credential stored yet" state as a freshly added one left blank, prompting for a password on
+  its first Connect (see "Exposed applications" above). Also excluded:
   `selfieproxy-identity-provider`'s admin account and RSA signing key -- a configuration export
   must never be able to grant login access to a different server, so import never touches
   server-local auth material, only goes through the same `BoringProxyClient` REST calls the rest

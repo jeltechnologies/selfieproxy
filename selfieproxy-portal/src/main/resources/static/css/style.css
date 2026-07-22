@@ -153,8 +153,12 @@ h1 { font-size: 32px; }
 	border-radius: 6px;
 }
 
-/* Name and Secret on the homelab edit page read as a matched pair. */
-#name { max-width: 24rem; }
+/* Name, Username, and Password (for an SSH/RDP/VNC-mode application) all read as a matched
+   pair -- none of them should stretch to the full form width like Host/Domain do. Password
+   also gets the same monospace treatment as a homelab's own secret field, without the
+   copy/reveal buttons that field has -- this one is write-only, entered fresh, never displayed. */
+#name, #username, #secret { max-width: 24rem; }
+#secret { font-family: monospace; }
 
 .page {
 	flex: 1 0 auto;
@@ -264,6 +268,16 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	text-decoration: none;
 	color: var(--text);
 	font-size: 0.85rem;
+}
+
+/* An <a> has no native disabled state -- the Applications list's Connect button uses this
+   (aria-disabled, not the href-removal trick) when that row's status dot is red, so the button
+   stays visible/readable but isn't clickable and isn't in the tab order (see dashboard.html,
+   which also drops tabindex to -1 alongside this). */
+.button-small[aria-disabled="true"] {
+	pointer-events: none;
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .code-block {

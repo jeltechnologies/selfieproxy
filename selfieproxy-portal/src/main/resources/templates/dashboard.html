@@ -43,14 +43,15 @@
 					<th data-sort-key="name">Name</th>
 					<th>Status</th>
 					<th data-sort-key="domain">Domain</th>
-					<th data-sort-key="internet">Internet</th>
 					<th data-sort-key="homelab">Homelab</th>
 					<th data-sort-key="localAddress">Local address</th>
+					<th></th>
 					<th></th>
 				</tr>
 			</thead>
 			<tbody>
-				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}">
+				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}"
+					th:with="offline=${appStatusMessage.containsKey(app.fqdn())}">
 					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : app.subdomain()}">
 						<span th:text="${app.isNetworkService()} ? ${app.name()} : ${app.subdomain()}"></span>
 						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
@@ -58,7 +59,7 @@
 					</td>
 					<td>
 						<span class="status" th:title="${appStatusMessage.get(app.fqdn())}">
-							<span class="status-dot" th:classappend="${appStatusMessage.containsKey(app.fqdn())} ? 'status-dot-offline' : 'status-dot-online'"></span>
+							<span class="status-dot" th:classappend="${offline} ? 'status-dot-offline' : 'status-dot-online'"></span>
 						</span>
 					</td>
 					<td th:attr="data-sort-value=${app.domain()}">
@@ -66,16 +67,23 @@
 						<span th:if="${!domainService.exists(app.domain())}"
 							  class="warning-icon" title="This application's domain no longer exists">&#9888;</span>
 					</td>
-					<td th:attr="data-sort-value=${tunnelMapper.result(app)}">
-						<a th:if="${tunnelMapper.resultIsLink(app)}" th:href="${tunnelMapper.result(app)}"
-						   target="_blank" rel="noopener" th:text="${tunnelMapper.result(app)}"></a>
-						<span th:unless="${tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
+					<td th:text="${app.homelabName()}"></td>
+					<td th:attr="data-sort-value=${app.host()} + ':' + ${app.port()}" th:text="${app.host()} + ':' + ${app.port()}"></td>
+					<td>
+						<a th:if="${app.isRemoteAccessMode()}" class="button-small"
+						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
+						   th:href="${app.encryptedSecret() != null}
+						             ? 'https://' + ${consoleDomain} + '/connect/' + ${app.fqdn()}
+						             : @{/apps/{fqdn}/connect(fqdn=${app.fqdn()})}"
+						   target="_blank" rel="noopener">Connect</a>
+						<a th:if="${!app.isRemoteAccessMode() and tunnelMapper.resultIsLink(app)}" class="button-small"
+						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
+						   th:href="${tunnelMapper.result(app)}" target="_blank" rel="noopener">Connect</a>
+						<span th:if="${!app.isRemoteAccessMode() and !tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
 						<span th:if="${certPendingByDomain.get(tunnelMapper.fqdn(app))}"
 							  class="cert-pending-badge"
 							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
 					</td>
-					<td th:text="${app.homelabName()}"></td>
-					<td th:attr="data-sort-value=${app.host()} + ':' + ${app.port()}" th:text="${app.host()} + ':' + ${app.port()}"></td>
 					<td>
 						<a class="button-small" th:href="@{/apps/{fqdn}/edit(fqdn=${app.fqdn()})}">Edit</a>
 					</td>

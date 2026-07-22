@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Decrypt-only counterpart to selfieproxy-portal's own
- * RemoteConsoleCredentialCipher -- reads the same self-provisioned key
- * (remote-console-secret-key, shared /data volume) that module writes, but
+ * NetworkServiceCredentialCipher -- reads the same self-provisioned key
+ * (network-service-secret-key, shared /data volume) that module writes, but
  * never generates or writes it here: this service never accepts new
  * credentials from a user, only decrypts what the portal already encrypted.
  * The AES/GCM parameters (key length, IV length, tag length, wire layout
@@ -34,7 +34,7 @@ public class RemoteConsoleCredentialCipher {
 	private final Path keyPath;
 	private volatile SecretKeySpec key;
 
-	public RemoteConsoleCredentialCipher(@Value("${selfieproxy.remote-console-key-path}") String keyPath) {
+	public RemoteConsoleCredentialCipher(@Value("${selfieproxy.network-service-key-path}") String keyPath) {
 		this.keyPath = Path.of(keyPath);
 	}
 

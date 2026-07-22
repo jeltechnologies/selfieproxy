@@ -22,8 +22,10 @@ import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
 import online.selfieproxy.portal.domain.ExposedAppType;
+import online.selfieproxy.portal.domain.NetworkServiceMode;
 import online.selfieproxy.portal.domain.Protocol;
 import online.selfieproxy.portal.domain.TunnelMapper;
+import online.selfieproxy.portal.security.NetworkServiceCredentialCipher;
 import online.selfieproxy.portal.session.PortalSession;
 import online.selfieproxy.portal.session.PortalSessions;
 
@@ -39,18 +41,20 @@ public class ExposedAppController {
 	private final TunnelMapper tunnelMapper;
 	private final BoringProxyProperties properties;
 	private final ExposedAppStore exposedAppStore;
+	private final NetworkServiceCredentialCipher cipher;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final DomainService domainService;
 	private final AgentStatusService agentStatusService;
 
 	public ExposedAppController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
-			BoringProxyProperties properties, ExposedAppStore exposedAppStore,
+			BoringProxyProperties properties, ExposedAppStore exposedAppStore, NetworkServiceCredentialCipher cipher,
 			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
 			AgentStatusService agentStatusService) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.properties = properties;
 		this.exposedAppStore = exposedAppStore;
+		this.cipher = cipher;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.domainService = domainService;
 		this.agentStatusService = agentStatusService;
@@ -61,7 +65,7 @@ public class ExposedAppController {
 		List<String> homelabs = homelabs();
 		ExposedApp app = new ExposedApp("", null, homelabs.stream().findFirst().orElse(null),
 				ExposedAppType.WEB_APPLICATION, Protocol.HTTPS, "127.0.0.1", 443, null, null, true,
-				properties.primaryDomain());
+				properties.primaryDomain(), null, null, null, false);
 		model.addAttribute("app", app);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());
@@ -85,7 +89,7 @@ public class ExposedAppController {
 	@PostMapping("/apps")
 	public String create(@ModelAttribute ExposedAppForm form, HttpServletRequest request, Model model) {
 		PortalSession session = PortalSessions.get(request.getSession(false));
-		ExposedApp app = toExposedApp(form);
+		ExposedApp app = toExposedApp(form, null);
 
 		List<String> errors = validate(app, session, null);
 		if (!errors.isEmpty()) {
@@ -98,7 +102,13 @@ public class ExposedAppController {
 			return "edit-app";
 		}
 
-		boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, session.owner()));
+		TunnelDto tunnel = boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, session.owner()));
+		// SSH/RDP/VNC mode submits exposedPort null (boringproxy auto-assigns it) -- capture the
+		// real assigned port from the response, or selfieproxy-remote-console ends up dialing
+		// port 0 (see ExposedApp.withExposedPort).
+		if (app.isRemoteAccessMode()) {
+			app = app.withExposedPort(tunnel.tunnelPort());
+		}
 		exposedAppStore.save(app);
 		return "redirect:/apps";
 	}
@@ -107,7 +117,8 @@ public class ExposedAppController {
 	public String update(@PathVariable String fqdn, @ModelAttribute ExposedAppForm form,
 			HttpServletRequest request, Model model) throws InterruptedException {
 		PortalSession session = PortalSessions.get(request.getSession(false));
-		ExposedApp app = toExposedApp(form);
+		ExposedApp existing = exposedAppStore.find(fqdn);
+		ExposedApp app = toExposedApp(form, existing);
 
 		List<String> errors = validate(app, session, fqdn);
 		if (!errors.isEmpty()) {
@@ -122,7 +133,10 @@ public class ExposedAppController {
 
 		boringProxyClient.deleteTunnel(fqdn);
 		Thread.sleep(2000);
-		boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, session.owner()));
+		TunnelDto tunnel = boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, session.owner()));
+		if (app.isRemoteAccessMode()) {
+			app = app.withExposedPort(tunnel.tunnelPort());
+		}
 		if (!fqdn.equals(app.fqdn())) {
 			exposedAppStore.delete(fqdn);
 		}
@@ -145,17 +159,36 @@ public class ExposedAppController {
 				.toList();
 	}
 
-	private ExposedApp toExposedApp(ExposedAppForm form) {
+	/**
+	 * existing is the previously stored record when editing (null when adding) --
+	 * used only to keep the current encrypted credential when the form's secret
+	 * field is submitted blank, the same "leave blank to keep unchanged"
+	 * convention the rest of an edit already follows.
+	 */
+	private ExposedApp toExposedApp(ExposedAppForm form, ExposedApp existing) {
 		boolean networkService = form.type() == ExposedAppType.NETWORK_SERVICE;
-		String domain = form.domain() == null || form.domain().isBlank() ? properties.primaryDomain() : form.domain();
+		NetworkServiceMode mode = networkService ? (form.mode() != null ? form.mode() : NetworkServiceMode.RAW_TCP) : null;
+		boolean remoteAccess = networkService && mode != NetworkServiceMode.RAW_TCP;
+
+		String domain = remoteAccess ? properties.primaryDomain()
+				: form.domain() == null || form.domain().isBlank() ? properties.primaryDomain() : form.domain();
 		String subdomain = networkService && (form.subdomain() == null || form.subdomain().isBlank())
 				? generateUniqueSubdomain(domain)
 				: form.subdomain() == null ? null : form.subdomain().trim().toLowerCase();
 		String name = networkService && form.name() != null && !form.name().isBlank() ? form.name().trim() : null;
+
+		String username = remoteAccess ? blankToNull(form.username()) : null;
+		boolean ignoreCertificate = remoteAccess && Boolean.TRUE.equals(form.ignoreCertificate());
+		String encryptedSecret = !remoteAccess ? null
+				: form.secret() == null || form.secret().isBlank()
+						? existing != null ? existing.encryptedSecret() : null
+						: cipher.encrypt(form.secret());
+
 		return new ExposedApp(subdomain, name, form.homelabName(), form.type(),
 				networkService ? null : form.protocol(),
-				form.host(), form.port() != null ? form.port() : 0, form.exposedPort(), form.tlsMode(),
-				!networkService && Boolean.TRUE.equals(form.ssoProtected()), domain);
+				form.host(), form.port() != null ? form.port() : 0, remoteAccess ? null : form.exposedPort(),
+				form.tlsMode(), !networkService && Boolean.TRUE.equals(form.ssoProtected()), domain,
+				mode, username, encryptedSecret, ignoreCertificate);
 	}
 
 	/** Random internal subdomain for a Network Service, retried until it doesn't collide with an existing tunnel on domain. */
@@ -219,10 +252,10 @@ public class ExposedAppController {
 			errors.add("Name is required for a network service.");
 		}
 
-		if (app.isNetworkService() && app.exposedPort() == null) {
-			errors.add("Exposed port to the internet is required for a network service.");
-		} else if (app.isNetworkService()) {
-			if (app.exposedPort() <= RESERVED_PORT_MAX) {
+		if (app.isNetworkService() && app.effectiveMode() == NetworkServiceMode.RAW_TCP) {
+			if (app.exposedPort() == null) {
+				errors.add("Exposed port to the internet is required for a network service.");
+			} else if (app.exposedPort() <= RESERVED_PORT_MAX) {
 				errors.add("Port " + app.exposedPort() + " is reserved for system services and cannot be exposed.");
 			} else {
 				boolean portTaken = existing.entrySet().stream()
@@ -237,5 +270,9 @@ public class ExposedAppController {
 		}
 
 		return errors;
+	}
+
+	private static String blankToNull(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
 	}
 }

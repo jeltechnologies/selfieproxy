@@ -10,6 +10,7 @@
 	var ssoWasEligible = null;
 
 	var typeSelect = document.getElementById("type");
+	var modeSelect = document.getElementById("mode");
 	var protocolSelect = document.getElementById("protocol");
 	var subdomainInput = document.getElementById("subdomain");
 	var domainSelect = document.getElementById("domain");
@@ -19,11 +20,16 @@
 	var resultInput = document.getElementById("result");
 
 	var networkServiceWarning = document.getElementById("network-service-warning");
+	var modeField = document.getElementById("mode-field");
 	var exposedPortField = document.getElementById("exposed-port-field");
 	var nameField = document.getElementById("name-field");
 	var subdomainField = document.getElementById("subdomain-field");
+	var domainField = document.getElementById("domain-field");
+	var resultField = document.getElementById("result-field");
 	var protocolField = document.getElementById("protocol-field");
-	var protocolTcpField = document.getElementById("protocol-tcp-field");
+	var usernameField = document.getElementById("username-field");
+	var secretField = document.getElementById("secret-field");
+	var ignoreCertificateField = document.getElementById("ignore-certificate-field");
 	var httpsWarning = document.getElementById("https-warning");
 	var advancedToggle = document.getElementById("advanced-settings-toggle");
 	var advancedSettings = document.getElementById("advanced-settings");
@@ -38,12 +44,19 @@
 
 	var tlsModeRadios = document.querySelectorAll('input[name="tlsMode"]');
 
+	var defaultModePorts = { SSH: 22, RDP: 3389, VNC: 5900 };
+	var portTouched = false;
+
 	// Collapsed until the user clicks "Advanced settings" -- updateVisibility()
 	// only ever hides this (when switching away from HTTPS), never shows it.
 	advancedSettings.style.display = "none";
 
 	function isNetworkService() {
 		return typeSelect.value === "NETWORK_SERVICE";
+	}
+
+	function isRemoteAccessMode() {
+		return isNetworkService() && modeSelect.value !== "RAW_TCP";
 	}
 
 	function selectedTlsMode() {
@@ -53,16 +66,24 @@
 
 	function updateVisibility() {
 		var networkService = isNetworkService();
+		var remoteAccess = isRemoteAccessMode();
 
 		networkServiceWarning.style.display = networkService ? "" : "none";
-		exposedPortField.style.display = networkService ? "" : "none";
+		modeField.style.display = networkService ? "" : "none";
+
+		exposedPortField.style.display = networkService && !remoteAccess ? "" : "none";
+		domainField.style.display = remoteAccess ? "none" : "";
+		resultField.style.display = remoteAccess ? "none" : "";
 		nameField.style.display = networkService ? "" : "none";
 		nameInput.required = networkService;
 		subdomainField.style.display = networkService ? "none" : "";
 		subdomainInput.required = !networkService;
 
 		protocolField.style.display = networkService ? "none" : "";
-		protocolTcpField.style.display = networkService ? "" : "none";
+
+		usernameField.style.display = remoteAccess && modeSelect.value !== "VNC" ? "" : "none";
+		secretField.style.display = remoteAccess ? "" : "none";
+		ignoreCertificateField.style.display = remoteAccess && modeSelect.value !== "SSH" ? "" : "none";
 
 		var showHttpsSettings = !networkService && protocolSelect.value === "HTTPS";
 		httpsWarning.style.display = (showHttpsSettings && selectedTlsMode() === "BYO_CERT") ? "" : "none";
@@ -107,6 +128,15 @@
 	}
 
 	typeSelect.addEventListener("change", refresh);
+	modeSelect.addEventListener("change", function () {
+		if (!portTouched && defaultModePorts[modeSelect.value]) {
+			portInput.value = defaultModePorts[modeSelect.value];
+		}
+		refresh();
+	});
+	portInput.addEventListener("input", function () {
+		portTouched = true;
+	});
 	protocolSelect.addEventListener("change", function () {
 		portInput.value = protocolSelect.value === "HTTPS" ? 443 : 80;
 		refresh();

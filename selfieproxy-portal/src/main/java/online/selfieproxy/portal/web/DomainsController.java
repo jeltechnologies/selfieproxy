@@ -197,7 +197,8 @@ public class DomainsController {
 			try {
 				ExposedApp renamed = new ExposedApp(app.subdomain(), app.name(), app.homelabName(), app.type(),
 						app.protocol(), app.host(), app.port(), app.exposedPort(), app.tlsMode(), app.ssoProtected(),
-						newName);
+						newName, app.mode(), app.username(), app.encryptedSecret(),
+						app.ignoreCertificate());
 				deleteTunnelIgnoringMissing(oldFqdn);
 				sleep();
 				boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(renamed, OWNER));

@@ -423,9 +423,9 @@ func Listen() {
 			// Proxied directly to selfieproxy-remote-console, same carve-out
 			// shape as -portal-domain (fixed local address, no Tunnel/Agent) --
 			// always gated behind single sign on, admin-only just like the portal
-			// domain (see oidc_auth.go's is_admin check), since Remote Consoles
-			// are Homelab-management tooling, not something a login-only User
-			// should ever reach.
+			// domain (see oidc_auth.go's is_admin check), since the browser
+			// SSH/RDP/VNC console it serves is Homelab-management tooling, not
+			// something a login-only User should ever reach.
 			consoleTunnel := Tunnel{Domain: *consoleDomain}
 			if !requireSsoIfNeeded(w, r, consoleTunnel.Domain, true) {
 				return

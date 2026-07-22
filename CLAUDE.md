@@ -42,8 +42,10 @@ runtime config/volumes they use:
   settings page instead, since it's added long after this container has already started.
 - `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
   template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
-  admin portal ("Remote consoles" nav tab, see `selfieproxy-portal/CLAUDE.md`) while this service itself
-  only serves the live browser session. Pairs with the `selfieproxy-guacd` service (the official,
+  admin portal as three of the four Network Service Modes an Application can have ("Terminal
+  Access: SSH", "Desktop Access: RDP", "Desktop Access: VNC" -- see `selfieproxy-portal/CLAUDE.md`'s
+  "Exposed applications" section) while this service itself only serves the live browser session.
+  Pairs with the `selfieproxy-guacd` service (the official,
   unmodified `guacamole/guacd` Docker image — see `THIRD-PARTY-NOTICES.md`) to bridge a WebSocket
   connection to a Homelab's SSH/RDP/VNC endpoint, reached over an `AllowExternalTcp: false` tunnel (never
   internet-reachable — see this file's "Running" section). Reached via its own always-SSO-gated,
@@ -57,11 +59,12 @@ runtime config/volumes they use:
 ├── .env                          # server config, copied from .env.example
 ├── data/                         # runtime volumes — not committed
 │   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
-│   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore),
+│   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore --
+│       │                            # also covers every SSH/RDP/VNC-mode Network Service, read by
+│       │                            # selfieproxy-remote-console over the shared volume) + network-service-secret-key
+│       │                            # (self-provisioned, see selfieproxy-portal/CLAUDE.md's "Exposed applications"),
 │       │                            # local-websites.json (LocalWebsiteStore), domains.json (DomainStore --
 │       │                            # registered secondary domains only, the primary domain is never stored here),
-│       │                            # remote-consoles.json (RemoteConsoleStore) + remote-console-secret-key
-│       │                            # (self-provisioned, see selfieproxy-portal/CLAUDE.md's "Remote consoles"),
 │       │                            # selfieproxy-localsites-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
 │       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
@@ -142,24 +145,25 @@ and `selfieproxy-localsites-agent` (`service_started`, the last service in every
 dependency chain), so the shared NGINX only comes up once everything upstream of it — DNS
 preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
 
-Two further services power the browser SSH/RDP/VNC console feature ("Remote consoles" in the
-portal, see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-guacd` (the official, unmodified
+Two further services power the browser SSH/RDP/VNC console feature (the "Terminal Access: SSH"/
+"Desktop Access: RDP"/"Desktop Access: VNC" Network Service Modes in the portal, see
+`selfieproxy-portal/CLAUDE.md`): `selfieproxy-guacd` (the official, unmodified
 `guacamole/guacd` Docker image — the one deliberate exception to every other service here
 carrying both `image:` and `build:`, since there is nothing of ours to build) and
 `selfieproxy-remote-console` (the WebSocket bridge between a browser and `guacd`, own
 Java/Spring module, same build template as `selfieproxy-portal`). Both run `network_mode: host`,
 like `selfieproxy-reverseproxy`/`selfieproxy-localsites-agent` — this is load-bearing, not just
-consistency: a Remote Console's underlying tunnel is created with `AllowExternalTcp: false`
+consistency: one of these apps' underlying tunnel is created with `AllowExternalTcp: false`
 (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section), which binds its listener to
 `127.0.0.1` on the server host rather than `0.0.0.0` — deliberately never reachable from the
 internet, only from a process sharing the host's own network namespace. `guacd` itself is
 further restricted to bind only `127.0.0.1:4822` (`GUACD_BIND_HOST`), since it has no
 authentication of its own and must never be reachable by anything but
 `selfieproxy-remote-console` on this same host. The two communicate over that same loopback
-interface; `selfieproxy-remote-console` reaches boringproxy's REST API (to create/delete a
-Remote Console's tunnel) over the ordinary public admin domain, and reads/decrypts credentials
-from `data/selfieproxy/remote-consoles.json`/`remote-console-secret-key`, both owned and
-self-provisioned by `selfieproxy-portal` (this service only ever reads them). The browser reaches
+interface; `selfieproxy-remote-console` reaches boringproxy's REST API only indirectly (it never
+creates/deletes tunnels itself -- the portal does, same as any other Application) and reads/
+decrypts credentials from `data/selfieproxy/exposed-apps.json`/`network-service-secret-key`, both
+owned and self-provisioned by `selfieproxy-portal` (this service only ever reads them). The browser reaches
 `selfieproxy-remote-console` through its own always-SSO-gated, admin-only domain carve-out
 (`-console-domain`/`-console-port`, default subdomain `console`) — see
 `selfieproxy-reverseproxy/CLAUDE.md`. See `THIRD-PARTY-NOTICES.md` for how Apache Guacamole is
@@ -218,7 +222,15 @@ stdout — off by default since every agent poll and every Homelabs-page auto-re
 otherwise log a line. The same flag also gates `selfieproxy-local-websites`' NGINX access log
 (`access_log off;` by default, `access_log /dev/stdout;` only when `DEBUG_MODE=true` — see its
 `entrypoint.sh`, which generates `/etc/nginx/access_log.conf` from the env var at container
-start), since every request to every Local Website would otherwise log a line there too.
+start), since every request to every Local Website would otherwise log a line there too. It also
+gates whether `selfieproxy-portal`, `selfieproxy-identity-provider`, and `selfieproxy-remote-console`
+send `Cache-Control: no-cache` for their own static JS/CSS
+(`spring.web.resources.cache.cachecontrol.no-cache`, each module's own `application.properties`) —
+normal browser caching (faster, the default) unless `DEBUG_MODE=true`, in which case every load
+force-revalidates so a rebuilt+redeployed container never keeps serving stale JS/CSS to an
+already-open tab; `selfieproxy-remote-console` has no `env_file: .env` of its own the other two
+get for free, so it needs `DEBUG_MODE` passed through explicitly via `docker-compose.yaml`'s
+`environment:` block instead.
 `LETSENCRYPT_EMAIL` (blank by default) is passed through as `-acme-email`
 to boringproxy — see below. `SSO_SESSION_IDLE_MINUTES`/`SSO_SESSION_MAX_MINUTES` (default `30`/
 `600`, i.e. 30 minutes idle / 10 hours absolute, matching Keycloak's own SSO Session Idle/Max

@@ -43,11 +43,14 @@ import tools.jackson.databind.json.JsonMapper;
  * ("servers"), and Local Websites (config + actual content files) -- see
  * selfieproxy-portal/CLAUDE.md's "Backup and restore" section for the full
  * product behavior and the deliberate exclusions (agent secrets,
- * identity-provider admin account). Remote Consoles (RemoteConsoleStore) are
- * excluded too, for the same host-specific-secret reason: their stored
- * credentials are encrypted with a key that never leaves this server (see
- * RemoteConsoleCredentialCipher), so an exported ciphertext would be
- * undecryptable on a different one.
+ * identity-provider admin account). An SSH/RDP/VNC-mode Network Service's
+ * stored credential is excluded too, for the same host-specific-secret
+ * reason: it's encrypted with a key that never leaves this server (see
+ * NetworkServiceCredentialCipher), so an exported ciphertext would be
+ * undecryptable on a different one -- buildManifest strips encryptedSecret
+ * (ExposedApp.withoutSecret) while keeping the rest of the app, including its
+ * username, so the admin only has to re-enter the password once after an
+ * import (see ConsoleConnectController) rather than losing the whole config.
  */
 @Component
 public class BackupService {
@@ -132,6 +135,7 @@ public class BackupService {
 				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
 				.map(tunnelMapper::toExposedApp)
 				.map(exposedAppStore::reconcile)
+				.map(ExposedApp::withoutSecret)
 				.toList();
 
 		String createdAt = ZonedDateTime.now(zone).truncatedTo(ChronoUnit.MILLIS).toString();
@@ -249,14 +253,28 @@ public class BackupService {
 				// Substitute the target domain the restore wizard's per-item <select> chose (default:
 				// the ZIP's own domain if it's still registered here, else the primary domain -- see
 				// BackupController) -- the tunnel is created/deleted at this domain, not the ZIP's.
-				String targetDomain = selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain());
+				// An SSH/RDP/VNC-mode app always lives on the primary domain (see
+				// ExposedAppController.toExposedApp) regardless of what the wizard's picker offered.
+				String targetDomain = original.isRemoteAccessMode() ? boringProxyProperties.primaryDomain()
+						: selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain());
+				// original.encryptedSecret() is always null here -- buildManifest already stripped it
+				// (see class docs), so an imported SSH/RDP/VNC-mode app naturally lands in the same
+				// "no credential stored yet" state ConsoleConnectController's Connect page prompts for.
 				ExposedApp app = new ExposedApp(original.subdomain(), original.name(), original.homelabName(),
 						original.type(), original.protocol(), original.host(), original.port(),
-						original.exposedPort(), original.tlsMode(), original.ssoProtected(), targetDomain);
+						original.exposedPort(), original.tlsMode(), original.ssoProtected(), targetDomain,
+						original.mode(), original.username(), original.encryptedSecret(),
+						original.ignoreCertificate());
 				String fqdn = tunnelMapper.fqdn(app);
 				deleteTunnelIgnoringMissing(fqdn);
 				sleep();
-				boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, OWNER));
+				TunnelDto tunnel = boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, OWNER));
+				// SSH/RDP/VNC mode submits exposedPort null (boringproxy auto-assigns it) -- capture
+				// the real assigned port from the response, same fix as ExposedAppController.create/
+				// update, or selfieproxy-remote-console ends up dialing port 0.
+				if (app.isRemoteAccessMode()) {
+					app = app.withExposedPort(tunnel.tunnelPort());
+				}
 				exposedAppStore.save(app);
 				exposedAppsRestored++;
 			} catch (Exception e) {

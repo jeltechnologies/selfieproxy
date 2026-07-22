@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title th:text="${console.name()} + ' - Selfie Proxy Remote Console'">Remote Console</title>
+	<title th:text="${console.name()} + ' - Selfie Proxy Console'">Selfie Proxy Console</title>
 	<link rel="stylesheet" th:href="@{/css/connect.css}">
 
 	<link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
@@ -16,7 +16,7 @@
 </head>
 <body>
 	<header class="toolbar">
-		<span class="console-name" th:text="${console.name()} + ' (' + ${console.protocol()} + ')'"></span>
+		<span class="console-name" th:text="${console.name()} + ' (' + ${console.mode()} + ')'"></span>
 		<span id="status" class="status">Connecting...</span>
 		<button type="button" id="fullscreen-button">Fullscreen</button>
 		<button type="button" id="disconnect-button">Disconnect</button>
@@ -32,10 +32,10 @@
 		// this comment used /* */ and quoted the inlining syntax inside it, which
 		// closed the comment early and broke the whole script.)
 		window.selfieProxyConsole = {
-			id: /*[[${id}]]*/ ""
+			fqdn: /*[[${fqdn}]]*/ ""
 		};
 		window.selfieProxyConsole.wsUrl = (window.location.protocol === "https:" ? "wss://" : "ws://")
-			+ window.location.host + "/connect/" + window.selfieProxyConsole.id + "/ws";
+			+ window.location.host + "/connect/" + window.selfieProxyConsole.fqdn + "/ws";
 	</script>
 	<script th:src="@{/js/vendor/guacamole-common-js/guacamole-common.min.js}"></script>
 	<script th:src="@{/js/connect.js}"></script>

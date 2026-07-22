@@ -30,7 +30,12 @@ public class TunnelMapper {
 		return app.fqdn();
 	}
 
-	/** The doc's "Result" field: the URL for a Web Application, or "domain:port" for a Network Service. */
+	/**
+	 * The doc's "Result" field: the URL for a Web Application, or "domain:port" for a Network
+	 * Service. Only meaningful for a RAW_TCP-mode Network Service -- an SSH/RDP/VNC-mode one is
+	 * never internet-reachable and dashboard.html never calls this for those rows, rendering its
+	 * own Connect button in the "Connect" column instead (see DashboardController).
+	 */
 	public String result(ExposedApp app) {
 		if (app.isNetworkService()) {
 			return app.domain() + ":" + app.exposedPort();
@@ -51,8 +56,13 @@ public class TunnelMapper {
 
 		if (app.isNetworkService()) {
 			tlsTermination = "passthrough";
-			tunnelPort = app.exposedPort();
-			allowExternalTcp = true;
+			boolean rawTcp = app.effectiveMode() == NetworkServiceMode.RAW_TCP;
+			// SSH/RDP/VNC mode: tunnelPort left null so boringproxy auto-assigns one, and
+			// allowExternalTcp false binds its listener to 127.0.0.1 on the server host --
+			// never internet-reachable, only selfieproxy-remote-console (network_mode: host)
+			// can dial it. See root CLAUDE.md's "Running" section.
+			tunnelPort = rawTcp ? app.exposedPort() : null;
+			allowExternalTcp = rawTcp;
 		} else if (app.protocol() == Protocol.HTTP) {
 			// Selfie Proxy still terminates the public TLS connection itself (managed cert, same as
 			// MANAGED/"Server HTTPS") and forwards plain HTTP onward -- proxyRequest defaults to
@@ -116,9 +126,16 @@ public class TunnelMapper {
 					: tunnel.domain().substring(0, tunnel.domain().length() - domain.length() - 1);
 		}
 
-		if ("passthrough".equals(tunnel.tlsTermination()) && tunnel.allowExternalTcp()) {
+		// Any passthrough tunnel is a Network Service, whether or not it's internet-reachable --
+		// allowExternalTcp alone used to gate this, which is exactly why an SSH/RDP/VNC-mode
+		// tunnel's own passthrough-but-not-allowExternalTcp shape fell through to the
+		// WEB_APPLICATION branch below and showed up mis-typed on the Applications list. The
+		// true mode (RAW_TCP vs SSH/RDP/VNC) is never recoverable from tunnel data alone --
+		// defaulted to RAW_TCP here and overlaid from the stored record by ExposedAppStore.reconcile.
+		if ("passthrough".equals(tunnel.tlsTermination())) {
 			return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
-					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null, false, domain);
+					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null, false, domain,
+					NetworkServiceMode.RAW_TCP, null, null, false);
 		}
 
 		boolean https = tunnel.clientAddress() != null && tunnel.clientAddress().startsWith(HTTPS_PREFIX);
@@ -133,6 +150,6 @@ public class TunnelMapper {
 
 		return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
 				https ? Protocol.HTTPS : Protocol.HTTP, host, tunnel.clientPort(), null, tlsMode,
-				tunnel.ssoProtected(), domain);
+				tunnel.ssoProtected(), domain, null, null, null, false);
 	}
 }
