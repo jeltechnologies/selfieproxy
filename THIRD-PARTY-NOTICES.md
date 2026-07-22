@@ -5,9 +5,10 @@ distributed alongside it that carries a different license, and how each one is c
 
 ## Apache Guacamole
 
-Used by the browser SSH/RDP/VNC console feature (`selfieproxy-remote-console`,
+Used by the browser RDP/VNC console feature (`selfieproxy-remote-console`,
 `selfieproxy-guacd` in `docker-compose.yaml`) to bridge a WebSocket connection to a Homelab's
-SSH/RDP/VNC service. **Copyright 2026 The Apache Software Foundation**, licensed under the
+RDP/VNC service. SSH no longer goes through Guacamole/guacd at all -- see Apache MINA SSHD and
+xterm.js below. **Copyright 2026 The Apache Software Foundation**, licensed under the
 Apache License, Version 2.0 (a full copy is included at `licenses/apache-2.0.txt`, and
 alongside the vendored JS file itself). Project home: <https://guacamole.apache.org/>.
 
