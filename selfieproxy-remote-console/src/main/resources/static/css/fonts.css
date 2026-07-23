@@ -1,0 +1,42 @@
+/* @font-face wiring for the SSH terminal's font-family picker (settings.js) --
+   only the non-default entries in settings.js's FONTS list need a face here;
+   "Default"/Menlo/Consolas/Courier New/DejaVu Sans Mono/System Monospace all
+   resolve to fonts assumed already installed on the client OS. These four are
+   commonly-requested programming fonts that are NOT reliably preinstalled
+   anywhere, so they're vendored and self-hosted (see
+   static/fonts/vendor/*/VERSION) rather than left to silently fall back to
+   generic monospace when missing locally. Regular weight only -- xterm.js
+   still requests a synthetic bold from the browser for bold text, matching
+   how no bold face was shipped for the OS-provided fonts either. */
+
+@font-face {
+	font-family: "JetBrains Mono";
+	src: url("/fonts/vendor/jetbrains-mono/JetBrainsMono-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Fira Code";
+	src: url("/fonts/vendor/fira-code/FiraCode-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Cascadia Code";
+	src: url("/fonts/vendor/cascadia-code/CascadiaCode-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Source Code Pro";
+	src: url("/fonts/vendor/source-code-pro/SourceCodePro-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}

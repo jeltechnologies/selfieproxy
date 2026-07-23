@@ -1,0 +1,11 @@
+Cascadia Code v2407.24 (Regular weight only, woff2)
+Source: https://github.com/microsoft/cascadia-code/releases/download/v2407.24/CascadiaCode-2407.24.zip
+        (ttf/static/CascadiaCode-Regular.ttf -- the plain, non-Nerd-Font, non-PowerLine static
+        Regular weight)
+File:   CascadiaCode-Regular.woff2 -- losslessly repackaged from the .ttf above into woff2 via
+        fontTools (fontTools.ttLib.TTFont, flavor="woff2"), since Microsoft's release only
+        publishes ttf/otf, no woff2 build. Same glyph outlines/hinting/metrics as the source
+        .ttf, just woff2's compressed container format, matching every other font in this
+        directory being served as woff2.
+License: SIL Open Font License 1.1 -- see OFL.txt in this directory, and
+         /licenses/ofl-1.1.txt at the repo root.

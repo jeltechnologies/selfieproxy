@@ -6,6 +6,7 @@
 	<title th:text="${console.name()} + ' - Selfie Proxy Console'">Selfie Proxy Console</title>
 	<link rel="stylesheet" th:href="@{/css/connect.css}">
 	<link rel="stylesheet" th:href="@{/css/vendor/xterm/xterm.css}">
+	<link rel="stylesheet" th:href="@{/css/fonts.css}">
 
 	<link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
 	<link rel="icon" th:href="@{/favicon.ico}" sizes="any">
@@ -21,6 +22,27 @@
 	<header class="toolbar">
 		<span class="console-name" th:text="${console.name()} + ' (' + ${console.mode()} + ')'"></span>
 		<span id="status" class="status">Connecting...</span>
+		<details class="settings-menu">
+			<summary>Settings</summary>
+			<div class="settings-panel">
+				<div class="settings-row">
+					<label>Font size</label>
+					<div class="font-size-control">
+						<button type="button" id="font-size-decrease" aria-label="Decrease font size">−</button>
+						<span id="font-size-value"></span>
+						<button type="button" id="font-size-increase" aria-label="Increase font size">+</button>
+					</div>
+				</div>
+				<div class="settings-row">
+					<label for="font-family-select">Font family</label>
+					<select id="font-family-select"></select>
+				</div>
+				<div class="settings-row">
+					<label for="theme-select">Color theme</label>
+					<select id="theme-select"></select>
+				</div>
+			</div>
+		</details>
 		<button type="button" id="fullscreen-button">Fullscreen</button>
 		<button type="button" id="disconnect-button">Disconnect</button>
 	</header>
@@ -39,6 +61,7 @@
 	</script>
 	<script th:src="@{/js/vendor/xterm/xterm.js}"></script>
 	<script th:src="@{/js/vendor/xterm/xterm-addon-fit.js}"></script>
+	<script th:src="@{/js/settings.js}"></script>
 	<script th:src="@{/js/terminal.js}"></script>
 </body>
 </html>

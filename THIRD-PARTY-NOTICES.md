@@ -68,3 +68,38 @@ this repository has no Node/JS build tooling anywhere else either.
 Because copies of these files are redistributed inside this repository and in published Docker
 images, their own `LICENSE` file travels with them
 (`selfieproxy-remote-console/.../vendor/xterm/LICENSE`), per the MIT License's own terms.
+
+## JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro
+
+Four selectable font-family options in the SSH terminal's Settings menu (`settings.js`'s `FONTS`
+list), self-hosted so the choice actually renders the same way regardless of what's installed on
+the client machine, rather than silently falling back to generic `monospace` when it isn't.
+Each is licensed under the **SIL Open Font License, Version 1.1** (a full copy is included at
+`licenses/ofl-1.1.txt`, and alongside each vendored font itself):
+
+- **JetBrains Mono** -- Copyright 2020 The JetBrains Mono Project Authors. Project home:
+  <https://www.jetbrains.com/lp/mono/>.
+- **Fira Code** -- Copyright (c) 2014, The Fira Code Project Authors. Project home:
+  <https://github.com/tonsky/FiraCode>.
+- **Cascadia Code** -- Copyright (c) 2019 - Present, Microsoft Corporation. Project home:
+  <https://github.com/microsoft/cascadia-code>.
+- **Source Code Pro** -- Copyright 2023 Adobe. Project home:
+  <https://github.com/adobe-fonts/source-code-pro>.
+
+Consumed entirely unmodified (Regular weight only, woff2), vendored as plain static assets into
+`selfieproxy-remote-console/src/main/resources/static/fonts/vendor/<font>/` -- see the `VERSION`
+file in each font's own directory for the exact source and version, including
+`cascadia-code/VERSION`'s note that its `.woff2` is a lossless repackaging of Microsoft's own
+`.ttf` release (via `fontTools`, no woff2 build is published upstream), since that's the one
+file in this group that isn't served byte-for-byte as downloaded. `settings.js`'s remaining font
+options (Menlo, Consolas, Courier New, DejaVu Sans Mono, System Monospace, and the xterm.js
+"Default" stack) are plain CSS `font-family` names, not vendored files -- they only render
+correctly if the browser's OS happens to already have that font installed, same as any web page
+requesting a system font.
+
+Wired into the SSH terminal page (`connect-terminal.html`) only, via a hand-written
+`@font-face` stylesheet (`static/css/fonts.css`) -- not RDP/VNC's `connect.html`, which has no
+font picker. Because copies of these font files are redistributed inside this repository and in
+published Docker images, each one's own `OFL.txt` travels with it
+(`selfieproxy-remote-console/.../fonts/vendor/<font>/OFL.txt`), per the OFL's own redistribution
+terms.

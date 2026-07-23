@@ -6,10 +6,12 @@
 	var fullscreenButton = document.getElementById("fullscreen-button");
 	var terminalContainer = document.getElementById("terminal-container");
 
+	var settings = window.SelfieProxyTerminalSettings.load();
 	var terminal = new Terminal({
 		cursorBlink: true,
-		fontFamily: "Menlo, Consolas, monospace",
-		theme: { background: "#1a1a1a", foreground: "#eee" }
+		fontFamily: window.SelfieProxyTerminalSettings.getFontFamily(settings.fontFamilyId).family,
+		fontSize: settings.fontSize,
+		theme: window.SelfieProxyTerminalSettings.getTheme(settings.themeId).theme
 	});
 	var fitAddon = new FitAddon.FitAddon();
 	terminal.loadAddon(fitAddon);
@@ -72,6 +74,12 @@
 	}
 	window.addEventListener("resize", requestFit);
 	document.addEventListener("fullscreenchange", requestFit);
+
+	window.SelfieProxyTerminalSettings.initPanel(terminal, {
+		onMetricsChange: function () {
+			requestFit();
+		}
+	});
 
 	window.addEventListener("beforeunload", function () {
 		ws.close();
