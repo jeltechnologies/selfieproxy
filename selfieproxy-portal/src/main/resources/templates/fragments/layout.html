@@ -31,6 +31,9 @@
 		<details class="user-menu">
 			<summary>Settings</summary>
 			<div class="user-menu-panel">
+				<form method="post" th:action="@{/appearance/toggle}">
+					<button type="submit" class="link-button" th:text="${theme == 'dark'} ? 'Change to Light mode' : 'Change to Dark mode'">Change to Dark mode</button>
+				</form>
 				<a th:href="@{/export-configuration}" th:classappend="${active == 'export'} ? 'active'">Export configuration</a>
 				<a th:href="@{/import-configuration}" th:classappend="${active == 'import'} ? 'active'">Import configuration</a>
 				<a th:href="@{/domains}" th:classappend="${active == 'domains'} ? 'active'">Domains</a>

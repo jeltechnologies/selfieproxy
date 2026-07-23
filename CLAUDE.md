@@ -67,7 +67,13 @@ runtime config/volumes they use:
 │       │                            # registered secondary domains only, the primary domain is never stored here),
 │       │                            # selfieproxy-localsites-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
-│       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key)
+│       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key),
+│       │                            # theme.json (ThemeStore -- shared Light/Dark UI theme, written by
+│       │                            # selfieproxy-portal, read by both it and selfieproxy-identity-provider),
+│       │                            # remote-console-settings.json (TerminalSettingsStore -- SSH console
+│       │                            # font/theme settings, written by selfieproxy-remote-console's own
+│       │                            # settings panel, also read/written by selfieproxy-portal for
+│       │                            # configuration export/import)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
 ├── selfieproxy-check-prerequisites/ # DNS pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites

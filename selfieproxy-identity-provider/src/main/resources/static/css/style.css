@@ -1,5 +1,5 @@
 :root {
-	color-scheme: light dark;
+	color-scheme: light;
 	--bg: #f7f7f8;
 	--card-bg: #ffffff;
 	--text: #1b1b1f;
@@ -12,17 +12,21 @@
 	--warning-border: #e8c96a;
 }
 
-@media (prefers-color-scheme: dark) {
-	:root {
-		--bg: #16171a;
-		--card-bg: #1f2023;
-		--text: #eaeaec;
-		--muted: #9a9aa2;
-		--border: #313236;
-		--success: #3fbf63;
-		--warning-bg: #3a341a;
-		--warning-border: #7a6a2a;
-	}
+/* Selfie Proxy's explicit, persisted Light/Dark setting (selfieproxy-portal's
+   ThemeStore/AppearanceController; this module only reads it) -- set as <html
+   data-theme="..."> by GlobalModelAttributes. There is deliberately no
+   prefers-color-scheme fallback: the setting always has an explicit value (default light), so
+   following the OS instead would make the actually-rendered theme ambiguous. */
+[data-theme="dark"] {
+	color-scheme: dark;
+	--bg: #212529;
+	--card-bg: #1f2023;
+	--text: #eaeaec;
+	--muted: #9a9aa2;
+	--border: #313236;
+	--success: #3fbf63;
+	--warning-bg: #3a341a;
+	--warning-border: #7a6a2a;
 }
 
 * { box-sizing: border-box; }

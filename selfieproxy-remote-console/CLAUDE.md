@@ -79,6 +79,17 @@ tidiness) to keep the live session in its own service.
   `Guacamole.WebSocketTunnel` + `Guacamole.Keyboard`/`Guacamole.Mouse`). Guacamole renders SSH as
   a terminal through the same canvas/display protocol as RDP/VNC, so this one frontend component
   covers all three protocols.
+- `domain/TerminalSettings.java` + `domain/TerminalSettingsStore.java` +
+  `web/TerminalSettingsController.java` — the SSH console's Settings panel (font size, font
+  family, color theme, `connect-terminal.html`'s `settings.js`) is persisted server-side here
+  (`data/remote-console-settings.json`, `GET`/`POST /api/terminal-settings`) rather than in the
+  browser's `localStorage` as it originally was, so the setting is shared across browsers/devices
+  and can be included in a configuration export/import (`selfieproxy-portal`'s `BackupService`
+  reads and, on restore, writes this same file through its own mirrored
+  `domain/TerminalSettings.java`/`TerminalSettingsStore.java` -- same shared-`/data`-volume
+  precedent as `ThemeStore`, not a Java dependency between the two modules). RDP/VNC's own
+  `connect.html`/`connect.js` have no such panel and are untouched -- their on-screen colors come
+  from whatever the remote server renders, not a client-side theme choice.
 - No dependency on `BoringProxyClient`/boringproxy's REST API at all — this service never
   creates or deletes tunnels, only reads the already-resolved `tunnelPort` the portal persisted.
 

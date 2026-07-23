@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add domain - Selfie Proxy' : 'Edit domain - Selfie Proxy')}"></head>
 <body>
 	<header th:replace="~{fragments/layout :: topbar(active='domains')}"></header>

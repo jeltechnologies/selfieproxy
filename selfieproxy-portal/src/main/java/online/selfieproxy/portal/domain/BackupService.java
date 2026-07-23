@@ -81,13 +81,15 @@ public class BackupService {
 	private final StaticSiteProvisioner staticSiteProvisioner;
 	private final SitesWebserverProperties sitesWebserverProperties;
 	private final ThisServerAgentProperties thisServerAgentProperties;
+	private final ThemeStore themeStore;
+	private final TerminalSettingsStore terminalSettingsStore;
 	private final Path stagingRoot;
 
 	public BackupService(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			BoringProxyProperties boringProxyProperties, ExposedAppStore exposedAppStore,
 			LocalWebsiteStore localWebsiteStore, StaticSiteProvisioner staticSiteProvisioner,
 			SitesWebserverProperties sitesWebserverProperties, ThisServerAgentProperties thisServerAgentProperties,
-			BackupProperties backupProperties) {
+			ThemeStore themeStore, TerminalSettingsStore terminalSettingsStore, BackupProperties backupProperties) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.boringProxyProperties = boringProxyProperties;
@@ -96,6 +98,8 @@ public class BackupService {
 		this.staticSiteProvisioner = staticSiteProvisioner;
 		this.sitesWebserverProperties = sitesWebserverProperties;
 		this.thisServerAgentProperties = thisServerAgentProperties;
+		this.themeStore = themeStore;
+		this.terminalSettingsStore = terminalSettingsStore;
 		this.stagingRoot = Path.of(backupProperties.restoreStagingPath());
 	}
 
@@ -140,7 +144,8 @@ public class BackupService {
 
 		String createdAt = ZonedDateTime.now(zone).truncatedTo(ChronoUnit.MILLIS).toString();
 		return new BackupManifest(BackupManifest.CURRENT_VERSION, createdAt,
-				boringProxyProperties.primaryDomain(), homelabNames(), exposedApps, localWebsiteStore.list());
+				boringProxyProperties.primaryDomain(), homelabNames(), exposedApps, localWebsiteStore.list(),
+				themeStore.load().id(), terminalSettingsStore.load());
 	}
 
 	/** Extracts zipData into a fresh staging directory and validates its manifest, without touching any live state. Returns the staging id for readStagedManifest/applyRestore/cancelStaged. */
@@ -191,7 +196,8 @@ public class BackupService {
 		return new BackupManifest(manifest.version(), manifest.createdAt(), manifest.sourcePrimaryDomain(),
 				manifest.homelabs().stream().filter(homelabs::contains).toList(),
 				manifest.exposedApps().stream().filter(app -> exposedAppFqdns.contains(app.fqdn())).toList(),
-				manifest.localWebsites().stream().filter(site -> localWebsiteFqdns.contains(site.fqdn())).toList());
+				manifest.localWebsites().stream().filter(site -> localWebsiteFqdns.contains(site.fqdn())).toList(),
+				manifest.theme(), manifest.terminalSettings());
 	}
 
 	/**
@@ -219,6 +225,23 @@ public class BackupService {
 	private RestoreResult doApplyRestore(BackupManifest manifest, RestoreSelection selection, Path stagingDir) {
 		Set<String> existingAgents = new HashSet<>(boringProxyClient.listAgents().keySet());
 		List<String> failures = new ArrayList<>();
+
+		// Always applied, unconditionally -- these are single global settings, not itemized/selectable
+		// like Homelabs/Apps/Local Websites below, so there's no RestoreSelection entry for either.
+		if (manifest.theme() != null) {
+			try {
+				themeStore.save(Theme.fromId(manifest.theme()));
+			} catch (Exception e) {
+				failures.add("Appearance setting: " + e.getMessage());
+			}
+		}
+		if (manifest.terminalSettings() != null) {
+			try {
+				terminalSettingsStore.save(manifest.terminalSettings());
+			} catch (Exception e) {
+				failures.add("SSH console settings: " + e.getMessage());
+			}
+		}
 
 		int homelabsRestored = 0;
 		for (String name : selection.homelabs()) {

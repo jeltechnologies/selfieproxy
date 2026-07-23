@@ -17,6 +17,11 @@ import java.util.List;
  * @param homelabs       every Homelab (Agent) name except the hidden "This Server" one -- see ThisServerAgentProperties
  * @param exposedApps    every Exposed App ("server"), the same merged view ExposedAppController itself shows/edits
  * @param localWebsites  every Local Website's config; its content files live in the ZIP under local-websites/&lt;fqdn&gt;/
+ * @param theme          the shared Light/Dark UI theme setting (see ThemeStore) -- always included and always applied
+ *                       on restore, unconditionally, the same treatment as sourcePrimaryDomain/createdAt: there's no
+ *                       "pick some, not others" selection concept for a single global setting
+ * @param terminalSettings the SSH console's font size/font family/color theme (see TerminalSettingsStore) --
+ *                       same unconditional treatment as theme above
  */
 public record BackupManifest(
 		int version,
@@ -24,7 +29,9 @@ public record BackupManifest(
 		String sourcePrimaryDomain,
 		List<String> homelabs,
 		List<ExposedApp> exposedApps,
-		List<LocalWebsite> localWebsites) {
+		List<LocalWebsite> localWebsites,
+		String theme,
+		TerminalSettings terminalSettings) {
 
-	public static final int CURRENT_VERSION = 1;
+	public static final int CURRENT_VERSION = 2;
 }

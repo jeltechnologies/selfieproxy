@@ -67,9 +67,12 @@ class BackupServiceTest {
 		DomainStore domainStore = new DomainStore(tempDir.resolve("domains.json").toString());
 		DomainService domainService = new DomainService(domainStore, boringProxyProperties);
 		TunnelMapper tunnelMapper = new TunnelMapper(domainService, exposedAppStore);
+		ThemeStore themeStore = new ThemeStore(tempDir.resolve("theme.json").toString());
+		TerminalSettingsStore terminalSettingsStore =
+				new TerminalSettingsStore(tempDir.resolve("remote-console-settings.json").toString());
 		return new BackupService(boringProxyClient, tunnelMapper, boringProxyProperties, exposedAppStore,
 				localWebsiteStore, staticSiteProvisioner, sitesWebserverProperties, thisServerAgentProperties,
-				backupProperties);
+				themeStore, terminalSettingsStore, backupProperties);
 	}
 
 	@Test
@@ -125,7 +128,7 @@ class BackupServiceTest {
 	@Test
 	void stageRestoreRejectsZipSlipEntries() throws IOException {
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of(), List.of(), List.of());
+				"example.com", List.of(), List.of(), List.of(), "light", new TerminalSettings(15, "dark", "default"));
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -151,7 +154,7 @@ class BackupServiceTest {
 		ExposedApp app = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
 				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of("lab1"), List.of(app), List.of());
+				"example.com", List.of("lab1"), List.of(app), List.of(), "light", new TerminalSettings(15, "dark", "default"));
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -188,7 +191,8 @@ class BackupServiceTest {
 				"127.0.0.1", 8081, null, null, false, "example.com", null, null, null, false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingApp, newApp),
-				List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("newsite", "example.com")));
+				List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("newsite", "example.com")),
+				"light", new TerminalSettings(15, "dark", "default"));
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		when(exposedAppStore.find("blog.example.com")).thenReturn(existingApp);

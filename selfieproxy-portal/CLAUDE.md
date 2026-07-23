@@ -31,7 +31,18 @@ container. After a successful login the user lands on the exposed applications p
   server, forwarding plain HTTP onward), and for an HTTPS homelab app only under Server HTTPS (the
   recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
   never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
-- The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds "Export configuration"
+- The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds a theme toggle button (its
+  label flips between "Change to Dark mode"/"Change to Light mode" depending on the current
+  setting, `POST /appearance/toggle`, `web/AppearanceController.java` -- a one-click toggle rather
+  than a picker page, since there are only two modes: `domain/Theme`/`domain/ThemeStore`, persisted
+  to `data/selfieproxy/theme.json`; the same setting is also read by
+  `selfieproxy-identity-provider`'s own read-only `ThemeStore` mirror, applying it to the login/
+  change-password/logged-out pages too -- one shared appearance across both apps, default Light.
+  Toggling redirects back to whichever page the admin was on, using only the path+query of the
+  request's `Referer` header, never its host, so this can't be turned into an open redirect. This
+  is unrelated to `selfieproxy-remote-console`'s own Dracula/Light/Dark/Solarized Dark xterm.js
+  terminal color themes for the SSH console -- that's a separate, independent per-session setting,
+  not this shared UI-chrome mode), "Export configuration"
   (`/export-configuration`), "Import configuration" (`/import-configuration`), "Domains" (`/domains`,
   `web/DomainsController.java` -- see "Domains" below, always shown, no hide condition), "Users" (`/users`,
   `web/UsersController.java` -- add/edit/remove non-admin Users and change any user's password,
@@ -326,7 +337,13 @@ Local Websites wizard steps' per-item domain picker below. `BackupService` does 
   (`LocalWebsiteStore`) plus its content directory, zipped under `local-websites/<fqdn>/` alongside
   a root-level `manifest.json` describing everything else. `manifest.json` is pretty-printed
   (Jackson `INDENT_OUTPUT`) since it's meant to be readable/hand-editable before an import, not
-  just machine-consumed.
+  just machine-consumed. Two more things are **always** included and applied, unconditionally --
+  no checkbox, no wizard step, the same treatment `sourcePrimaryDomain`/`createdAt` already get,
+  since a single global setting has no "pick some, not others" selection concept: the shared
+  Light/Dark UI theme (`ThemeStore`, `manifest.theme`) and the SSH console's font
+  size/font family/color theme (`selfieproxy-remote-console`'s `TerminalSettingsStore`, mirrored
+  read/write here as `domain/TerminalSettings.java`/`TerminalSettingsStore.java`,
+  `manifest.terminalSettings`) -- restoring either overwrites the target server's current setting.
 - **What's deliberately excluded, always**: a Homelab's secret (its boringproxy access token) is
   never exported. Importing a Homelab that doesn't already exist on the target server always mints
   it a **brand-new** secret -- the import wizard's Homelabs step warns about this per item (only

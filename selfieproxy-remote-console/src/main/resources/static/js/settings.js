@@ -1,7 +1,7 @@
 (function () {
 	"use strict";
 
-	var STORAGE_KEY = "selfieproxy-remote-console-terminal-settings";
+	var SETTINGS_URL = "/api/terminal-settings";
 	var MIN_FONT_SIZE = 10;
 	var MAX_FONT_SIZE = 24;
 	var DEFAULT_FONT_SIZE = 15;
@@ -142,53 +142,67 @@
 		return FONTS[0];
 	}
 
+	// Returns a Promise resolving to a settings object -- server-persisted (TerminalSettingsStore/
+	// TerminalSettingsController), not localStorage, so it's shared across browsers/devices and
+	// covered by selfieproxy-portal's configuration export/import. Never rejects -- any network or
+	// parse error falls back to defaults silently, same "don't block the console" spirit the old
+	// localStorage try/catch had.
 	function load() {
-		var settings = {
-			version: 1,
-			fontSize: DEFAULT_FONT_SIZE,
-			themeId: DEFAULT_THEME_ID,
-			fontFamilyId: DEFAULT_FONT_FAMILY_ID
-		};
-		try {
-			var raw = window.localStorage.getItem(STORAGE_KEY);
-			if (!raw) {
+		return fetch(SETTINGS_URL)
+			.then(function (response) {
+				if (!response.ok) {
+					throw new Error("Unexpected status " + response.status);
+				}
+				return response.json();
+			})
+			.then(function (parsed) {
+				var settings = {
+					fontSize: DEFAULT_FONT_SIZE,
+					themeId: DEFAULT_THEME_ID,
+					fontFamilyId: DEFAULT_FONT_FAMILY_ID
+				};
+				if (parsed && typeof parsed === "object") {
+					if ("fontSize" in parsed) {
+						settings.fontSize = clampFontSize(parsed.fontSize);
+					}
+					if (typeof parsed.themeId === "string") {
+						settings.themeId = getTheme(parsed.themeId).id;
+					}
+					if (typeof parsed.fontFamilyId === "string") {
+						settings.fontFamilyId = getFontFamily(parsed.fontFamilyId).id;
+					}
+				}
 				return settings;
-			}
-			var parsed = JSON.parse(raw);
-			if (parsed && typeof parsed === "object") {
-				if ("fontSize" in parsed) {
-					settings.fontSize = clampFontSize(parsed.fontSize);
-				}
-				if (typeof parsed.themeId === "string") {
-					settings.themeId = getTheme(parsed.themeId).id;
-				}
-				if (typeof parsed.fontFamilyId === "string") {
-					settings.fontFamilyId = getFontFamily(parsed.fontFamilyId).id;
-				}
-			}
-		} catch (e) {
-			// Corrupted or inaccessible storage -- fall back to defaults silently.
-		}
-		return settings;
+			})
+			.catch(function () {
+				return {
+					fontSize: DEFAULT_FONT_SIZE,
+					themeId: DEFAULT_THEME_ID,
+					fontFamilyId: DEFAULT_FONT_FAMILY_ID
+				};
+			});
 	}
 
+	// Fire-and-forget -- the setting already applies live in this session regardless of whether
+	// the save succeeds, so a network error is swallowed silently rather than surfaced to the user.
 	function save(settings) {
-		try {
-			window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-				version: 1,
+		fetch(SETTINGS_URL, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
 				fontSize: settings.fontSize,
 				themeId: settings.themeId,
 				fontFamilyId: settings.fontFamilyId
-			}));
-		} catch (e) {
-			// Storage disabled (e.g. private browsing) -- setting still applies
-			// live this session, it just won't persist for next time.
-		}
+			})
+		}).catch(function () {
+			// Server unreachable -- setting still applies live this session, it just won't persist.
+		});
 	}
 
-	function initPanel(terminal, opts) {
-		var settings = load();
-
+	// settings is the object already resolved from load() -- initPanel no longer fetches itself,
+	// since load() is async and the caller (terminal.js) needs the settings before constructing
+	// the Terminal anyway.
+	function initPanel(terminal, settings, opts) {
 		var themeSelect = document.getElementById("theme-select");
 		THEMES.forEach(function (t) {
 			var option = document.createElement("option");

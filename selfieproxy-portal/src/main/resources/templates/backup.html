@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Export configuration')}"></head>
 <body>
 	<header th:replace="~{fragments/layout :: topbar(active='export')}"></header>
@@ -11,6 +11,7 @@
 				<p class="page-tagline">Use the exported configuration as backup, or import it to another server.</p>
 				<p class="page-subtitle">Choose what to include, then export a configuration ZIP. Agent secrets and
 					the admin login are never included -- importing a homelab always issues it a brand-new secret.</p>
+				<p class="page-subtitle">The Appearance theme and SSH console settings are always included.</p>
 			</div>
 		</section>
 

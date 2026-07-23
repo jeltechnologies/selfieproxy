@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Import configuration')}"></head>
 <body>
 	<header th:replace="~{fragments/layout :: topbar(active='import')}"></header>
@@ -12,9 +12,11 @@
 			</div>
 		</section>
 
+		<p class="page-subtitle">This import will also apply the exported Appearance theme and SSH console settings.</p>
+
 		<div class="warning"
 				th:if="${#lists.isEmpty(selectedHomelabs) and #lists.isEmpty(selectedExposedApps) and #lists.isEmpty(selectedLocalWebsites)}">
-			<p><strong>Nothing to import.</strong></p>
+			<p><strong>No homelabs, applications, or local websites selected.</strong></p>
 		</div>
 
 		<fieldset th:unless="${#lists.isEmpty(selectedHomelabs)}">

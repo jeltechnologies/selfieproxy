@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Import configuration')}"></head>
 <body>
 	<header th:replace="~{fragments/layout :: topbar(active='import')}"></header>
