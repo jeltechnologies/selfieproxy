@@ -31,13 +31,18 @@
 
 	// redirectToExisting/redirectSourceExisting are absent whenever there's nothing to pick from
 	// (no Web Applications or other Local Websites deployed yet) -- Custom is the only option then.
+	// Uses visibility rather than display for the inactive control -- display:none would collapse
+	// its row to the height of the bare radio label, so switching source made the other row's
+	// radio visibly jump up/down; visibility:hidden keeps the same box reserved (both rows always
+	// as tall as their real select/input) without showing it. disabled (unaffected by CSS
+	// visibility) is what actually keeps the inactive one out of the form submission.
 	function updateRedirectSource() {
 		var useExisting = !!(redirectSourceExisting && redirectSourceExisting.checked);
 		if (redirectToExisting) {
-			redirectToExisting.style.display = useExisting ? "" : "none";
+			redirectToExisting.style.visibility = useExisting ? "visible" : "hidden";
 			redirectToExisting.disabled = !useExisting;
 		}
-		redirectToCustom.style.display = useExisting ? "none" : "";
+		redirectToCustom.style.visibility = useExisting ? "hidden" : "visible";
 		redirectToCustom.disabled = useExisting;
 	}
 
