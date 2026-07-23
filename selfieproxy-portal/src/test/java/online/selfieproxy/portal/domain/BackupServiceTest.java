@@ -83,7 +83,7 @@ class BackupServiceTest {
 				"127.0.0.1", 8080, false, "server", false, false, "admin", "lab1", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", tunnel));
 		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null)));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null, false)));
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
@@ -109,7 +109,7 @@ class BackupServiceTest {
 				"127.0.0.1", 8081, false, "server", false, false, "admin", "lab2", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", blogTunnel, "shop.example.com", shopTunnel));
 		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null), new LocalWebsite("shopsite", "example.com", null)));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("shopsite", "example.com", null, false)));
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
@@ -214,7 +214,7 @@ class BackupServiceTest {
 
 	@Test
 	void applyRestoreSkipsContentRestoreForRedirectModeLocalWebsite() throws IOException {
-		LocalWebsite site = new LocalWebsite("old", "example.com", "https://www.example.com");
+		LocalWebsite site = new LocalWebsite("old", "example.com", "https://www.example.com", false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of(), List.of(), List.of(site), "light", new TerminalSettings(15, "dark", "default"));
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -248,13 +248,13 @@ class BackupServiceTest {
 				"127.0.0.1", 8081, null, null, false, "example.com", null, null, null, false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingApp, newApp),
-				List.of(new LocalWebsite("blogsite", "example.com", null), new LocalWebsite("newsite", "example.com", null)),
+				List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("newsite", "example.com", null, false)),
 				"light", new TerminalSettings(15, "dark", "default"));
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		when(exposedAppStore.find("blog.example.com")).thenReturn(existingApp);
 		when(exposedAppStore.find("shop.example.com")).thenReturn(null);
-		when(localWebsiteStore.find("blogsite.example.com")).thenReturn(new LocalWebsite("blogsite", "example.com", null));
+		when(localWebsiteStore.find("blogsite.example.com")).thenReturn(new LocalWebsite("blogsite", "example.com", null, false));
 		when(localWebsiteStore.find("newsite.example.com")).thenReturn(null);
 
 		BackupService service = newService();

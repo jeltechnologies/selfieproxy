@@ -274,6 +274,33 @@ no user-run address behind them, no Homelab to pick, just a domain. See root `CL
 `selfieproxy-local-websites`/`selfieproxy-localsites-agent` infrastructure behind this feature;
 this section is the portal-side UI behavior.
 
+- Two default Local Websites are created automatically the first time the portal ever starts
+  (`LocalWebsiteDemoBootstrap`): a "Local website demo" content site at `www.PRIMARY_DOMAIN`,
+  populated from `local-website-demo.zip` -- a single classpath resource the build zips up from
+  `src/main/resources/local-website-demo/` (see `pom.xml`), so the demo content ships inside the
+  portal's own Docker image with no separate download step -- and a redirect from the bare
+  `PRIMARY_DOMAIN` to it. Like the default homelab (see "Agents" above), each is a one-time,
+  independently-tracked bootstrap: deleting the demo content site does not bring it back on a
+  later restart, deleting the redirect does not bring *it* back either, and deleting one has no
+  effect on whether the other still exists. Because the bundled zip is baked into the jar at
+  build time, a *fresh* install (no `local-website-demo-bootstrapped` marker yet) always gets
+  whatever demo content shipped in the image it's running; an *existing* install upgrading to a
+  newer image tag does not get its already-bootstrapped `www` site's content touched, so an
+  admin's own edits to it are never silently overwritten by an image upgrade.
+- While the demo content site is still present and unmodified, the list page shows a `.notice`
+  banner (`LocalWebsiteDemoStatus`, visually distinct from the `.warning` cert-pending banner above
+  -- a friendly heads-up, not a problem to act on) naming the demo site and, if it too is still
+  unmodified, the apex redirect, saying both are safe to delete or replace. "Still unmodified" is a
+  plain `LocalWebsite.demo()` boolean -- `LocalWebsiteDemoBootstrap` sets it true when it creates
+  the site, `LocalWebsiteController` clears it the instant a ZIP is uploaded to it, a rename/
+  redirect-target-only edit or a domain rename (`DomainsController`) carries it forward unchanged,
+  and a configuration import (`BackupService`) always forces it false regardless of what the
+  export said, since "demo" is a single-server, single-bootstrap concept that must never follow an
+  export onto a different server. This is a cheap field read on every list-page load, not a
+  filesystem comparison -- editing the content directory directly (e.g. via `docker exec`, see
+  below) isn't a documented user workflow, so it isn't accounted for and won't clear the flag. The
+  banner independently stops mentioning the redirect the moment that's been repointed or removed,
+  via its own separate (also flag-free) check against the redirect's stored target.
 - The nav has a "Local websites" tab next to Applications. The list page shows every site's domain
   (opens in a new tab, with a warning icon if its chosen domain was since removed from the Domains
   page -- same treatment as the Applications page), an Edit button, and a Download button (streams

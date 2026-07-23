@@ -67,6 +67,9 @@ runtime config/volumes they use:
 │       │                            # registered secondary domains only, the primary domain is never stored here),
 │       │                            # selfieproxy-localsites-agent-secret,
 │       │                            # default-homelab-bootstrapped (marker, see AgentBootstrap),
+│       │                            # local-website-demo-bootstrapped / local-website-demo-redirect-bootstrapped
+│       │                            # (markers, see LocalWebsiteDemoBootstrap -- independently tracked so
+│       │                            # deleting one of the two default Local Websites doesn't recreate it),
 │       │                            # sso-signing-key.pem (selfieproxy-identity-provider's self-provisioned RSA key),
 │       │                            # theme.json (ThemeStore -- shared Light/Dark UI theme, written by
 │       │                            # selfieproxy-portal, read by both it and selfieproxy-identity-provider),
@@ -150,6 +153,13 @@ the stack — its `depends_on` waits on both `check-prerequisites` (`service_com
 and `selfieproxy-localsites-agent` (`service_started`, the last service in every other service's
 dependency chain), so the shared NGINX only comes up once everything upstream of it — DNS
 preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
+
+On first boot, `selfieproxy-portal` also auto-creates two default Local Websites through this
+same `selfieproxy-local-websites` infrastructure: a demo content site at `www.PRIMARY_DOMAIN`
+(bundled with the portal itself, see `selfieproxy-portal/CLAUDE.md`'s "Local websites" section)
+and a redirect from the bare `PRIMARY_DOMAIN` to it — see `LocalWebsiteDemoBootstrap`, the same
+one-time, marker-file-gated pattern `AgentBootstrap` already uses for the default homelab above,
+applied independently to each of the two.
 
 Two further services power the browser SSH/RDP/VNC console feature (the "Terminal Access: SSH"/
 "Desktop Access: RDP"/"Desktop Access: VNC" Network Service Modes in the portal, see

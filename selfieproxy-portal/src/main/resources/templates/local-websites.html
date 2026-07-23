@@ -17,6 +17,16 @@
 			No local websites yet.
 		</p>
 
+		<p class="notice" th:if="${demoContentAvailable and demoRedirectAvailable}">
+			Your server includes a demo website at <strong th:text="${demoContentFqdn}"></strong> and a
+			redirect from <strong th:text="${demoRedirectDomain}"></strong> to it. Feel free to delete
+			the demo, or replace it with your own contents.
+		</p>
+		<p class="notice" th:if="${demoContentAvailable and !demoRedirectAvailable}">
+			Your server includes a demo website at <strong th:text="${demoContentFqdn}"></strong>. Feel
+			free to delete the demo, or replace it with your own contents.
+		</p>
+
 		<p class="warning" th:if="${hasPendingCerts}">
 			One or more local websites are temporarily using a self-signed certificate -- browsers will show a
 			security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can

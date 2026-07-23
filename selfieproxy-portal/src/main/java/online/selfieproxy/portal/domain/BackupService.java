@@ -319,8 +319,11 @@ public class BackupService {
 				continue;
 			}
 			try {
+				// demo is always forced false on import -- it's a single-server, single-bootstrap
+				// concept (see LocalWebsite.demo()) that must never follow an export onto another server.
 				LocalWebsite site = new LocalWebsite(original.label(),
-						selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain()), original.redirectTo());
+						selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain()), original.redirectTo(),
+						false);
 				String fqdn = site.fqdn();
 				deleteTunnelIgnoringMissing(fqdn);
 				sleep();

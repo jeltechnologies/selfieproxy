@@ -10,6 +10,8 @@
 	--success: #2e9e4f;
 	--warning-bg: #fff6e0;
 	--warning-border: #e8c96a;
+	--notice-bg: #eaf1fd;
+	--notice-border: #a9c6f7;
 }
 
 /* Selfie Proxy's explicit, persisted Light/Dark setting (ThemeStore/AppearanceController) -- set
@@ -26,6 +28,8 @@
 	--success: #3fbf63;
 	--warning-bg: #3a341a;
 	--warning-border: #7a6a2a;
+	--notice-bg: #1c2a3e;
+	--notice-border: #3a5a8a;
 }
 
 * { box-sizing: border-box; }
@@ -365,6 +369,17 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 .warning {
 	background: var(--warning-bg);
 	border: 1px solid var(--warning-border);
+	border-radius: 8px;
+	padding: 0.75rem 1rem;
+	margin: 0.75rem 0;
+	font-size: 0.9rem;
+}
+
+/* Same shape as .warning, but for a friendly heads-up rather than a problem to act on -- eg. the
+   "this is still just demo content" hint on the Local Websites list (LocalWebsiteDemoStatus). */
+.notice {
+	background: var(--notice-bg);
+	border: 1px solid var(--notice-border);
 	border-radius: 8px;
 	padding: 0.75rem 1rem;
 	margin: 0.75rem 0;

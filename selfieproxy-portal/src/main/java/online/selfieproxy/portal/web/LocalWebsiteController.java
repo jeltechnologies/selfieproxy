@@ -31,6 +31,7 @@ import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.DnsLabelValidator;
 import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.LocalWebsite;
+import online.selfieproxy.portal.domain.LocalWebsiteDemoStatus;
 import online.selfieproxy.portal.domain.LocalWebsiteStore;
 import online.selfieproxy.portal.domain.LocalWebsiteType;
 import online.selfieproxy.portal.domain.RedirectUrlValidator;
@@ -65,11 +66,12 @@ public class LocalWebsiteController {
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final BoringProxyProperties boringProxyProperties;
 	private final DomainService domainService;
+	private final LocalWebsiteDemoStatus localWebsiteDemoStatus;
 
 	public LocalWebsiteController(BoringProxyClient boringProxyClient, LocalWebsiteStore localWebsiteStore,
 			StaticSiteProvisioner staticSiteProvisioner, SitesWebserverProperties sitesWebserverProperties,
 			ThisServerAgentProperties thisServerAgentProperties, BoringProxyProperties boringProxyProperties,
-			DomainService domainService) {
+			DomainService domainService, LocalWebsiteDemoStatus localWebsiteDemoStatus) {
 		this.boringProxyClient = boringProxyClient;
 		this.localWebsiteStore = localWebsiteStore;
 		this.staticSiteProvisioner = staticSiteProvisioner;
@@ -77,6 +79,7 @@ public class LocalWebsiteController {
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.boringProxyProperties = boringProxyProperties;
 		this.domainService = domainService;
+		this.localWebsiteDemoStatus = localWebsiteDemoStatus;
 	}
 
 	@GetMapping("/local-websites")
@@ -99,12 +102,23 @@ public class LocalWebsiteController {
 		boolean hasPendingCerts = certPendingByDomain.values().stream().anyMatch(Boolean::booleanValue);
 		model.addAttribute("hasPendingCerts", hasPendingCerts);
 
+		// Only shown while the demo content site LocalWebsiteDemoBootstrap created on first boot is
+		// still byte-for-byte the bundled demo -- disappears the moment it's replaced with real
+		// content, regardless of whether that happened through this portal or directly on disk.
+		boolean demoContentAvailable = localWebsiteDemoStatus.isDemoContentUnmodified();
+		model.addAttribute("demoContentAvailable", demoContentAvailable);
+		if (demoContentAvailable) {
+			model.addAttribute("demoContentFqdn", localWebsiteDemoStatus.demoContentFqdn());
+			model.addAttribute("demoRedirectAvailable", localWebsiteDemoStatus.isDemoRedirectUnmodified());
+			model.addAttribute("demoRedirectDomain", localWebsiteDemoStatus.demoRedirectDomain());
+		}
+
 		return "local-websites";
 	}
 
 	@GetMapping("/local-websites/new")
 	public String newWebsite(Model model) {
-		LocalWebsite website = new LocalWebsite("", boringProxyProperties.primaryDomain(), null);
+		LocalWebsite website = new LocalWebsite("", boringProxyProperties.primaryDomain(), null, false);
 		model.addAttribute("website", website);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());
@@ -129,7 +143,7 @@ public class LocalWebsiteController {
 	public String create(@ModelAttribute LocalWebsiteForm form,
 			@RequestParam(value = "websiteZip", required = false) MultipartFile websiteZip,
 			HttpServletRequest request, Model model) throws IOException {
-		LocalWebsite website = toLocalWebsite(form);
+		LocalWebsite website = toLocalWebsite(form, null);
 
 		List<String> errors = validate(website, null);
 		if (!errors.isEmpty()) {
@@ -157,7 +171,7 @@ public class LocalWebsiteController {
 			@RequestParam(value = "websiteZip", required = false) MultipartFile websiteZip,
 			HttpServletRequest request, Model model) throws InterruptedException, IOException {
 		LocalWebsite existing = localWebsiteStore.find(fqdn);
-		LocalWebsite website = toLocalWebsite(form);
+		LocalWebsite website = toLocalWebsite(form, existing);
 		boolean hasZip = websiteZip != null && !websiteZip.isEmpty();
 
 		boolean fqdnUnchanged = fqdn.equals(website.fqdn());
@@ -191,6 +205,9 @@ public class LocalWebsiteController {
 		}
 		if (hasZip && !website.isRedirect()) {
 			staticSiteProvisioner.replaceContents(newFqdn, websiteZip.getInputStream());
+			// A freshly uploaded ZIP means this can no longer be the untouched bootstrap demo, even
+			// if it started out as one -- see LocalWebsite.demo()/LocalWebsiteDemoStatus.
+			website = new LocalWebsite(website.label(), website.domain(), website.redirectTo(), false);
 		}
 		if (!fqdnUnchanged) {
 			localWebsiteStore.delete(fqdn);
@@ -265,10 +282,12 @@ public class LocalWebsiteController {
 				&& targets.stream().anyMatch(t -> ("https://" + t).equalsIgnoreCase(website.redirectTo())));
 	}
 
-	private LocalWebsite toLocalWebsite(LocalWebsiteForm form) {
+	/** existing is the pre-edit record (null when adding), so a rename/redirect-target change alone carries its demo flag forward unchanged -- see LocalWebsite.demo(). */
+	private LocalWebsite toLocalWebsite(LocalWebsiteForm form, LocalWebsite existing) {
 		String label = normalize(form.label());
 		String redirectTo = form.type() == LocalWebsiteType.REDIRECT ? blankToNull(form.redirectTo()) : null;
-		return new LocalWebsite(label.isBlank() ? null : label, normalize(form.domain()), redirectTo);
+		boolean demo = existing != null && existing.demo();
+		return new LocalWebsite(label.isBlank() ? null : label, normalize(form.domain()), redirectTo, demo);
 	}
 
 	private static String blankToNull(String value) {

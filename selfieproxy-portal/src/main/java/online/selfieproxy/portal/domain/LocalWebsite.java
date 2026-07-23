@@ -10,8 +10,9 @@ package online.selfieproxy.portal.domain;
  * @param label      the subdomain label suffixed with {@link #domain} to form the FQDN, or blank/null to serve the site at the bare domain itself (apex)
  * @param domain     which registered domain (the primary domain or a secondary one, see DomainService) label is suffixed onto
  * @param redirectTo blank/null for the default content mode (files uploaded through the portal); a bare {@code scheme://host} to instead have this domain issue an HTTP 301 to it (see RedirectUrlValidator)
+ * @param demo       true only for the exact content site LocalWebsiteDemoBootstrap created on first boot, and only until its content is replaced -- see LocalWebsiteDemoStatus, which reads this flag (cheaply, no filesystem I/O) to decide whether to still show the "this is just demo content" hint. LocalWebsiteController clears it the moment a ZIP is uploaded; a plain rename/domain move carries it forward unchanged (see DomainsController); a configuration import always forces it false (see BackupService), since "demo" is a single-server, single-bootstrap concept that must never follow an export to a different server.
  */
-public record LocalWebsite(String label, String domain, String redirectTo) {
+public record LocalWebsite(String label, String domain, String redirectTo, boolean demo) {
 
 	public String fqdn() {
 		return label == null || label.isBlank() ? domain : label + "." + domain;

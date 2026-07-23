@@ -216,7 +216,7 @@ public class DomainsController {
 		for (LocalWebsite site : affectedSites) {
 			String oldFqdn = site.fqdn();
 			try {
-				LocalWebsite renamed = new LocalWebsite(site.label(), newName, site.redirectTo());
+				LocalWebsite renamed = new LocalWebsite(site.label(), newName, site.redirectTo(), site.demo());
 				String newFqdn = renamed.fqdn();
 				deleteTunnelIgnoringMissing(oldFqdn);
 				sleep();
