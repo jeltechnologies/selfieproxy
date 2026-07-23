@@ -22,7 +22,7 @@
 	--card-bg: #1f2023;
 	--text: #eaeaec;
 	--muted: #9a9aa2;
-	--border: #313236;
+	--border: #6c757d;
 	--success: #3fbf63;
 	--warning-bg: #3a341a;
 	--warning-border: #7a6a2a;
@@ -59,7 +59,7 @@ h1 { font-size: 32px; }
 .brand { font-size: 1.4rem; font-weight: 600; color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4em; }
 .brand-icon { width: 1em; height: 1em; flex: none; color: #245edb; }
 
-.topbar-nav { flex: 1; margin-left: 1.5rem; display: flex; gap: 1.5rem; align-items: center; }
+.topbar-nav { flex: 1; margin-left: 2.5rem; display: flex; gap: 1.5rem; align-items: center; }
 .topbar-nav a {
 	color: var(--muted);
 	text-decoration: none;
@@ -275,6 +275,15 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	text-decoration: none;
 	color: var(--text);
 	font-size: 0.85rem;
+}
+
+/* Dark mode only -- .button-small has no background in Light mode (it shows the page/card
+   background through), but that page background is dark in Dark mode, making the button read as
+   invisible/blended in. Blue (.button/--accent) and red (.button-danger/--danger) buttons keep
+   their own colors, untouched. */
+[data-theme="dark"] .button-small {
+	background: #6c757d;
+	color: #fff;
 }
 
 /* An <a> has no native disabled state -- the Applications list's Connect button uses this
