@@ -59,6 +59,7 @@
 				<label class="restore-item" th:each="site : ${manifest.localWebsites()}">
 					<input type="checkbox" name="localWebsites" th:value="${site.fqdn()}" checked>
 					<span th:text="${site.fqdn()}"></span>
+					<span th:if="${site.isRedirect()}" class="muted" th:text="'→ ' + ${site.redirectTo()}"></span>
 				</label>
 			</fieldset>
 

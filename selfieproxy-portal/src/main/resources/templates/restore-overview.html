@@ -48,6 +48,7 @@
 			<legend>Local websites</legend>
 			<div th:each="site : ${manifest.localWebsites()}" th:if="${selectedLocalWebsites.contains(site.fqdn())}">
 				<span th:text="${site.fqdn()}"></span>
+				<span th:if="${site.isRedirect()}" class="muted" th:text="'→ ' + ${site.redirectTo()}"></span>
 				<span th:if="${existingLocalWebsites.contains(site.fqdn())}" class="status-badge status-badge-existing">Existing</span>
 				<span th:unless="${existingLocalWebsites.contains(site.fqdn())}" class="status-badge status-badge-new">New</span>
 				<p class="warning" th:if="${existingLocalWebsites.contains(site.fqdn())}">
