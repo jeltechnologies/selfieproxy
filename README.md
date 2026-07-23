@@ -1,34 +1,38 @@
 # Selfie Proxy
 
-Expose apps and services running at home to the internet, without dealing with port
-forwarding, dynamic IPs, or certificates by hand.
+Selfie Proxy provides a simplified, selfhosting solution for accessing home labs behind NAT/CGNAT, creating HTTPS subdomains via a small internet-facing server rather than complex configurations. It avoids unnecessary enterprise features like load balancing and auditing, focusing instead on ease of use for self-hosters.
 
 ## Why
 
-Most home internet connections can't be reached from outside: ISPs use shared/dynamic
-addresses and port forwarding often doesn't work. Tools like Cloudflare Tunnel, Pangolin,
-or NetBird solve this, but are built for enterprise use cases and require real networking
-knowledge to configure.
+Homelabs typically operate on a home internet network that can't be reached from the outside. 
 
-Selfie Proxy is scoped to a single use case: one person exposing their own home services
-through one small internet-facing server. You connect your home network to it, and every
-app you want to share gets its own HTTPS subdomain, managed from an admin portal instead
-of config files. No high availability, load balancing, role-based permissions, or auditing
-and enterprise compliance tooling — if you need those, use a commercial product instead.
+Internet service providers introduced CGNAT, which creates a protective barrier, stopping hackers and malicious bots from scanning, targeting, or accessing home gadgets. While CGNAT is a good thing for normal consumers, it brings problems for homelabs because classic port forwarding does not work anymore.
+
+Tools like Cloudflare Tunnel, Pangolin, Tailscale, and NetBird solve this, but they require real networking knowledge to configure. With many options and configurations, it takes many clicks to get things working. As a self-hoster, you don't need all these options. 
+
+Most of these mentioned tools are built for enterprise use cases. They hide basic functions like backup and restore, terminal access, and remote desktop behind paid enterprise licenses.
+
+Selfie Proxy is designed for people selfhosting for a hobby. It includes the essential security that homelabs actually need, while deliberately skipping enterprise bloat to keep things lightweight, zero-cost, and easy to run yourself.
+
+Selfie Proxy deliberately lacks enterprise features that commercial alternatives provide:
+- No high availability or load balancing
+- No auditing and enterprise compliance tooling
+- No dedicated support
+
+If your business requires these features, use a commercial product instead!
 
 ## Features
 
 - Admin portal to manage every exposed app and website.
 - Automatic, auto-renewing HTTPS certificates.
 - Built-in login (single sign on) protecting the admin portal and, optionally, individual exposed apps.
-- Simple user management: one admin account runs the portal, plus any number of additional
+- Simplified user management: one admin account runs the portal, plus any number of additional
   Users who can only log in to the apps you've protected — nothing more.
-- Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
 - Remote Desktop and SSH terminal access to your homelab machines, right in your browser —
   no VPN, no separate RDP/VNC/SSH client to install or configure.
-- Light and dark mode for the admin portal, your choice, saved for next time.
+- Light and dark mode for its user interfaces.
 - Back up your configuration, or move it to another Selfie Proxy server — everything at once,
   with the exception of passwords.
 - Single Docker command to install and update.
@@ -39,19 +43,19 @@ Selfie Proxy's reverse tunnel engine (`selfieproxy-reverseproxy`) is a fork of
 [boringproxy](https://github.com/boringproxy/boringproxy) by Anders Pitman, which is no longer
 actively maintained. Written in Go, it's lightweight and fast. Selfie Proxy itself is a larger
 system built around that engine — the admin portal, identity provider, and other services are
-our own code, not part of the fork. On top of boringproxy we added:
+our own code, not part of the fork. 
 
+On top of boringproxy we added:
 - A new admin portal aimed at home users instead of boringproxy's networking-first UI.
 - WebSocket support.
 - Per-app authentication for exposed applications.
 - Centralized agent ("client") management from the admin portal.
 - Built-in single sign on login for the portal, with support for swapping in an external OIDC provider.
-- Admin-managed Users, so you can share login access to your apps without sharing the admin account.
+- Users management, so you can share login access to your apps without sharing the admin account.
 - Static website hosting.
 - Browser-based Remote Desktop and SSH terminal access to homelab machines.
 - Export/import configuration for every homelab, application, and static website.
-- Fixed tunnel authentication failing on modern OpenSSH (8.8+), which rejects the old
-  RSA/`ssh-rsa` keys by default, by switching to Ed25519 — also a more secure algorithm.
+- Improved security by replacing RSA keys with Ed25519 encryption between agent and server.
 - A one-command Docker install.
 
 ## Requirements
@@ -111,7 +115,13 @@ our own code, not part of the fork. On top of boringproxy we added:
 ## FAQ
 
 **Is this free?** Yes, MIT-licensed, no restrictions on hobby or commercial use — see
-[License](#license). For business-critical use, prefer a supported enterprise product.
+[License](#license). For business-critical use cases, we recommend using supported enterprise products instead.
+
+**Is this secure?** The homelab-to-server tunnel is encrypted, the server is under your own
+control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
+app) sits behind login. Repeated failed login attempts are throttled with an increasing
+delay, capped at 15 minutes, so password-guessing scripts get slower with every attempt
+without ever locking a legitimate user out for longer than that. It's open source.
 
 **macOS/Windows?** The homelab agent runs fine on macOS/Windows, in Docker's default bridge
 mode — except it can't use a local DNS server, so use an IP address rather than a hostname
@@ -123,12 +133,6 @@ server has no such flexibility: it requires `network_mode: host`, so it must run
 point it directly at the application (HTTP, or HTTPS with a self-signed cert). Connecting
 straight to the app is what lets Selfie Proxy manage certificates and auth for it;
 forwarding through another reverse proxy breaks both.
-
-**Is this secure?** The homelab-to-server tunnel is encrypted, the server is under your own
-control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
-app) sits behind login. Repeated failed login attempts are throttled with an increasing
-delay, capped at 15 minutes, so password-guessing scripts get slower with every attempt
-without ever locking a legitimate user out for longer than that. It's open source.
 
 **What's in a configuration export?** Everything, with the exception of passwords. Importing
 walks you through what's new versus what already exists before anything changes. A restored
