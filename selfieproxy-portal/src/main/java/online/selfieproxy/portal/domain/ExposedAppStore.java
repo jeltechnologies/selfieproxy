@@ -3,7 +3,9 @@ package online.selfieproxy.portal.domain;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -99,6 +101,13 @@ public class ExposedAppStore {
 	public ExposedApp find(String fqdn) {
 		synchronized (lock) {
 			return readAll().get(fqdn);
+		}
+	}
+
+	/** A snapshot of every stored record, eg. for a cross-record check like Network Service name uniqueness. */
+	public Collection<ExposedApp> values() {
+		synchronized (lock) {
+			return List.copyOf(readAll().values());
 		}
 	}
 

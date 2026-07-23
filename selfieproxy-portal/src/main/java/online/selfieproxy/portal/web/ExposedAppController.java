@@ -3,7 +3,6 @@ package online.selfieproxy.portal.web;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -22,6 +21,7 @@ import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
 import online.selfieproxy.portal.domain.ExposedAppType;
+import online.selfieproxy.portal.domain.NetworkServiceLabel;
 import online.selfieproxy.portal.domain.NetworkServiceMode;
 import online.selfieproxy.portal.domain.Protocol;
 import online.selfieproxy.portal.domain.TunnelMapper;
@@ -172,11 +172,11 @@ public class ExposedAppController {
 
 		String domain = remoteAccess ? properties.primaryDomain()
 				: form.domain() == null || form.domain().isBlank() ? properties.primaryDomain() : form.domain();
+		String name = networkService && form.name() != null && !form.name().isBlank() ? form.name().trim() : null;
 		String trimmedSubdomain = form.subdomain() == null ? null : form.subdomain().trim().toLowerCase();
 		String subdomain = networkService
-				? (trimmedSubdomain == null || trimmedSubdomain.isBlank() ? generateUniqueSubdomain(domain) : trimmedSubdomain)
+				? generateSubdomain(domain, name, existing != null ? existing.fqdn() : null)
 				: (trimmedSubdomain == null || trimmedSubdomain.isBlank() ? null : trimmedSubdomain);
-		String name = networkService && form.name() != null && !form.name().isBlank() ? form.name().trim() : null;
 
 		String username = remoteAccess ? blankToNull(form.username()) : null;
 		boolean ignoreCertificate = remoteAccess && Boolean.TRUE.equals(form.ignoreCertificate());
@@ -192,15 +192,26 @@ public class ExposedAppController {
 				mode, username, encryptedSecret, ignoreCertificate);
 	}
 
-	/** Random internal subdomain for a Network Service, retried until it doesn't collide with an existing tunnel on domain. */
-	private String generateUniqueSubdomain(String domain) {
+	/**
+	 * Internal subdomain for a Network Service, derived from its Name (see NetworkServiceLabel) so
+	 * it reads as a label the admin understands rather than a random string -- recomputed on every
+	 * save, so a rename keeps the tunnel's label in sync. Retried with a numeric suffix until it
+	 * doesn't collide with an existing tunnel on domain; excludeFqdn is the record's own current
+	 * FQDN when editing, so re-saving without a rename doesn't suffix itself.
+	 */
+	private String generateSubdomain(String domain, String name, String excludeFqdn) {
+		String base = NetworkServiceLabel.slugify(name == null ? "" : name);
 		Map<String, TunnelDto> existing = boringProxyClient.listTunnels();
+		String candidate = base;
+		int suffix = 2;
 		while (true) {
-			String candidate = "svc-" + UUID.randomUUID().toString().substring(0, 8);
 			String fqdn = candidate + "." + domain;
-			if (existing.keySet().stream().noneMatch(d -> d.equalsIgnoreCase(fqdn))) {
+			boolean taken = existing.keySet().stream()
+					.anyMatch(d -> d.equalsIgnoreCase(fqdn) && (excludeFqdn == null || !d.equalsIgnoreCase(excludeFqdn)));
+			if (!taken) {
 				return candidate;
 			}
+			candidate = base + "-" + suffix++;
 		}
 	}
 
@@ -251,6 +262,14 @@ public class ExposedAppController {
 
 		if (app.isNetworkService() && (app.name() == null || app.name().isBlank())) {
 			errors.add("Name is required for a network service.");
+		} else if (app.isNetworkService()) {
+			boolean nameTaken = exposedAppStore.values().stream()
+					.anyMatch(other -> other.isNetworkService() && other.name() != null
+							&& other.name().equalsIgnoreCase(app.name())
+							&& (originalFqdn == null || !other.fqdn().equalsIgnoreCase(originalFqdn)));
+			if (nameTaken) {
+				errors.add("Name \"" + app.name() + "\" is already used by another network service.");
+			}
 		}
 
 		if (app.isNetworkService() && app.effectiveMode() == NetworkServiceMode.RAW_TCP) {

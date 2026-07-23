@@ -6,7 +6,7 @@ package online.selfieproxy.portal.domain;
  * vocabulary (Client/Tunnel) in field names, per selfieproxy-portal/CLAUDE.md.
  *
  * @param subdomain    the app's Selfie Proxy identifier -- the label suffixed with {@link #domain} to form the FQDN, or blank/null to expose the app at the bare domain itself (apex)
- * @param name         only meaningful when type is NETWORK_SERVICE -- a free-text label; not unique, not part of the domain
+ * @param name         only meaningful when type is NETWORK_SERVICE -- a label, unique across every Network Service (see ExposedAppController's uniqueness check), not part of the domain but the basis for the generated internal subdomain (see NetworkServiceLabel)
  * @param exposedPort  only meaningful when type is NETWORK_SERVICE -- the internet-facing port for RAW_TCP mode, or the boringproxy-assigned tunnel port for SSH/RDP/VNC mode (never internet-facing, dialed by selfieproxy-remote-console instead)
  * @param protocol     only meaningful when type is WEB_APPLICATION (Network Service is always TCP)
  * @param tlsMode      only set when type is WEB_APPLICATION and protocol is HTTPS

@@ -149,8 +149,8 @@ container. After a successful login the user lands on the exposed applications p
   click any header to sort ascending/descending, plain client-side JS,
   `static/js/sortable-table.js`, no server round-trip) and a domain-only filter dropdown above the
   table (populated from every registered domain, see "Domains"). Each row shows Name (the subdomain
-  for a Web application; the user-entered Name for a Network service, since its internal `svc-`
-  subdomain is never shown), Domain (with a warning icon if that domain was since removed from the
+  for a Web application; the user-entered Name for a Network service, since its internal, Name-derived
+  subdomain -- see `NetworkServiceLabel` -- is never shown), Domain (with a warning icon if that domain was since removed from the
   Domains page -- the app keeps working, it's just orphaned from Selfie Proxy's own domain
   registry; always the primary domain for an SSH/RDP/VNC-mode app, which still shows normally here
   like any other domain, warning icon included, rather than being special-cased -- see
@@ -183,7 +183,8 @@ The edit page fields, in order:
      exposed; a port can only be exposed by one app at a time), on a subdomain of a chosen
      **Domain** (dropdown of every registered domain, primary first -- same ordering/labeling as a
      Web application's Domain field). The subdomain itself is never shown to the user -- a
-     generated internal `svc-` value, exactly like every mode below.
+     generated internal value derived from Name (see `NetworkServiceLabel`, lowercased/sanitized,
+     with a numeric suffix on collision), exactly like every mode below.
    - **Terminal Access: SSH**, **Desktop Access: RDP**, **Desktop Access: VNC** -- a browser
      SSH/RDP/VNC session instead, reached through a **Connect** action on the Applications list
      (see below) rather than a public URL: the underlying tunnel is created with
@@ -209,7 +210,8 @@ The edit page fields, in order:
    immediately after the subdomain/exposed port, updated live as the user edits the form
    (including changing the domain dropdown). Not a hyperlink.
 4. The "Address in the homelab" fieldset: **Name** (Network service only, required, for every
-   mode -- a label shown in the list, not part of the domain, not unique), Homelab, then a row with
+   mode -- a label shown in the list, not part of the domain, unique across every Network Service
+   -- see "Validation" below -- and the basis for the generated internal subdomain above), Homelab, then a row with
    Protocol (HTTP/HTTPS dropdown, Web application only -- no equivalent field for a Network
    Service, since Mode already says TCP/SSH/RDP/VNC and repeating "Protocol: TCP" next to it added
    nothing), host/IP (always shown, needed for every type/mode), and port (defaults to 80 for HTTP,
@@ -258,8 +260,11 @@ Button panel: Cancel (returns to the list, no changes), OK (add/update), Remove 
 background/white text, asks for confirmation in an overlay first).
 
 Validation: before adding, check the subdomain isn't already taken on the chosen domain
-(case-insensitive) — this also applies to a Network service's generated internal subdomain,
-regenerated until it doesn't collide. `proxylistener`/`selfieproxy`/`auth` (or their env overrides,
+(case-insensitive) — this also applies to a Network service's generated internal subdomain
+(derived from its Name, see point 4 above), regenerated on every save until it doesn't collide, so
+a rename keeps the tunnel's label in sync with the current Name. A Network Service's Name must
+also be unique across every other Network Service (case-insensitive, any mode/domain --
+`ExposedAppController.validate`), independent of the subdomain-collision check. `proxylistener`/`selfieproxy`/`auth` (or their env overrides,
 `REVERSE_PROXY_LISTENER_SUBDOMAIN`/`SELFPROXY_ADMIN_DOMAIN`/`SELFPROXY_AUTH_DOMAIN`) are reserved and
 cannot be used for a user's own exposed apps -- but only when the primary domain is selected, since
 those reserved subdomains are hardcoded to the primary domain alone (`docker-compose.yaml`); the same
