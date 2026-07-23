@@ -7,7 +7,7 @@
 <meta name="description" content="Selfie Proxy gives every app running in your homelab a friendly, secure internet address — from one small server you control. No port forwarding, automatic HTTPS, built-in login, one Docker command." />
 <meta property="og:title" content="Selfie Proxy — self-hosted reverse proxy for homelabs" />
 <meta property="og:description" content="Self-host your homelab on the internet. Open source, MIT licensed, one Docker command." />
-<meta property="og:image" content="screenshots/applications.png" />
+<meta property="og:image" content="screenshots/edit-application.jpg" />
 <meta property="og:type" content="website" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -78,11 +78,20 @@
       <div class="hero-shot reveal">
         <div class="browser-frame">
           <div class="browser-chrome"><span></span><span></span><span></span></div>
-          <button type="button" class="shot-frame shot-trigger"
-                  data-lightbox-src="screenshots/applications.png"
-                  data-lightbox-alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address.">
-            <img src="screenshots/applications.png" alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address." width="1549" height="760" />
+          <button type="button" class="shot-frame shot-trigger" id="hero-carousel-trigger"
+                  data-lightbox-src="screenshots/edit-application.jpg"
+                  data-lightbox-alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
+            <img id="hero-carousel-img" src="screenshots/edit-application.jpg" alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." width="1920" height="879" />
           </button>
+        </div>
+        <div class="hero-carousel-dots" id="hero-carousel-dots" role="group" aria-label="Product screenshots">
+          <button type="button" class="carousel-dot is-active" aria-label="Show Applications screenshot"></button>
+          <button type="button" class="carousel-dot" aria-label="Show Homelabs screenshot"></button>
+          <button type="button" class="carousel-dot" aria-label="Show Connect a homelab screenshot"></button>
+          <button type="button" class="carousel-dot" aria-label="Show Remote desktop (Windows) screenshot"></button>
+          <button type="button" class="carousel-dot" aria-label="Show Remote desktop (Linux) screenshot"></button>
+          <button type="button" class="carousel-dot" aria-label="Show Terminal access screenshot"></button>
+          <button type="button" class="carousel-dot" aria-label="Show Local websites screenshot"></button>
         </div>
       </div>
     </div>
@@ -108,12 +117,6 @@
           are designed for enterprise network engineers. Selfie Proxy instead focuses on
           usability and simplicity for the self-hoster.
         </p>
-        <ul class="tool-list" aria-hidden="true">
-          <li>high availability</li>
-          <li>load balancing</li>
-          <li>role-based access</li>
-          <li>managed SaaS</li>
-        </ul>
         <p class="problem-punch">Selfie Proxy is built for exactly one person: you, running your own stuff.</p>
       </div>
     </div>
@@ -136,7 +139,7 @@
             </svg>
           </div>
           <h3>One simple admin portal</h3>
-          <p>Every homelab and every exposed app, managed from a single page. A web form to fill in, not a config file to get right.</p>
+          <p>Every homelab and every exposed app, managed from a single page — in light or dark, your call. A web form to fill in, not a config file to get right.</p>
         </div>
 
         <div class="feature-card">
@@ -147,6 +150,16 @@
           </div>
           <h3>Authentication built in</h3>
           <p>The admin portal is protected out of the box, and a checkbox puts the same login in front of any app you expose. Separate user accounts add security too: everyone can reach the apps, only you can reach the portal.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-badge">
+            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="12" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/><path d="M7 10.5l2.5-2.5L7 5.5" /><line x1="11" y1="10.5" x2="14" y2="10.5"/>
+            </svg>
+          </div>
+          <h3>Remote desktop and terminal, right in your browser</h3>
+          <p>Open a homelab machine's desktop or command line from any tab. No VPN, no extra software to install.</p>
         </div>
 
         <div class="feature-card">
@@ -165,18 +178,8 @@
               <path d="M11 3H4v7l10 10 7-7L11 3Z"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
             </svg>
           </div>
-          <h3>Add an app in seconds</h3>
-          <p>Pick a subdomain, point it at your app's local address, save. <code>nas.yourdomain.com</code> is live before you've finished your coffee.</p>
-        </div>
-
-        <div class="feature-card">
-          <div class="feature-icon-badge">
-            <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="5" cy="6" r="2.1"/><circle cx="19" cy="6" r="2.1"/><circle cx="12" cy="18" r="2.1"/><line x1="6.8" y1="7.3" x2="10.5" y2="16"/><line x1="17.2" y1="7.3" x2="13.5" y2="16"/><line x1="7.2" y1="6" x2="16.8" y2="6"/>
-            </svg>
-          </div>
-          <h3>Any number of homelabs</h3>
-          <p>Connect your house, a parents' house, a friend's server rack — manage every one of them from the same portal.</p>
+          <h3>Add an app in seconds, from any homelab</h3>
+          <p>Pick a subdomain, point it at your app's local address, save. Connect your house, a parents' house, a friend's rack — all from one portal.</p>
         </div>
 
         <div class="feature-card">
@@ -218,12 +221,41 @@
     </div>
   </section>
 
+  <!-- ============ FAQ ============ -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <div class="section-head reveal">
+        <p class="eyebrow">Questions</p>
+        <h2>Before you install it</h2>
+      </div>
+
+      <div class="faq-list reveal">
+        <details class="faq-item" open>
+          <summary>Is this actually secure?</summary>
+          <p>Yes. Traffic between your homelab and the server always travels through an encrypted tunnel, to a server that's entirely under your own control rather than a third party's. Every exposed app gets HTTPS automatically, and the admin portal — optionally any app — is protected by a built-in login screen that automatically slows down repeated wrong-password attempts. It's open source, so the code is there for anyone to check.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is this free?</summary>
+          <p>Yes. Selfie Proxy is free and open source under the MIT license, usable in any environment, hobby or professional, without limitations. That said, if your business depends on it, you're probably better served by a supported enterprise solution — see "What this isn't" above.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Does it run on macOS or Windows?</summary>
+          <p>The server needs Linux — it relies on Docker's host networking, which macOS and Windows don't support. The homelab agent has no such restriction: it runs fine in Docker's default bridge mode on macOS and Windows too, with one limitation — no local DNS server support, so you'll enter an IP address rather than a hostname when setting it up.</p>
+        </details>
+        <details class="faq-item">
+          <summary>I already run NGINX at home with a valid certificate — can Selfie Proxy just use that?</summary>
+          <p>No. Point Selfie Proxy directly at the web application itself, over HTTP or HTTPS with a self-signed certificate — not at the NGINX reverse proxy in front of it. Connecting straight to the application is what lets Selfie Proxy manage certificates for you automatically and protect the app with its own login, neither of which is possible if it's only forwarding to another reverse proxy.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
   <!-- ============ TOUR ============ -->
   <section class="tour" id="tour">
     <div class="container">
       <div class="section-head reveal">
         <p class="eyebrow">See it in action</p>
-        <h2>The whole admin portal, in four screens</h2>
+        <h2>Selfie Proxy, in five screens</h2>
         <p>Every screenshot below is the real thing — no mockups.</p>
       </div>
 
@@ -232,9 +264,9 @@
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
-                    data-lightbox-src="screenshots/homelabs.png"
-                    data-lightbox-alt="Homelabs page listing two connected networks, my-homelab shown Connected in green and smart home network shown Disconnected in red, each with an application count.">
-              <img src="screenshots/homelabs.png" alt="Homelabs page listing two connected networks, my-homelab shown Connected in green and smart home network shown Disconnected in red, each with an application count." loading="lazy" width="1180" height="527" />
+                    data-lightbox-src="screenshots/homelabs.jpg"
+                    data-lightbox-alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 applications, and iot-gadgets shown Disconnected in red with 1 application.">
+              <img src="screenshots/homelabs.jpg" alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 applications, and iot-gadgets shown Disconnected in red with 1 application." loading="lazy" width="1920" height="879" />
             </button>
           </div>
         </div>
@@ -250,16 +282,16 @@
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
-                    data-lightbox-src="screenshots/applications.png"
-                    data-lightbox-alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address.">
-              <img src="screenshots/applications.png" alt="Applications table listing exposed apps such as nas, navidrome, photoalbum, portainer, proxmox and termix, each with its internet address, homelab and local address." loading="lazy" width="1549" height="760" />
+                    data-lightbox-src="screenshots/rdp-windows.jpg?v=2"
+                    data-lightbox-alt="Browser-based remote desktop session titled windows-box (RDP), showing the Windows 10 Settings app open to About, with the Windows Specifications for the homelab machine.">
+              <img src="screenshots/rdp-windows.jpg?v=2" alt="Browser-based remote desktop session titled windows-box (RDP), showing the Windows 10 Settings app open to About, with the Windows Specifications for the homelab machine, and the remote desktop's own taskbar at the bottom." loading="lazy" width="1321" height="811" />
             </button>
           </div>
         </div>
         <div class="tour-text">
-          <p class="eyebrow">Applications</p>
-          <h3>Every exposed app in one table</h3>
-          <p>Its internet address, which homelab it lives on, and where to find it locally. Click through to a working <code>https://</code> link straight from the list.</p>
+          <p class="eyebrow">Remote desktop</p>
+          <h3>Open a homelab machine's full desktop, right in the browser</h3>
+          <p>No RDP client to install, no VPN to dial in first — just a tab.</p>
         </div>
       </div>
 
@@ -268,9 +300,27 @@
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
-                    data-lightbox-src="screenshots/edit-application.png"
-                    data-lightbox-alt="Edit application form for navidrome, showing subdomain, the resulting HTTPS address, an authentication checkbox, and the local homelab address with protocol, host and port fields.">
-              <img src="screenshots/edit-application.png" alt="Edit application form for navidrome, showing subdomain, the resulting HTTPS address, an authentication checkbox, and the local homelab address with protocol, host and port fields." loading="lazy" width="954" height="800" />
+                    data-lightbox-src="screenshots/ssh-terminal.jpg?v=2"
+                    data-lightbox-alt="Browser-based SSH terminal session titled vibecoding-ssh, showing an Ubuntu welcome banner, system information, and a live command prompt.">
+              <img src="screenshots/ssh-terminal.jpg?v=2" alt="Browser-based SSH terminal session titled vibecoding-ssh, showing an Ubuntu welcome banner, system information, and a live command prompt." loading="lazy" width="1321" height="811" />
+            </button>
+          </div>
+        </div>
+        <div class="tour-text">
+          <p class="eyebrow">Terminal access</p>
+          <h3>Or skip the desktop — a real SSH session, in the browser</h3>
+          <p>Type actual commands, see actual output. No terminal app to open, no key to copy around.</p>
+        </div>
+      </div>
+
+      <div class="tour-row reverse reveal">
+        <div class="tour-frame">
+          <div class="browser-frame">
+            <div class="browser-chrome"><span></span><span></span><span></span></div>
+            <button type="button" class="shot-frame shot-trigger"
+                    data-lightbox-src="screenshots/edit-application.jpg"
+                    data-lightbox-alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
+              <img src="screenshots/edit-application.jpg" alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." loading="lazy" width="1920" height="879" />
             </button>
           </div>
         </div>
@@ -281,21 +331,21 @@
         </div>
       </div>
 
-      <div class="tour-row reverse reveal">
+      <div class="tour-row reveal">
         <div class="tour-frame">
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
-                    data-lightbox-src="screenshots/lcoal-websites.png"
-                    data-lightbox-alt="Local websites page listing two static sites, www.nordicsnerd.com and www.mystuff.info, each with an Edit button.">
-              <img src="screenshots/lcoal-websites.png" alt="Local websites page listing two static sites, www.nordicsnerd.com and www.mystuff.info, each with an Edit button." loading="lazy" width="1176" height="527" />
+                    data-lightbox-src="screenshots/local-websites.jpg"
+                    data-lightbox-alt="Local websites page listing selfieproxy.online redirecting to https://www.selfieproxy.online, and www.selfieproxy.online itself, both temporarily flagged as using a self-signed certificate.">
+              <img src="screenshots/local-websites.jpg" alt="Local websites page listing selfieproxy.online redirecting to https://www.selfieproxy.online, and www.selfieproxy.online itself, both temporarily flagged as using a self-signed certificate." loading="lazy" width="1920" height="879" />
             </button>
           </div>
         </div>
         <div class="tour-text">
           <p class="eyebrow">Local websites</p>
           <h3>Serve a plain static site under your own domain</h3>
-          <p>A homepage, a resume, a small landing page — hosted straight from the server you already pay for, no separate hosting bill.</p>
+          <p>A homepage, a resume, a small landing page — hosted straight from the server you already pay for, no separate hosting bill. Or skip the files entirely and point the domain straight at another address you manage.</p>
         </div>
       </div>
     </div>
@@ -360,7 +410,7 @@
       <div class="spec-sheet reveal">
         <div class="spec-row">
           <span class="spec-label">DOMAIN</span>
-          <span class="spec-value">A domain name from any registrar. <span>You'll point it, and a wildcard subdomain, at your server.</span></span>
+          <span class="spec-value">A domain name from any registrar. <span>You'll point it, and a wildcard subdomain, at your server. You can connect more than one domain later, all from the same server.</span></span>
         </div>
         <div class="spec-row">
           <span class="spec-label">SERVER</span>
@@ -370,35 +420,6 @@
           <span class="spec-label">HOMELAB</span>
           <span class="spec-value">A machine at home that can run Docker. <span>Physical or virtual — this is what connects your homelab to Selfie Proxy.</span></span>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ FAQ ============ -->
-  <section class="faq" id="faq">
-    <div class="container">
-      <div class="section-head reveal">
-        <p class="eyebrow">Questions</p>
-        <h2>Before you install it</h2>
-      </div>
-
-      <div class="faq-list reveal">
-        <details class="faq-item" open>
-          <summary>Is this actually secure?</summary>
-          <p>Yes. Traffic between your homelab and the server always travels through an encrypted tunnel, to a server that's entirely under your own control rather than a third party's. Every exposed app gets HTTPS automatically, and the admin portal — optionally any app — is protected by a built-in login screen. It's open source, so the code is there for anyone to check.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Is this free?</summary>
-          <p>Yes. Selfie Proxy is free and open source under the MIT license, usable in any environment, hobby or professional, without limitations. That said, if your business depends on it, you're probably better served by a supported enterprise solution — see "What this isn't" above.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Does it run on macOS or Windows?</summary>
-          <p>The server needs Linux — it relies on Docker's host networking, which macOS and Windows don't support. The homelab agent has no such restriction: it runs fine in Docker's default bridge mode on macOS and Windows too, with one limitation — no local DNS server support, so you'll enter an IP address rather than a hostname when setting it up.</p>
-        </details>
-        <details class="faq-item">
-          <summary>I already run NGINX at home with a valid certificate — can Selfie Proxy just use that?</summary>
-          <p>No. Point Selfie Proxy directly at the web application itself, over HTTP or HTTPS with a self-signed certificate — not at the NGINX reverse proxy in front of it. Connecting straight to the application is what lets Selfie Proxy manage certificates for you automatically and protect the app with its own login, neither of which is possible if it's only forwarding to another reverse proxy.</p>
-        </details>
       </div>
     </div>
   </section>

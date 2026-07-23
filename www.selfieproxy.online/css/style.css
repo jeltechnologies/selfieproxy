@@ -355,7 +355,47 @@ code,
 }
 
 .hero-shot .shot-frame {
-  aspect-ratio: 1549 / 760;
+  aspect-ratio: 1920 / 879;
+}
+
+.shot-frame img {
+  transition: opacity 0.25s ease;
+}
+
+.shot-frame img.is-fading {
+  opacity: 0;
+}
+
+.hero-carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--line-strong);
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.carousel-dot:hover {
+  background: var(--text-faint);
+}
+
+.carousel-dot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.carousel-dot.is-active {
+  background: var(--gold);
+  transform: scale(1.3);
 }
 
 .hero h1 {
@@ -553,25 +593,6 @@ code,
   border-left: 3px solid var(--accent);
   padding-left: var(--space-4);
   margin-top: var(--space-6) !important;
-}
-
-.tool-list {
-  list-style: none;
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.tool-list li {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--text-faint);
-  background: var(--surface-alt);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-3);
 }
 
 /* ---------- features ---------- */
