@@ -263,6 +263,16 @@ no compose file or `.env` template for them here. An agent connects with just a 
 server-generated secret (`AGENT_NAME`/`AGENT_SECRET`) issued from the admin portal's Agents
 page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER_SUBDOMAIN.PRIMARY_DOMAIN` from this
 server's `.env`); the portal itself is the source of guidance for running that agent process.
+**Possible future enhancement**: agents dial a hardcoded port 22 for their SSH reverse tunnel today
+(boringproxy's own `-ssh-server-port` flag already exists and defaults to `22` -- see
+`selfieproxy-reverseproxy/CLAUDE.md` -- but nothing in this repo's `.env`/docker-compose.yaml
+exposes it yet). Some homelabs sit behind networks that only allow outbound `80`/`443` (corporate
+firewalls, hotel/campus Wi-Fi, some mobile carriers), which blocks port 22 entirely. The obvious
+fix -- move the SSH port to `443` -- doesn't work as a simple env var, though: boringproxy's own
+HTTPS listener already owns `443` on this same host, and sharing one TCP port between SSH and TLS
+traffic needs a protocol multiplexer (e.g. `sslh`, sniffing the ClientHello to route SSH vs TLS to
+different local ports) that this stack doesn't have today. Wiring this up for real is a bigger
+change than exposing the existing flag.
 `docker-compose.yaml` passes `-acme-email "${LETSENCRYPT_EMAIL:-}"` to both boringproxy
 invocations (the main server and the colocated `selfieproxy-localsites-agent`, which does its
 own independent certmagic issuance into `this-server-certmagic`) — it's optional for ACME/Let's
