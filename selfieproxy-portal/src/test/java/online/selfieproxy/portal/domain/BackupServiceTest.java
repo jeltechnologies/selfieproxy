@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,7 +83,7 @@ class BackupServiceTest {
 				"127.0.0.1", 8080, false, "server", false, false, "admin", "lab1", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", tunnel));
 		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com")));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null)));
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
@@ -108,7 +109,7 @@ class BackupServiceTest {
 				"127.0.0.1", 8081, false, "server", false, false, "admin", "lab2", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("blog.example.com", blogTunnel, "shop.example.com", shopTunnel));
 		when(exposedAppStore.reconcile(any())).thenAnswer(inv -> inv.getArgument(0));
-		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("shopsite", "example.com")));
+		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null), new LocalWebsite("shopsite", "example.com", null)));
 
 		BackupService service = newService();
 		ByteArrayOutputStream backupBytes = new ByteArrayOutputStream();
@@ -212,6 +213,34 @@ class BackupServiceTest {
 	}
 
 	@Test
+	void applyRestoreSkipsContentRestoreForRedirectModeLocalWebsite() throws IOException {
+		LocalWebsite site = new LocalWebsite("old", "example.com", "https://www.example.com");
+		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
+				"example.com", List.of(), List.of(), List.of(site), "light", new TerminalSettings(15, "dark", "default"));
+		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
+		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
+			zip.putNextEntry(new ZipEntry("manifest.json"));
+			zip.write(JsonMapper.builder().build().writeValueAsBytes(manifest));
+			zip.closeEntry();
+		}
+
+		doThrow(new BoringProxyException(404, "Tunnel doesn't exist")).when(boringProxyClient)
+				.deleteTunnel(eq("old.example.com"));
+
+		BackupService service = newService();
+		String stagingId = service.stageRestore(new ByteArrayInputStream(zipBytes.toByteArray()));
+
+		RestoreResult result = service.applyRestore(stagingId,
+				new RestoreSelection(List.of(), List.of(), List.of("old.example.com"), Map.of()));
+
+		assertEquals(1, result.localWebsitesRestored());
+		assertTrue(result.failures().isEmpty(), "unexpected failures: " + result.failures());
+		verify(staticSiteProvisioner).provision("old.example.com", "https://www.example.com");
+		verify(staticSiteProvisioner, never()).replaceContents(any(), any());
+		verify(localWebsiteStore).save(site);
+	}
+
+	@Test
 	void diffManifestFlagsExistingItemsAgainstLiveState() {
 		ExposedApp existingApp = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
 				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);
@@ -219,13 +248,13 @@ class BackupServiceTest {
 				"127.0.0.1", 8081, null, null, false, "example.com", null, null, null, false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingApp, newApp),
-				List.of(new LocalWebsite("blogsite", "example.com"), new LocalWebsite("newsite", "example.com")),
+				List.of(new LocalWebsite("blogsite", "example.com", null), new LocalWebsite("newsite", "example.com", null)),
 				"light", new TerminalSettings(15, "dark", "default"));
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		when(exposedAppStore.find("blog.example.com")).thenReturn(existingApp);
 		when(exposedAppStore.find("shop.example.com")).thenReturn(null);
-		when(localWebsiteStore.find("blogsite.example.com")).thenReturn(new LocalWebsite("blogsite", "example.com"));
+		when(localWebsiteStore.find("blogsite.example.com")).thenReturn(new LocalWebsite("blogsite", "example.com", null));
 		when(localWebsiteStore.find("newsite.example.com")).thenReturn(null);
 
 		BackupService service = newService();

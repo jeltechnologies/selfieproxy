@@ -37,19 +37,34 @@ public class StaticSiteProvisioner {
 		this.sitesDir = Path.of(properties.sitesPath());
 	}
 
-	/** Ensures domain's content directory exists and (re)writes its NGINX server block. */
-	public void provision(String domain) {
+	/**
+	 * Writes domain's NGINX server block. In content mode (redirectTo blank/null) also ensures its
+	 * content directory exists. In redirect mode, the content directory is deliberately left
+	 * untouched -- never created, and never deleted if one already exists from a previous content
+	 * mode (see LocalWebsiteController), so switching back later doesn't lose uploaded files.
+	 */
+	public void provision(String domain, String redirectTo) {
 		try {
-			Files.createDirectories(sitesDir.resolve(domain));
 			Files.createDirectories(confDir);
-			Files.writeString(confFile(domain), """
-					server {
-						listen 80;
-						server_name %s;
-						root /sites/%s;
-						index index.html;
-					}
-					""".formatted(domain, domain));
+			if (redirectTo != null && !redirectTo.isBlank()) {
+				Files.writeString(confFile(domain), """
+						server {
+							listen 80;
+							server_name %s;
+							return 301 %s$request_uri;
+						}
+						""".formatted(domain, redirectTo));
+			} else {
+				Files.createDirectories(sitesDir.resolve(domain));
+				Files.writeString(confFile(domain), """
+						server {
+							listen 80;
+							server_name %s;
+							root /sites/%s;
+							index index.html;
+						}
+						""".formatted(domain, domain));
+			}
 		} catch (IOException e) {
 			throw new IllegalStateException("Failed to provision static site for " + domain, e);
 		}
@@ -69,20 +84,23 @@ public class StaticSiteProvisioner {
 	 * Moves oldDomain's content directory to newDomain and re-provisions under
 	 * the new name. If a directory for newDomain already exists (eg. a race
 	 * with a concurrent add under that same domain), it's left as-is and
-	 * reused instead of being overwritten.
+	 * reused instead of being overwritten. In redirect mode there's no content
+	 * directory to move -- see provision(String, String).
 	 */
-	public void rename(String oldDomain, String newDomain) {
+	public void rename(String oldDomain, String newDomain, String redirectTo) {
 		try {
 			Files.deleteIfExists(confFile(oldDomain));
-			Path oldDir = sitesDir.resolve(oldDomain);
-			Path newDir = sitesDir.resolve(newDomain);
-			if (Files.exists(oldDir) && !Files.exists(newDir)) {
-				Files.move(oldDir, newDir);
+			if (redirectTo == null || redirectTo.isBlank()) {
+				Path oldDir = sitesDir.resolve(oldDomain);
+				Path newDir = sitesDir.resolve(newDomain);
+				if (Files.exists(oldDir) && !Files.exists(newDir)) {
+					Files.move(oldDir, newDir);
+				}
 			}
 		} catch (IOException e) {
 			throw new IllegalStateException("Failed to rename static site from " + oldDomain + " to " + newDomain, e);
 		}
-		provision(newDomain);
+		provision(newDomain, redirectTo);
 	}
 
 	/** Zips domain's content directory to out, entries relative to the directory root (no leading domain folder). A missing directory yields an empty zip. */

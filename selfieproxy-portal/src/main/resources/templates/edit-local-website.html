@@ -14,6 +14,14 @@
 		<form id="website-form" method="post" enctype="multipart/form-data"
 			  th:action="${isNew} ? @{/local-websites} : @{/local-websites/{fqdn}(fqdn=${website.fqdn()})}">
 
+			<div class="field" id="type-field">
+				<label for="type">Type</label>
+				<select id="type" name="type">
+					<option value="CONTENT" th:selected="${!website.isRedirect()}">Serve website files</option>
+					<option value="REDIRECT" th:selected="${website.isRedirect()}">Redirect to another address</option>
+				</select>
+			</div>
+
 			<div class="field-row">
 				<div class="field" id="label-field">
 					<label for="label">Subdomain</label>
@@ -36,6 +44,13 @@
 					<label>Fully qualified domain name</label>
 					<p id="result" class="result-text"></p>
 				</div>
+			</div>
+
+			<div class="field" id="redirect-to-field" style="display:none">
+				<label for="redirectTo">Redirect to</label>
+				<input type="url" id="redirectTo" name="redirectTo" th:value="${website.redirectTo()}"
+					   placeholder="https://www.example.com"
+					   title="An address like https://www.example.com, with no path, query, or fragment">
 			</div>
 
 			<div class="field" id="website-zip-field">

@@ -216,12 +216,12 @@ public class DomainsController {
 		for (LocalWebsite site : affectedSites) {
 			String oldFqdn = site.fqdn();
 			try {
-				LocalWebsite renamed = new LocalWebsite(site.label(), newName);
+				LocalWebsite renamed = new LocalWebsite(site.label(), newName, site.redirectTo());
 				String newFqdn = renamed.fqdn();
 				deleteTunnelIgnoringMissing(oldFqdn);
 				sleep();
 				boringProxyClient.createTunnel(toLocalWebsiteTunnelRequest(newFqdn));
-				staticSiteProvisioner.rename(oldFqdn, newFqdn);
+				staticSiteProvisioner.rename(oldFqdn, newFqdn, site.redirectTo());
 				localWebsiteStore.delete(oldFqdn);
 				localWebsiteStore.save(renamed);
 				sitesUpdated++;

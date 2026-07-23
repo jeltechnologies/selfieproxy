@@ -320,13 +320,15 @@ public class BackupService {
 			}
 			try {
 				LocalWebsite site = new LocalWebsite(original.label(),
-						selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain()));
+						selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain()), original.redirectTo());
 				String fqdn = site.fqdn();
 				deleteTunnelIgnoringMissing(fqdn);
 				sleep();
 				boringProxyClient.createTunnel(toLocalWebsiteTunnelRequest(fqdn));
-				staticSiteProvisioner.provision(fqdn);
-				restoreLocalWebsiteContent(stagingDir, fqdnKey, fqdn);
+				staticSiteProvisioner.provision(fqdn, site.redirectTo());
+				if (!site.isRedirect()) {
+					restoreLocalWebsiteContent(stagingDir, fqdnKey, fqdn);
+				}
 				localWebsiteStore.save(site);
 				localWebsitesRestored++;
 			} catch (Exception e) {

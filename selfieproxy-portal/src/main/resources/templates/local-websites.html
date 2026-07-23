@@ -44,6 +44,7 @@
 					th:with="fqdn=${website.fqdn()}" th:attr="data-domain=${website.domain()}">
 					<td th:attr="data-sort-value=${fqdn}">
 						<a th:href="'https://' + ${fqdn}" target="_blank" rel="noopener" th:text="${fqdn}"></a>
+						<span th:if="${website.isRedirect()}" class="muted" th:text="'→ ' + ${website.redirectTo()}"></span>
 						<span th:if="${!domainService.exists(website.domain())}"
 							  class="warning-icon" title="This local website's domain no longer exists">&#9888;</span>
 						<span th:if="${certPendingByDomain.get(fqdn)}"
@@ -52,7 +53,7 @@
 					</td>
 					<td>
 						<a class="button-small" th:href="@{/local-websites/{fqdn}/edit(fqdn=${fqdn})}">Edit</a>
-						<a class="button-small" th:href="@{/local-websites/{fqdn}/download(fqdn=${fqdn})}">Download</a>
+						<a th:unless="${website.isRedirect()}" class="button-small" th:href="@{/local-websites/{fqdn}/download(fqdn=${fqdn})}">Download</a>
 					</td>
 				</tr>
 			</tbody>

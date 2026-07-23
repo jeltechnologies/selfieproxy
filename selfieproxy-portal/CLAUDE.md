@@ -306,6 +306,20 @@ this section is the portal-side UI behavior.
   separate DNS-mismatch check here -- a Local Website's domain is always a registered one, so its
   DNS correctness is already tracked centrally on the Domains settings page instead (see "Domains"
   above), exactly like an Exposed App.
+- **Type: Serve website files (default) or Redirect to another address** (`LocalWebsite.redirectTo`,
+  blank/null for the default content mode, same "presence implies special mode" idiom the domain/
+  subdomain fields already use for apex). Redirect mode has `StaticSiteProvisioner` write an NGINX
+  `return 301 <redirectTo>$request_uri;` block instead of `root`/`index` -- the tunnel, cert, and
+  domain machinery are identical to content mode, only the generated server block differs. The
+  primary use case is a bare/apex domain redirecting to its own `www.` subdomain (e.g.
+  `nordicsnerd.com` → `https://www.nordicsnerd.com`), but the target can be any registered or
+  external domain. The target must be a bare `scheme://host` with no path/query/fragment
+  (`RedirectUrlValidator`) -- NGINX appends the visited path onto it verbatim via `$request_uri`,
+  so allowing a path in the target would make that concatenation ambiguous; this is meant to point
+  a whole domain elsewhere, not rewrite individual URLs. A site can't be set to redirect to itself.
+  Switching an existing site from content to redirect mode leaves its uploaded content directory
+  untouched on disk (nothing to lose if switched back later) but hides the Download button and
+  ZIP-upload field while in redirect mode, since there's nothing to download or replace.
 
 ## Backup and restore
 

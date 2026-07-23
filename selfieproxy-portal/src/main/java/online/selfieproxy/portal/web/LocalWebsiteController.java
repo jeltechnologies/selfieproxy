@@ -1,9 +1,11 @@
 package online.selfieproxy.portal.web;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -28,6 +30,8 @@ import online.selfieproxy.portal.domain.DnsLabelValidator;
 import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.LocalWebsite;
 import online.selfieproxy.portal.domain.LocalWebsiteStore;
+import online.selfieproxy.portal.domain.LocalWebsiteType;
+import online.selfieproxy.portal.domain.RedirectUrlValidator;
 import online.selfieproxy.portal.domain.StaticSiteProvisioner;
 import online.selfieproxy.portal.session.PortalSession;
 import online.selfieproxy.portal.session.PortalSessions;
@@ -98,7 +102,7 @@ public class LocalWebsiteController {
 
 	@GetMapping("/local-websites/new")
 	public String newWebsite(Model model) {
-		model.addAttribute("website", new LocalWebsite("", boringProxyProperties.primaryDomain()));
+		model.addAttribute("website", new LocalWebsite("", boringProxyProperties.primaryDomain(), null));
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());
 		return "edit-local-website";
@@ -134,8 +138,8 @@ public class LocalWebsiteController {
 		PortalSession session = PortalSessions.get(request.getSession(false));
 		String fqdn = website.fqdn();
 		boringProxyClient.createTunnel(toCreateTunnelRequest(fqdn, session.owner()));
-		staticSiteProvisioner.provision(fqdn);
-		if (websiteZip != null && !websiteZip.isEmpty()) {
+		staticSiteProvisioner.provision(fqdn, website.redirectTo());
+		if (websiteZip != null && !websiteZip.isEmpty() && !website.isRedirect()) {
 			staticSiteProvisioner.replaceContents(fqdn, websiteZip.getInputStream());
 		}
 		localWebsiteStore.save(website);
@@ -146,11 +150,15 @@ public class LocalWebsiteController {
 	public String update(@PathVariable String fqdn, @ModelAttribute LocalWebsiteForm form,
 			@RequestParam(value = "websiteZip", required = false) MultipartFile websiteZip,
 			HttpServletRequest request, Model model) throws InterruptedException, IOException {
+		LocalWebsite existing = localWebsiteStore.find(fqdn);
 		LocalWebsite website = toLocalWebsite(form);
 		boolean hasZip = websiteZip != null && !websiteZip.isEmpty();
 
 		boolean fqdnUnchanged = fqdn.equals(website.fqdn());
-		if (fqdnUnchanged && !hasZip) {
+		// redirectTo is independent of the fqdn -- "fqdn unchanged and no zip" alone no longer means
+		// nothing changed, since the redirect target/mode could have.
+		boolean redirectUnchanged = existing != null && Objects.equals(existing.redirectTo(), website.redirectTo());
+		if (fqdnUnchanged && redirectUnchanged && !hasZip) {
 			return "redirect:/local-websites";
 		}
 
@@ -169,9 +177,12 @@ public class LocalWebsiteController {
 			deleteTunnelIgnoringMissing(fqdn);
 			Thread.sleep(2000);
 			boringProxyClient.createTunnel(toCreateTunnelRequest(newFqdn, session.owner()));
-			staticSiteProvisioner.rename(fqdn, newFqdn);
+			staticSiteProvisioner.rename(fqdn, newFqdn, website.redirectTo());
+		} else if (!redirectUnchanged) {
+			// Same domain, same tunnel -- only the NGINX block needs rewriting.
+			staticSiteProvisioner.provision(newFqdn, website.redirectTo());
 		}
-		if (hasZip) {
+		if (hasZip && !website.isRedirect()) {
 			staticSiteProvisioner.replaceContents(newFqdn, websiteZip.getInputStream());
 		}
 		if (!fqdnUnchanged) {
@@ -184,7 +195,7 @@ public class LocalWebsiteController {
 	@GetMapping("/local-websites/{fqdn}/download")
 	public void download(@PathVariable String fqdn, HttpServletResponse response) throws IOException {
 		LocalWebsite website = localWebsiteStore.find(fqdn);
-		if (website == null) {
+		if (website == null || website.isRedirect()) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND);
 			return;
 		}
@@ -221,7 +232,21 @@ public class LocalWebsiteController {
 
 	private LocalWebsite toLocalWebsite(LocalWebsiteForm form) {
 		String label = normalize(form.label());
-		return new LocalWebsite(label.isBlank() ? null : label, normalize(form.domain()));
+		String redirectTo = form.type() == LocalWebsiteType.REDIRECT ? blankToNull(form.redirectTo()) : null;
+		return new LocalWebsite(label.isBlank() ? null : label, normalize(form.domain()), redirectTo);
+	}
+
+	private static String blankToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		// Strips a trailing slash so StaticSiteProvisioner's "<redirectTo>$request_uri" concatenation
+		// never produces a double slash -- $request_uri already starts with one.
+		if (trimmed.endsWith("/")) {
+			trimmed = trimmed.substring(0, trimmed.length() - 1);
+		}
+		return trimmed.isBlank() ? null : trimmed;
 	}
 
 	/**
@@ -277,6 +302,17 @@ public class LocalWebsiteController {
 			errors.add(website.label() != null && !website.label().isBlank()
 					? "Subdomain \"" + website.label() + "\" is already in use."
 					: "\"" + website.domain() + "\" is already in use.");
+		}
+
+		if (website.isRedirect()) {
+			if (!RedirectUrlValidator.isValid(website.redirectTo())) {
+				errors.add("Redirect target must be an address like https://example.com, with no path, query, or fragment.");
+			} else {
+				String targetHost = URI.create(website.redirectTo()).getHost();
+				if (targetHost != null && targetHost.equalsIgnoreCase(fqdn)) {
+					errors.add("A local website can't redirect to itself.");
+				}
+			}
 		}
 
 		return errors;
