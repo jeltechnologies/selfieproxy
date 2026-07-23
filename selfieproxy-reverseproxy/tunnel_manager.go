@@ -68,12 +68,19 @@ func NewTunnelManager(config *Config, db *Database, certConfig *certmagic.Config
 	return tunMan
 }
 
-// IsCertPending reports whether domain currently has a managed-TLS tunnel
-// waiting on certificate issuance (used to decide whether to serve a
-// temporary self-signed certificate for it).
-func (m *TunnelManager) IsCertPending(domain string) bool {
+// CertFallbackDecision is withSelfSignedFallback's predicate for the server: certFallbackSelfSigned
+// for a domain with no tunnel at all, or a known tunnel still waiting on real cert issuance;
+// certFallbackNone otherwise (a managed tunnel whose cert failed for some other reason, or an
+// unmanaged TLS-termination mode that was never expecting a cert here in the first place).
+func (m *TunnelManager) CertFallbackDecision(domain string) certFallback {
 	tunnel, exists := m.db.GetTunnel(domain)
-	return exists && tunnel.CertPending && isManagedTlsTermination(tunnel.TlsTermination)
+	if !exists {
+		return certFallbackSelfSigned
+	}
+	if tunnel.CertPending && isManagedTlsTermination(tunnel.TlsTermination) {
+		return certFallbackSelfSigned
+	}
+	return certFallbackNone
 }
 
 // startCertRetryLoop periodically retries certificate issuance for tunnels

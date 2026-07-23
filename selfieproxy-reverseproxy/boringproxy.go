@@ -246,7 +246,7 @@ func Listen() {
 
 	p := &Server{db, tunMan, httpClient, httpListener}
 
-	getCertificate := withSelfSignedFallback(certConfig, tunMan.IsCertPending, selfSignedCerts)
+	getCertificate := withSelfSignedFallback(certConfig, tunMan.CertFallbackDecision, selfSignedCerts)
 
 	tlsConfig := &tls.Config{
 		GetCertificate: getCertificate,
@@ -412,13 +412,17 @@ func Listen() {
 				return
 			}
 			r.Header.Set("X-Selfieproxy-Sso-Verified", "true")
-			proxyRequest(w, r, portalTunnel, httpClient, "localhost", *portalPort, *behindProxy)
+			// Report 200 rather than the raw dial error while selfieproxy-portal is still
+			// starting up (e.g. "connection reset by peer" before its Spring Boot listener is
+			// bound) -- the same "still booting" condition oidcAuthHolder-nil already reports
+			// as 503 for the OIDC endpoints above, just for the plain HTTP proxy path instead.
+			proxyRequest(w, r, portalTunnel, httpClient, "localhost", *portalPort, *behindProxy, upstreamErrorStartingUp)
 		} else if *ssoDomain != "" && hostDomain == *ssoDomain {
 			// Proxied directly to selfieproxy-sso-server, same
 			// before-any-agent-exists carve-out as -portal-domain. Never gated
 			// behind single sign on itself -- it's the IdP the gate calls out to.
 			ssoTunnel := Tunnel{Domain: *ssoDomain}
-			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, *behindProxy)
+			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, *behindProxy, upstreamErrorStartingUp)
 		} else if *consoleDomain != "" && hostDomain == *consoleDomain {
 			// Proxied directly to selfieproxy-remote-console, same carve-out
 			// shape as -portal-domain (fixed local address, no Tunnel/Agent) --
@@ -431,14 +435,16 @@ func Listen() {
 				return
 			}
 			r.Header.Set("X-Selfieproxy-Sso-Verified", "true")
-			proxyRequest(w, r, consoleTunnel, httpClient, "localhost", *consolePort, *behindProxy)
+			proxyRequest(w, r, consoleTunnel, httpClient, "localhost", *consolePort, *behindProxy, upstreamErrorStartingUp)
 		} else {
 
 			tunnel, exists := db.GetTunnel(hostDomain)
 			if !exists {
-				errMessage := fmt.Sprintf("No tunnel attached to %s", hostDomain)
-				w.WriteHeader(500)
-				io.WriteString(w, errMessage)
+				// Reachable at all only because getCertificate's certFallbackEphemeral case
+				// (self_signed_cert.go) now serves a self-signed cert for domains with no tunnel,
+				// rather than aborting the TLS handshake outright -- see TunnelManager.CertFallbackDecision.
+				writeHtmlError(w, http.StatusNotFound, "404 - Not Found",
+					"<p>This domain is not configured in Selfie Proxy.</p><p>If you own this domain, add an application or local website for it in the Selfie Proxy portal.</p>")
 				return
 			}
 
@@ -446,7 +452,12 @@ func Listen() {
 				return
 			}
 
-			proxyRequest(w, r, tunnel, httpClient, "127.0.0.1", tunnel.TunnelPort, *behindProxy)
+			// Only "server"-terminated tunnels (Web Applications, and the hidden This Server
+			// homelab's Local Websites) ever reach this branch -- Network Services are always
+			// "passthrough" (raw TCP, handled earlier in Server.handleConnection) and never
+			// HTTP-parsed here, so upstreamErrorAgentUnreachable's Web-Application-only wording
+			// is always accurate for whatever lands on this path.
+			proxyRequest(w, r, tunnel, httpClient, "127.0.0.1", tunnel.TunnelPort, *behindProxy, upstreamErrorAgentUnreachable)
 		}
 	})
 

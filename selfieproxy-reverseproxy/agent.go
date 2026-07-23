@@ -354,7 +354,12 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	// just backed by a per-tunnel flag here since the agent has no shared tunnel DB to query.
 	certPending := &atomic.Bool{}
 	getCertificate := withSelfSignedFallback(c.certConfig,
-		func(string) bool { return certPending.Load() }, c.selfSignedCerts)
+		func(string) certFallback {
+			if certPending.Load() {
+				return certFallbackSelfSigned
+			}
+			return certFallbackNone
+		}, c.selfSignedCerts)
 
 	if tunnel.TlsTermination == "client" {
 
@@ -367,7 +372,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 		httpMux := http.NewServeMux()
 
 		httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			proxyRequest(w, r, tunnel, c.httpClient, tunnel.ClientAddress, tunnel.ClientPort, c.behindProxy)
+			proxyRequest(w, r, tunnel, c.httpClient, tunnel.ClientAddress, tunnel.ClientPort, c.behindProxy, upstreamErrorDefault)
 		})
 
 		httpServer := &http.Server{

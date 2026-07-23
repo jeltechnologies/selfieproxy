@@ -2,6 +2,7 @@ package boringproxy
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,7 +12,31 @@ import (
 	"time"
 )
 
-func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpClient *http.Client, address string, port int, behindProxy bool) {
+// upstreamErrorMode controls how proxyRequest reports a failure to reach address:port -- the
+// same function backs the portal/sso/console synthetic-tunnel proxies (a local Selfie Proxy
+// service that may still be starting up) and ordinary Web Application tunnels (a homelab agent
+// that may be disconnected, or whose own dial to the real backend failed -- see tls_proxy.go's
+// handleConnection, which closes the tunnel connection with no response on a dial failure,
+// surfacing here as the same httpClient.Do error as an agent that's simply not connected).
+// Distinguishing the two lets each report a response its own audience can act on, without ever
+// exposing the raw dial error (which, for a tunnel, would otherwise reveal the homelab's internal
+// address -- see ExposedApp's host field in selfieproxy-portal).
+type upstreamErrorMode int
+
+const (
+	// upstreamErrorDefault reports the raw error with a 502, e.g. for the admin API/other
+	// internal callers where the detail is useful and there's no untrusted end-user audience.
+	upstreamErrorDefault upstreamErrorMode = iota
+	// upstreamErrorStartingUp reports 200 so a portal/sso/console page's own retry-on-200
+	// behavior (rather than treating a non-200 as fatal) can quietly recover once that
+	// service finishes booting.
+	upstreamErrorStartingUp
+	// upstreamErrorAgentUnreachable reports 404 for an ordinary Web Application tunnel whose
+	// agent is disconnected, or whose own dial to the homelab backend failed.
+	upstreamErrorAgentUnreachable
+)
+
+func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpClient *http.Client, address string, port int, behindProxy bool, errorMode upstreamErrorMode) {
 
 	if tunnel.AuthUsername != "" || tunnel.AuthPassword != "" {
 		username, password, ok := r.BasicAuth()
@@ -132,9 +157,30 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 	upstreamRes, err := httpClient.Do(upstreamReq)
 	if err != nil {
 		log.Printf("proxyRequest upstream error: %s %s -> %s: %s", r.Method, r.Host, upstreamUrl, err)
-		errMessage := fmt.Sprintf("%s", err)
-		w.WriteHeader(502)
-		io.WriteString(w, errMessage)
+		switch errorMode {
+		case upstreamErrorStartingUp:
+			w.WriteHeader(http.StatusOK)
+			io.WriteString(w, "Selfie Proxy is starting, please retry later")
+		case upstreamErrorAgentUnreachable:
+			var opErr *net.OpError
+			if errors.As(err, &opErr) && opErr.Op == "dial" {
+				// Dialing 127.0.0.1:<tunnel port> itself failed -- nothing is listening there at
+				// all, meaning the agent's own SSH reverse-tunnel bore for this app is gone
+				// (agent process down, or its SSH connection to this server dropped).
+				writeHtmlError(w, http.StatusNotFound, "404 - Agent Not Found",
+					`<p>The Selfie Proxy agent your the homelab is disconnected.</p><p>Please edit the homelab in the Selfie Proxy portal, and verify that name and secrets are correctly configured in docker-compose.yaml of the agent.</p>`)
+			} else {
+				// The dial succeeded (the agent's tunnel listener accepted the connection) but no
+				// response ever came back -- the agent itself is connected, but its own dial to the
+				// real backend inside the homelab failed (see tls_proxy.go's handleConnection).
+				writeHtmlError(w, http.StatusNotFound, "404 - Server Not Found",
+					`<p>The Selfie Proxy agent could not connect to the server in your homelab.</p><p>Please edit your application and check that all settings in 'Address in the homelab' are correct.</p>`)
+			}
+		default:
+			errMessage := fmt.Sprintf("%s", err)
+			w.WriteHeader(502)
+			io.WriteString(w, errMessage)
+		}
 		return
 	}
 	defer upstreamRes.Body.Close()
