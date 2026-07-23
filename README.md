@@ -26,9 +26,11 @@ and enterprise compliance tooling — if you need those, use a commercial produc
 - Works behind NAT/CGNAT — no static IP or port forwarding needed.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
-- Back up your configuration, or move it to another Selfie Proxy server — a single portable ZIP
-  covering every homelab, application, and static website, with a step-by-step
-  review of what's new versus what already exists before anything changes.
+- Remote Desktop and SSH terminal access to your homelab machines, right in your browser —
+  no VPN, no separate RDP/VNC/SSH client to install or configure.
+- Light and dark mode for the admin portal, your choice, saved for next time.
+- Back up your configuration, or move it to another Selfie Proxy server — everything at once,
+  with the exception of passwords.
 - Single Docker command to install and update.
 
 ## Background
@@ -46,6 +48,7 @@ boringproxy we added:
 - Built-in single sign on login for the portal, with support for swapping in an external OIDC provider.
 - Admin-managed Users, so you can share login access to your apps without sharing the admin account.
 - Static website hosting.
+- Browser-based Remote Desktop and SSH terminal access to homelab machines.
 - Export/import configuration for every homelab, application, and static website.
 - Fixed tunnel authentication failing on modern OpenSSH (8.8+), which rejects the old
   RSA/`ssh-rsa` keys by default, by switching to Ed25519 — also a more secure algorithm.
@@ -127,12 +130,9 @@ app) sits behind login. Repeated failed login attempts are throttled with an inc
 delay, capped at 15 minutes, so password-guessing scripts get slower with every attempt
 without ever locking a legitimate user out for longer than that. It's open source.
 
-**What's in a configuration export?** Every homelab, application, and static website —
-including website files — in a single ZIP you can store safely or move to a new server.
-Homelab secrets and the admin login are never included; importing walks you through a
-step-by-step wizard showing what's new versus what already exists, with a warning wherever
-something will actually change, before anything is applied. A restored homelab always gets a
-new secret, which you then update on that homelab.
+**What's in a configuration export?** Everything, with the exception of passwords. Importing
+walks you through what's new versus what already exists before anything changes. A restored
+homelab always gets a new secret, which you then update on that homelab.
 
 ## License
 
