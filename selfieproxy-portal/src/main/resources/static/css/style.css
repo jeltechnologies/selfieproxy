@@ -231,6 +231,14 @@ select {
 
 .field { margin-bottom: 0.75rem; }
 
+/* redirectToExisting/redirectToCustom each sit alone in their own .field-row cell, one of the two
+   toggled invisible at a time (see local-websites.js) -- without this, each control's own 1rem
+   margin-bottom stacks on top of its wrapping .field's 0.75rem, so whichever row's control is
+   currently visible ends up ~1.75rem taller than its sibling radio-only row instead of the usual
+   ~0.75rem, reading as a stray blank line between the two radio options. */
+#redirectToExisting,
+#redirectToCustom { margin-bottom: 0; }
+
 .field-row {
 	display: flex;
 	gap: 0.75rem;
