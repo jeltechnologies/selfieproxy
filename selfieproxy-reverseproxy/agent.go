@@ -40,7 +40,6 @@ type Agent struct {
 	cancelFuncsMutex *sync.Mutex
 	certConfig       *certmagic.Config
 	selfSignedCerts  *SelfSignedCertProvider
-	behindProxy      bool
 	pollInterval     int
 }
 
@@ -54,7 +53,6 @@ type AgentConfig struct {
 	AcmeUseStaging bool   `json:"acmeUseStaging,omitempty"`
 	AcmeCa         string `json:"acmeCa,omitempty"`
 	DnsServer      string `json:"dnsServer,omitempty"`
-	BehindProxy    bool   `json:"behindProxy,omitempty"`
 	PollInterval   int    `json:"pollInterval,omitempty"`
 }
 
@@ -135,7 +133,6 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		cancelFuncsMutex: cancelFuncsMutex,
 		certConfig:       certConfig,
 		selfSignedCerts:  NewSelfSignedCertProvider(),
-		behindProxy:      config.BehindProxy,
 		pollInterval:     config.PollInterval,
 	}, nil
 }
@@ -372,7 +369,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 		httpMux := http.NewServeMux()
 
 		httpMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			proxyRequest(w, r, tunnel, c.httpClient, tunnel.ClientAddress, tunnel.ClientPort, c.behindProxy, upstreamErrorDefault)
+			proxyRequest(w, r, tunnel, c.httpClient, tunnel.ClientAddress, tunnel.ClientPort, upstreamErrorDefault)
 		})
 
 		httpServer := &http.Server{

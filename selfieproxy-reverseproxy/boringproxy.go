@@ -66,7 +66,6 @@ func Listen() {
 	httpsPort := flagSet.Int("https-port", 443, "HTTPS (secure) port")
 	allowHttp := flagSet.Bool("allow-http", false, "Allow unencrypted (HTTP) requests")
 	publicIp := flagSet.String("public-ip", "", "Public IP")
-	behindProxy := flagSet.Bool("behind-proxy", false, "Whether we're running behind another reverse proxy")
 	acmeEmail := flagSet.String("acme-email", "", "Email for ACME (ie Let's Encrypt)")
 	acmeUseStaging := flagSet.Bool("acme-use-staging", false, "Use ACME (ie Let's Encrypt) staging servers")
 	acceptCATerms := flagSet.Bool("accept-ca-terms", false, "Automatically accept CA terms")
@@ -416,13 +415,13 @@ func Listen() {
 			// starting up (e.g. "connection reset by peer" before its Spring Boot listener is
 			// bound) -- the same "still booting" condition oidcAuthHolder-nil already reports
 			// as 503 for the OIDC endpoints above, just for the plain HTTP proxy path instead.
-			proxyRequest(w, r, portalTunnel, httpClient, "localhost", *portalPort, *behindProxy, upstreamErrorStartingUp)
+			proxyRequest(w, r, portalTunnel, httpClient, "localhost", *portalPort, upstreamErrorStartingUp)
 		} else if *ssoDomain != "" && hostDomain == *ssoDomain {
 			// Proxied directly to selfieproxy-sso-server, same
 			// before-any-agent-exists carve-out as -portal-domain. Never gated
 			// behind single sign on itself -- it's the IdP the gate calls out to.
 			ssoTunnel := Tunnel{Domain: *ssoDomain}
-			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, *behindProxy, upstreamErrorStartingUp)
+			proxyRequest(w, r, ssoTunnel, httpClient, "localhost", *ssoPort, upstreamErrorStartingUp)
 		} else if *consoleDomain != "" && hostDomain == *consoleDomain {
 			// Proxied directly to selfieproxy-remote-console, same carve-out
 			// shape as -portal-domain (fixed local address, no Tunnel/Agent) --
@@ -435,7 +434,7 @@ func Listen() {
 				return
 			}
 			r.Header.Set("X-Selfieproxy-Sso-Verified", "true")
-			proxyRequest(w, r, consoleTunnel, httpClient, "localhost", *consolePort, *behindProxy, upstreamErrorStartingUp)
+			proxyRequest(w, r, consoleTunnel, httpClient, "localhost", *consolePort, upstreamErrorStartingUp)
 		} else {
 
 			tunnel, exists := db.GetTunnel(hostDomain)
@@ -457,7 +456,7 @@ func Listen() {
 			// "passthrough" (raw TCP, handled earlier in Server.handleConnection) and never
 			// HTTP-parsed here, so upstreamErrorAgentUnreachable's Web-Application-only wording
 			// is always accurate for whatever lands on this path.
-			proxyRequest(w, r, tunnel, httpClient, "127.0.0.1", tunnel.TunnelPort, *behindProxy, upstreamErrorAgentUnreachable)
+			proxyRequest(w, r, tunnel, httpClient, "127.0.0.1", tunnel.TunnelPort, upstreamErrorAgentUnreachable)
 		}
 	})
 

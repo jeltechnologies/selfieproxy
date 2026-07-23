@@ -36,7 +36,7 @@ const (
 	upstreamErrorAgentUnreachable
 )
 
-func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpClient *http.Client, address string, port int, behindProxy bool, errorMode upstreamErrorMode) {
+func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpClient *http.Client, address string, port int, errorMode upstreamErrorMode) {
 
 	if tunnel.AuthUsername != "" || tunnel.AuthPassword != "" {
 		username, password, ok := r.BasicAuth()
@@ -56,7 +56,7 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 	}
 
 	if isWebsocketUpgrade(r) {
-		proxyWebsocket(w, r, tunnel, address, port, behindProxy)
+		proxyWebsocket(w, r, tunnel, address, port)
 		return
 	}
 
@@ -139,13 +139,6 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 
 	xForwardedFor := remoteHost
 
-	if behindProxy {
-		xForwardedFor := downstreamReqHeaders.Get("X-Forwarded-For")
-		if xForwardedFor != "" {
-			xForwardedFor = xForwardedFor + ", " + remoteHost
-		}
-	}
-
 	upstreamReq.Header.Set("X-Forwarded-For", xForwardedFor)
 	upstreamReq.Header.Set("Forwarded", fmt.Sprintf("for=%s", remoteHost))
 
@@ -220,7 +213,7 @@ func isWebsocketUpgrade(r *http.Request) bool {
 // the (header-rewritten) handshake request ourselves, and then just pipe
 // raw bytes both directions -- the 101 response and all subsequent
 // WebSocket frames pass through untouched.
-func proxyWebsocket(w http.ResponseWriter, r *http.Request, tunnel Tunnel, address string, port int, behindProxy bool) {
+func proxyWebsocket(w http.ResponseWriter, r *http.Request, tunnel Tunnel, address string, port int) {
 	upstreamHost := address
 	useTls := false
 	if strings.HasPrefix(address, "https://") {
@@ -274,11 +267,6 @@ func proxyWebsocket(w http.ResponseWriter, r *http.Request, tunnel Tunnel, addre
 	r.Header.Set("X-Forwarded-Host", r.Host)
 
 	xForwardedFor := remoteHost
-	if behindProxy {
-		if existing := r.Header.Get("X-Forwarded-For"); existing != "" {
-			xForwardedFor = existing + ", " + remoteHost
-		}
-	}
 	r.Header.Set("X-Forwarded-For", xForwardedFor)
 	r.Header.Set("Forwarded", fmt.Sprintf("for=%s", remoteHost))
 

@@ -95,7 +95,6 @@ func main() {
 		acmeUseStaging := flagSet.Bool("acme-use-staging", false, "Use ACME (ie Let's Encrypt) staging servers")
 		acmeCa := flagSet.String("acme-certificate-authority", "", "URI for ACME Certificate Authority")
 		dnsServer := flagSet.String("dns-server", "", "Custom DNS server")
-		behindProxy := flagSet.Bool("behind-proxy", false, "Whether we're running behind another reverse proxy")
 		pollInterval := flagSet.Int("poll-interval-ms", 2000, "Interval in milliseconds to poll for tunnel changes")
 
 		err := flagSet.Parse(os.Args[2:])
@@ -126,7 +125,6 @@ func main() {
 			AcmeUseStaging: *acmeUseStaging,
 			AcmeCa:         *acmeCa,
 			DnsServer:      *dnsServer,
-			BehindProxy:    *behindProxy,
 			PollInterval:   *pollInterval,
 		}
 
