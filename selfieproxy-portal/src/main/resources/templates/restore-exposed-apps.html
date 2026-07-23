@@ -27,7 +27,7 @@
 				<div th:each="app : ${manifest.exposedApps()}">
 					<label class="restore-item">
 						<input type="checkbox" name="exposedApps" th:value="${app.fqdn()}">
-						<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
+						<span th:text="${(app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())) + ' (' + app.homelabName() + ')'}"></span>
 						<span th:if="${existingExposedApps.contains(app.fqdn())}" class="status-badge status-badge-existing">Existing</span>
 						<span th:unless="${existingExposedApps.contains(app.fqdn())}" class="status-badge status-badge-new">New</span>
 						<select th:name="'domain__' + ${app.fqdn()}">

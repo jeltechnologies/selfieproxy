@@ -220,7 +220,8 @@ public class LocalWebsiteController {
 	}
 
 	private LocalWebsite toLocalWebsite(LocalWebsiteForm form) {
-		return new LocalWebsite(normalize(form.label()), normalize(form.domain()));
+		String label = normalize(form.label());
+		return new LocalWebsite(label.isBlank() ? null : label, normalize(form.domain()));
 	}
 
 	/**
@@ -252,11 +253,7 @@ public class LocalWebsiteController {
 	private List<String> validate(LocalWebsite website, String originalFqdn) {
 		List<String> errors = new ArrayList<>();
 
-		if (website.label() == null || website.label().isBlank()) {
-			errors.add("Subdomain is required.");
-			return errors;
-		}
-		if (!DnsLabelValidator.isValid(website.label())) {
+		if (website.label() != null && !website.label().isBlank() && !DnsLabelValidator.isValid(website.label())) {
 			errors.add("Subdomain can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen.");
 			return errors;
 		}
@@ -277,7 +274,9 @@ public class LocalWebsiteController {
 				.anyMatch(d -> d.equalsIgnoreCase(fqdn)
 						&& (originalFqdn == null || !d.equalsIgnoreCase(originalFqdn)));
 		if (taken) {
-			errors.add("Subdomain \"" + website.label() + "\" is already in use.");
+			errors.add(website.label() != null && !website.label().isBlank()
+					? "Subdomain \"" + website.label() + "\" is already in use."
+					: "\"" + website.domain() + "\" is already in use.");
 		}
 
 		return errors;

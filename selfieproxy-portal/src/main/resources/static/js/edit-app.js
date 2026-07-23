@@ -77,7 +77,6 @@
 		nameField.style.display = networkService ? "" : "none";
 		nameInput.required = networkService;
 		subdomainField.style.display = networkService ? "none" : "";
-		subdomainInput.required = !networkService;
 
 		protocolField.style.display = networkService ? "none" : "";
 
@@ -117,8 +116,8 @@
 			var port = exposedPortInput.value;
 			resultInput.textContent = domain + (port ? ":" + port : "");
 		} else {
-			var subdomain = subdomainInput.value || "(subdomain)";
-			resultInput.textContent = "https://" + subdomain + "." + domain;
+			var subdomain = subdomainInput.value;
+			resultInput.textContent = "https://" + (subdomain ? subdomain + "." + domain : domain);
 		}
 	}
 

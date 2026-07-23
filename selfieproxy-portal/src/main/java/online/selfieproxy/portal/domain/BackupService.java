@@ -267,7 +267,7 @@ public class BackupService {
 				failures.add("Exposed app " + fqdnKey + ": not found in configuration export");
 				continue;
 			}
-			if (!DnsLabelValidator.isValid(original.subdomain())) {
+			if (original.subdomain() != null && !original.subdomain().isBlank() && !DnsLabelValidator.isValid(original.subdomain())) {
 				failures.add("Exposed app " + fqdnKey + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}
@@ -314,7 +314,7 @@ public class BackupService {
 				failures.add("Local website " + fqdnKey + ": not found in configuration export");
 				continue;
 			}
-			if (!DnsLabelValidator.isValid(original.label())) {
+			if (original.label() != null && !original.label().isBlank() && !DnsLabelValidator.isValid(original.label())) {
 				failures.add("Local website " + fqdnKey + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}

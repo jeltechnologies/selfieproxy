@@ -12,8 +12,9 @@
 	var deleteForm = document.getElementById("delete-form");
 
 	function updateResult() {
-		var label = labelInput.value || "(subdomain)";
-		resultInput.textContent = label + "." + domainSelect.value;
+		var label = labelInput.value;
+		var domain = domainSelect.value;
+		resultInput.textContent = label ? label + "." + domain : domain;
 	}
 
 	labelInput.addEventListener("input", updateResult);

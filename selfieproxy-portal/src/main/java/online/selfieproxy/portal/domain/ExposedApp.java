@@ -5,7 +5,7 @@ package online.selfieproxy.portal.domain;
  * "Tunnel" by {@link TunnelMapper}. Deliberately avoids BoringProxy's own
  * vocabulary (Client/Tunnel) in field names, per selfieproxy-portal/CLAUDE.md.
  *
- * @param subdomain    the app's Selfie Proxy identifier -- the label suffixed with {@link #domain} to form the FQDN
+ * @param subdomain    the app's Selfie Proxy identifier -- the label suffixed with {@link #domain} to form the FQDN, or blank/null to expose the app at the bare domain itself (apex)
  * @param name         only meaningful when type is NETWORK_SERVICE -- a free-text label; not unique, not part of the domain
  * @param exposedPort  only meaningful when type is NETWORK_SERVICE -- the internet-facing port for RAW_TCP mode, or the boringproxy-assigned tunnel port for SSH/RDP/VNC mode (never internet-facing, dialed by selfieproxy-remote-console instead)
  * @param protocol     only meaningful when type is WEB_APPLICATION (Network Service is always TCP)
@@ -35,7 +35,7 @@ public record ExposedApp(
 		boolean ignoreCertificate) {
 
 	public String fqdn() {
-		return subdomain + "." + domain;
+		return subdomain == null || subdomain.isBlank() ? domain : subdomain + "." + domain;
 	}
 
 	public boolean isWebApplication() {

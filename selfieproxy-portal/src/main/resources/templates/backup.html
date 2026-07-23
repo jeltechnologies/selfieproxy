@@ -45,7 +45,7 @@
 				<legend>Applications</legend>
 				<label class="restore-item" th:each="app : ${manifest.exposedApps()}">
 					<input type="checkbox" name="exposedApps" th:value="${app.fqdn()}" checked>
-					<span th:text="${(app.isNetworkService() ? app.name() : app.subdomain()) + ' (' + app.homelabName() + ')'}"></span>
+					<span th:text="${(app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())) + ' (' + app.homelabName() + ')'}"></span>
 				</label>
 			</fieldset>
 

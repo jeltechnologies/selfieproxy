@@ -5,7 +5,7 @@
 	<header th:replace="~{fragments/layout :: topbar(active='apps')}"></header>
 
 	<main class="page">
-		<h1 th:text="${isNew} ? 'Add application' : (${app.isNetworkService()} ? (${#strings.isEmpty(app.name())} ? 'Edit TCP ' + ${app.exposedPort()} : 'Edit ' + ${app.name()}) : 'Edit ' + ${app.subdomain()})"></h1>
+		<h1 th:text="${isNew} ? 'Add application' : (${app.isNetworkService()} ? (${#strings.isEmpty(app.name())} ? 'Edit TCP ' + ${app.exposedPort()} : 'Edit ' + ${app.name()}) : 'Edit ' + (${#strings.isEmpty(app.subdomain())} ? ${app.domain()} : ${app.subdomain()}))"></h1>
 
 		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
 			<li th:each="e : ${errors}" th:text="${e}"></li>
@@ -52,7 +52,8 @@
 					<label for="subdomain">Subdomain</label>
 					<input type="text" id="subdomain" name="subdomain" th:value="${app.subdomain()}"
 						   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
-						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen">
+						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen"
+						   placeholder="(leave blank to use the domain by itself)">
 				</div>
 
 				<div class="field" id="domain-field">

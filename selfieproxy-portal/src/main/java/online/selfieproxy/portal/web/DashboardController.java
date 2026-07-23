@@ -65,7 +65,7 @@ public class DashboardController {
 				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
 				.map(tunnelMapper::toExposedApp)
 				.map(exposedAppStore::reconcile)
-				.sorted(Comparator.comparing(ExposedApp::subdomain))
+				.sorted(Comparator.comparing(app -> app.subdomain() == null ? "" : app.subdomain()))
 				.toList();
 
 		boolean hasOrphanedApps = exposedApps.stream()

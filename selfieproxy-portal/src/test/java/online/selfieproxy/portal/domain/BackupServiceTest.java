@@ -184,6 +184,34 @@ class BackupServiceTest {
 	}
 
 	@Test
+	void applyRestoreAcceptsApexExposedAppWithBlankSubdomain() throws IOException {
+		ExposedApp app = new ExposedApp(null, null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
+				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);
+		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
+				"example.com", List.of("lab1"), List.of(app), List.of(), "light", new TerminalSettings(15, "dark", "default"));
+		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
+		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
+			zip.putNextEntry(new ZipEntry("manifest.json"));
+			zip.write(JsonMapper.builder().build().writeValueAsBytes(manifest));
+			zip.closeEntry();
+		}
+
+		when(boringProxyClient.listAgents()).thenReturn(Map.of());
+		doThrow(new BoringProxyException(404, "Tunnel doesn't exist")).when(boringProxyClient)
+				.deleteTunnel(eq("example.com"));
+
+		BackupService service = newService();
+		String stagingId = service.stageRestore(new ByteArrayInputStream(zipBytes.toByteArray()));
+
+		RestoreResult result = service.applyRestore(stagingId,
+				new RestoreSelection(List.of("lab1"), List.of("example.com"), List.of(), Map.of()));
+
+		assertEquals(1, result.exposedAppsRestored());
+		assertTrue(result.failures().isEmpty(), "unexpected failures: " + result.failures());
+		verify(exposedAppStore).save(app);
+	}
+
+	@Test
 	void diffManifestFlagsExistingItemsAgainstLiveState() {
 		ExposedApp existingApp = new ExposedApp("blog", null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
 				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);

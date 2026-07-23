@@ -172,9 +172,10 @@ public class ExposedAppController {
 
 		String domain = remoteAccess ? properties.primaryDomain()
 				: form.domain() == null || form.domain().isBlank() ? properties.primaryDomain() : form.domain();
-		String subdomain = networkService && (form.subdomain() == null || form.subdomain().isBlank())
-				? generateUniqueSubdomain(domain)
-				: form.subdomain() == null ? null : form.subdomain().trim().toLowerCase();
+		String trimmedSubdomain = form.subdomain() == null ? null : form.subdomain().trim().toLowerCase();
+		String subdomain = networkService
+				? (trimmedSubdomain == null || trimmedSubdomain.isBlank() ? generateUniqueSubdomain(domain) : trimmedSubdomain)
+				: (trimmedSubdomain == null || trimmedSubdomain.isBlank() ? null : trimmedSubdomain);
 		String name = networkService && form.name() != null && !form.name().isBlank() ? form.name().trim() : null;
 
 		String username = remoteAccess ? blankToNull(form.username()) : null;
@@ -207,11 +208,7 @@ public class ExposedAppController {
 	private List<String> validate(ExposedApp app, PortalSession session, String originalFqdn) {
 		List<String> errors = new ArrayList<>();
 
-		if (app.subdomain() == null || app.subdomain().isBlank()) {
-			errors.add("Subdomain is required.");
-			return errors;
-		}
-		if (!DnsLabelValidator.isValid(app.subdomain())) {
+		if (app.subdomain() != null && !app.subdomain().isBlank() && !DnsLabelValidator.isValid(app.subdomain())) {
 			errors.add("Subdomain can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen.");
 		}
 		if (!domainService.exists(app.domain())) {
@@ -219,8 +216,10 @@ public class ExposedAppController {
 			return errors;
 		}
 		// The reserved subdomains below only ever exist under the primary domain (see docker-compose.yaml) --
-		// the same label under a secondary domain is a perfectly ordinary, unreserved app domain.
-		if (app.domain().equals(properties.primaryDomain())) {
+		// the same label under a secondary domain is a perfectly ordinary, unreserved app domain. A blank
+		// subdomain (apex) never collides with any of these, since they're all subdomains of the primary
+		// domain, not the primary domain itself.
+		if (app.subdomain() != null && app.domain().equals(properties.primaryDomain())) {
 			if (app.subdomain().equalsIgnoreCase(properties.adminSubdomain())) {
 				errors.add("\"" + app.subdomain() + "\" is reserved for the BoringProxy admin portal itself.");
 			}
@@ -241,7 +240,9 @@ public class ExposedAppController {
 				.anyMatch(domain -> domain.equalsIgnoreCase(fqdn)
 						&& (originalFqdn == null || !domain.equalsIgnoreCase(originalFqdn)));
 		if (taken) {
-			errors.add("Subdomain \"" + app.subdomain() + "\" is already in use.");
+			errors.add(app.subdomain() != null && !app.subdomain().isBlank()
+					? "Subdomain \"" + app.subdomain() + "\" is already in use."
+					: "\"" + app.domain() + "\" is already in use.");
 		}
 
 		if (app.ssoProtected() && !app.canProtectWithSso()) {

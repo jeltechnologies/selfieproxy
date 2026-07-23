@@ -7,12 +7,12 @@ package online.selfieproxy.portal.domain;
  * selfieproxy-local-websites container via the hidden "This Server" homelab. See
  * LocalWebsiteController/StaticSiteProvisioner.
  *
- * @param label  the subdomain label suffixed with {@link #domain} to form the FQDN
+ * @param label  the subdomain label suffixed with {@link #domain} to form the FQDN, or blank/null to serve the site at the bare domain itself (apex)
  * @param domain which registered domain (the primary domain or a secondary one, see DomainService) label is suffixed onto
  */
 public record LocalWebsite(String label, String domain) {
 
 	public String fqdn() {
-		return label + "." + domain;
+		return label == null || label.isBlank() ? domain : label + "." + domain;
 	}
 }

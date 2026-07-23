@@ -52,8 +52,8 @@
 			<tbody>
 				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}"
 					th:with="offline=${appStatusMessage.containsKey(app.fqdn())}">
-					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : app.subdomain()}">
-						<span th:text="${app.isNetworkService()} ? ${app.name()} : ${app.subdomain()}"></span>
+					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())}">
+						<span th:text="${app.isNetworkService()} ? ${app.name()} : (${#strings.isEmpty(app.subdomain())} ? ${app.domain()} : ${app.subdomain()})"></span>
 						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
 							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
 					</td>

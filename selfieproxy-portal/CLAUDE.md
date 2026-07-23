@@ -110,7 +110,10 @@ container. After a successful login the user lands on the exposed applications p
 
 - Each exposed web service is bound to one subdomain of whichever domain it's assigned to (see
   "Domains" above), composing a FQDN automatically (subdomain `music` on domain `example.com` becomes
-  `music.example.com`).
+  `music.example.com`). The subdomain is optional -- leaving it blank exposes the service at the bare
+  domain itself (`example.com`), including the primary domain, since nothing else listens on it bare
+  (the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains are all subdomains *of* the
+  primary domain, never the primary domain itself).
 - The Homelabs page and the Exposed Applications page are two views over related data, not two
   separate concepts: a Homelab corresponds to one Agent (see Agents page below) and is managed
   there, not on the Exposed Applications page.
@@ -200,7 +203,8 @@ The edit page fields, in order:
      already has for HTTP/HTTPS. Leaving the password field blank on an
      edit keeps the previously stored one unchanged; leaving it blank when adding is allowed too
      (eg. a VNC target with no password) -- see "Connecting" below for what happens then.
-   **Subdomain** (Web application only): the label, composing the FQDN as `<subdomain>.<domain>`.
+   **Subdomain** (Web application only): the label, composing the FQDN as `<subdomain>.<domain>` --
+   optional; leaving it blank exposes the app at the bare domain itself (see "Homelabs" above).
 3. The FQDN itself (Web application and TCP mode only): a label (not a text field), shown
    immediately after the subdomain/exposed port, updated live as the user edits the form
    (including changing the domain dropdown). Not a hyperlink.
@@ -277,10 +281,11 @@ this section is the portal-side UI behavior.
   sortable-column-headers and domain-filter treatment as the Applications page above.
 - Adding one: a subdomain-label text field plus a dropdown of every registered domain, same
   ordering/labeling as an Exposed App's domain dropdown -- composes `<subdomain>.<chosen domain>`.
-  Exactly like an Exposed App, there's no way to point a Local Website at a domain that isn't
-  registered on the Domains page first -- if a user needs one on a domain Selfie Proxy doesn't
-  already know about, they register that domain there first, then add the website as a subdomain
-  of it.
+  The label is optional, same as an Exposed App's Subdomain field -- leaving it blank serves the
+  site at the bare domain itself. Exactly like an Exposed App, there's no way to point a Local
+  Website at a domain that isn't registered on the Domains page first -- if a user needs one on a
+  domain Selfie Proxy doesn't already know about, they register that domain there first, then add
+  the website as a subdomain (or the bare domain) of it.
 - Renaming one: change the subdomain and/or domain on the edit page. The tunnel is recreated under
   the new FQDN and the site's files are moved to the new folder — nothing is lost.
 - Uploading a ZIP (add or edit page): replaces the site's entire content directory --
