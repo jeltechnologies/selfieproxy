@@ -205,8 +205,12 @@ public class LocalWebsiteController {
 		}
 		if (hasZip && !website.isRedirect()) {
 			staticSiteProvisioner.replaceContents(newFqdn, websiteZip.getInputStream());
-			// A freshly uploaded ZIP means this can no longer be the untouched bootstrap demo, even
-			// if it started out as one -- see LocalWebsite.demo()/LocalWebsiteDemoStatus.
+		}
+		if ((hasZip && !website.isRedirect()) || !redirectUnchanged) {
+			// A freshly uploaded ZIP, or a changed redirect target/mode, means this can no longer be
+			// the untouched bootstrap demo, even if it started out as one -- see
+			// LocalWebsite.demo()/LocalWebsiteDemoStatus. A rename alone (fqdn change with the same
+			// redirectTo) still carries the flag forward unchanged.
 			website = new LocalWebsite(website.label(), website.domain(), website.redirectTo(), false);
 		}
 		if (!fqdnUnchanged) {
@@ -282,7 +286,7 @@ public class LocalWebsiteController {
 				&& targets.stream().anyMatch(t -> ("https://" + t).equalsIgnoreCase(website.redirectTo())));
 	}
 
-	/** existing is the pre-edit record (null when adding), so a rename/redirect-target change alone carries its demo flag forward unchanged -- see LocalWebsite.demo(). */
+	/** existing is the pre-edit record (null when adding); demo is carried forward here and cleared afterward in update() if the redirect target/mode actually changed -- see LocalWebsite.demo(). */
 	private LocalWebsite toLocalWebsite(LocalWebsiteForm form, LocalWebsite existing) {
 		String label = normalize(form.label());
 		String redirectTo = form.type() == LocalWebsiteType.REDIRECT ? blankToNull(form.redirectTo()) : null;

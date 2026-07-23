@@ -292,10 +292,12 @@ this section is the portal-side UI behavior.
   -- a friendly heads-up, not a problem to act on) naming the demo site and, if it too is still
   unmodified, the apex redirect, saying both are safe to delete or replace. "Still unmodified" is a
   plain `LocalWebsite.demo()` boolean -- `LocalWebsiteDemoBootstrap` sets it true when it creates
-  the site, `LocalWebsiteController` clears it the instant a ZIP is uploaded to it, a rename/
-  redirect-target-only edit or a domain rename (`DomainsController`) carries it forward unchanged,
-  and a configuration import (`BackupService`) always forces it false regardless of what the
-  export said, since "demo" is a single-server, single-bootstrap concept that must never follow an
+  the site, `LocalWebsiteController` clears it the instant a ZIP is uploaded to it or the redirect
+  target/mode is actually changed (this also covers the export/`manifest.json`'s own `demo` field,
+  since `BackupService.buildManifest` serializes the stored records as-is); a rename or a domain
+  rename (`DomainsController`) alone carries it forward unchanged, since neither touches the
+  content/target itself, and a configuration import (`BackupService`) always forces it false
+  regardless of what the export said, since "demo" is a single-server, single-bootstrap concept that must never follow an
   export onto a different server. This is a cheap field read on every list-page load, not a
   filesystem comparison -- editing the content directory directly (e.g. via `docker exec`, see
   below) isn't a documented user workflow, so it isn't accounted for and won't clear the flag. The
