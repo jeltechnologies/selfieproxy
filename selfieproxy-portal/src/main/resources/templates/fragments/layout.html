@@ -32,17 +32,18 @@
 			<summary>Settings</summary>
 			<div class="user-menu-panel">
 				<form method="post" th:action="@{/appearance/toggle}">
-					<button type="submit" class="link-button" th:text="${theme == 'dark'} ? 'Change to Light mode' : 'Change to Dark mode'">Change to Dark mode</button>
+					<button type="submit" class="link-button" th:text="${theme == 'dark'} ? 'Change to light mode' : 'Change to dark mode'">Change to dark mode</button>
 				</form>
-				<a th:href="@{/export-configuration}" th:classappend="${active == 'export'} ? 'active'">Export configuration</a>
-				<a th:href="@{/import-configuration}" th:classappend="${active == 'import'} ? 'active'">Import configuration</a>
 				<a th:href="@{/domains}" th:classappend="${active == 'domains'} ? 'active'">Domains</a>
 				<a th:if="${showUsersLink}" th:href="@{/users}" th:classappend="${active == 'users'} ? 'active'">Users</a>
+				<a th:href="@{/export-configuration}" th:classappend="${active == 'export'} ? 'active'">Export configuration</a>
+				<a th:href="@{/import-configuration}" th:classappend="${active == 'import'} ? 'active'">Import configuration</a>
 				<form method="post" th:action="@{/logout}">
-					<button type="submit" class="link-button">Logout</button>
+					<button type="submit" class="link-button">Log out</button>
 				</form>
 			</div>
 		</details>
+		<script th:src="@{/js/topbar.js}"></script>
 	</header>
 	<footer class="app-footer muted" th:fragment="footer">Powered by selfieproxy by Jelte Jansons — built on boringproxy by Anders Pitman — MIT Licensed</footer>
 </body>

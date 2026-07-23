@@ -104,9 +104,13 @@ h1 { font-size: 32px; }
 
 .user-menu-panel a,
 .user-menu-panel .link-button {
+	display: block;
 	color: var(--text);
 	text-decoration: none;
+	font-family: inherit;
 	font-size: 0.8rem;
+	line-height: 1.2rem;
+	margin: 0;
 	padding: 0;
 	white-space: nowrap;
 }
@@ -308,6 +312,8 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 }
 
 .link-button {
+	appearance: none;
+	-webkit-appearance: none;
 	background: none;
 	border: none;
 	color: var(--accent);

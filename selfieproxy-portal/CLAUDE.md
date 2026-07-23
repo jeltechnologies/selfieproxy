@@ -32,7 +32,7 @@ container. After a successful login the user lands on the exposed applications p
   recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
   never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
 - The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds a theme toggle button (its
-  label flips between "Change to Dark mode"/"Change to Light mode" depending on the current
+  label flips between "Change to dark mode"/"Change to light mode" depending on the current
   setting, `POST /appearance/toggle`, `web/AppearanceController.java` -- a one-click toggle rather
   than a picker page, since there are only two modes: `domain/Theme`/`domain/ThemeStore`, persisted
   to `data/selfieproxy/theme.json`; the same setting is also read by
@@ -42,12 +42,15 @@ container. After a successful login the user lands on the exposed applications p
   request's `Referer` header, never its host, so this can't be turned into an open redirect. This
   is unrelated to `selfieproxy-remote-console`'s own Dracula/Light/Dark/Solarized Dark xterm.js
   terminal color themes for the SSH console -- that's a separate, independent per-session setting,
-  not this shared UI-chrome mode), "Export configuration"
-  (`/export-configuration`), "Import configuration" (`/import-configuration`), "Domains" (`/domains`,
-  `web/DomainsController.java` -- see "Domains" below, always shown, no hide condition), "Users" (`/users`,
-  `web/UsersController.java` -- add/edit/remove non-admin Users and change any user's password,
-  hidden whenever an external IdP is configured, since Selfie Proxy no longer controls who can
-  authenticate in that case), and Logout. The Users page shares the portal's own look/topbar/logo
+  not this shared UI-chrome mode), then every other entry in a fixed order (not alphabetical) --
+  "Domains" (`/domains`, `web/DomainsController.java` -- see "Domains" below, always shown, no hide
+  condition), "Users" (`/users`, `web/UsersController.java` -- add/edit/remove non-admin Users and
+  change any user's password, hidden whenever an external IdP is configured, since Selfie Proxy no
+  longer controls who can authenticate in that case), "Export configuration"
+  (`/export-configuration`), "Import configuration" (`/import-configuration`) -- with "Log out"
+  always pinned last regardless of alphabetical order, since it's a destructive/session-ending
+  action, not a settings page, and shouldn't be interleaved with the rest. The Users page shares
+  the portal's own look/topbar/logo
   like every other page here, but its data and validation (`UserStore`/`AdminUserStore`/
   `PasswordPolicy`) still live in `selfieproxy-identity-provider` -- `UsersController` is a thin
   client of `InternalUsersController`, identity-provider's own internal-only REST API, reached
@@ -67,7 +70,7 @@ container. After a successful login the user lands on the exposed applications p
   `BackupController`, `RestoreSelection`, `RestoreResult`, templates named `backup.html`/
   `restore.html`/`restore-picker.html`) keep the shorter "backup"/"restore" naming (see "Backup
   and restore" below), the same kind of internal-vs-UI naming split as Homelab/Agent and Exposed
-  App/Tunnel. Logout ends the portal's own session and clears boringproxy's single sign on cookie for
+  App/Tunnel. Log out ends the portal's own session and clears boringproxy's single sign on cookie for
   the portal domain, landing on a confirmation page served by `selfieproxy-identity-provider` with
   a link back into the portal — which immediately requires logging in again, since both session
   and cookie are gone.
