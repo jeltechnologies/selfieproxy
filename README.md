@@ -115,7 +115,7 @@ On top of boringproxy we added:
 ## FAQ
 
 **Is this free?** Yes, MIT-licensed, no restrictions on hobby or commercial use — see
-[License](#license). For business-critical use cases, it is better to use a supported enterprise products.
+[License](#license). For business-critical use cases, we recommend using supported enterprise products instead.
 
 **Is this secure?** The homelab-to-server tunnel is encrypted, the server is under your own
 control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
