@@ -18,6 +18,16 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// Bounds how long a single agent<->server control-plane request (registration, tunnel polling)
+// may take. c.httpClient has no client-wide Timeout because it's also used to proxy real,
+// potentially long-lived backend traffic (see proxyRequest) -- a blanket timeout there would
+// cut off legitimate slow requests. Without this, a stalled/half-open connection on the
+// control-plane side (registration or the recurring tunnel poll) could hang Agent.Run's request
+// indefinitely, silently freezing the whole poll loop -- it never reaches the next tick, logs no
+// error, and no tunnel changes (new/renamed/deleted) are ever picked up again until the agent
+// process is restarted.
+const controlPlaneRequestTimeout = 30 * time.Second
+
 type Agent struct {
 	httpClient       *http.Client
 	tunnels          map[string]Tunnel
@@ -137,7 +147,10 @@ func (c *Agent) Run(ctx context.Context) error {
 		url = url + "&user=" + c.user
 	}
 
-	agentReq, err := http.NewRequest("POST", url, nil)
+	registerCtx, cancelRegister := context.WithTimeout(ctx, controlPlaneRequestTimeout)
+	defer cancelRegister()
+
+	agentReq, err := http.NewRequestWithContext(registerCtx, "POST", url, nil)
 	if err != nil {
 		return fmt.Errorf("Failed to create request for URL %s", url)
 	}
@@ -201,7 +214,10 @@ func (c *Agent) PollTunnels(ctx context.Context) error {
 
 	url := fmt.Sprintf("https://%s/api/tunnels?agent-name=%s", c.server, c.agentName)
 
-	listenReq, err := http.NewRequest("GET", url, nil)
+	pollCtx, cancel := context.WithTimeout(ctx, controlPlaneRequestTimeout)
+	defer cancel()
+
+	listenReq, err := http.NewRequestWithContext(pollCtx, "GET", url, nil)
 	if err != nil {
 		return err
 	}
