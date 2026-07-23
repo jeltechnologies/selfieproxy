@@ -319,7 +319,12 @@ this section is the portal-side UI behavior.
   a whole domain elsewhere, not rewrite individual URLs. A site can't be set to redirect to itself.
   Switching an existing site from content to redirect mode leaves its uploaded content directory
   untouched on disk (nothing to lose if switched back later) but hides the Download button and
-  ZIP-upload field while in redirect mode, since there's nothing to download or replace.
+  ZIP-upload field while in redirect mode, since there's nothing to download or replace. The target
+  is picked either from a dropdown of every currently deployed Web Application and other Local
+  Website (`LocalWebsiteController.redirectTargets` -- excludes the site being edited itself, and
+  every Network Service, since those have no public web address to redirect to) or typed as a
+  custom address -- the two share one underlying `redirectTo` value, so which UI mode was used to
+  set it doesn't change how it's stored or applied.
 
 ## Backup and restore
 

@@ -47,8 +47,29 @@
 			</div>
 
 			<div class="field" id="redirect-to-field" style="display:none">
-				<label for="redirectTo">Redirect to</label>
-				<input type="url" id="redirectTo" name="redirectTo" th:value="${website.redirectTo()}"
+				<label>Redirect to</label>
+
+				<div class="field" th:if="${!redirectTargets.isEmpty()}">
+					<label>
+						<input type="radio" name="redirectSource" id="redirectSourceExisting"
+							   th:checked="${!redirectTargets.isEmpty() and (!website.isRedirect() or redirectMatchesExisting)}">
+						An existing application or website
+					</label>
+				</div>
+				<div class="field">
+					<label>
+						<input type="radio" name="redirectSource" id="redirectSourceCustom"
+							   th:checked="${redirectTargets.isEmpty() or (website.isRedirect() and !redirectMatchesExisting)}">
+						A custom address
+					</label>
+				</div>
+
+				<select id="redirectToExisting" name="redirectTo" th:if="${!redirectTargets.isEmpty()}">
+					<option th:each="t : ${redirectTargets}" th:value="'https://' + ${t}" th:text="${t}"
+							th:selected="${'https://' + t == website.redirectTo()}"></option>
+				</select>
+
+				<input type="url" id="redirectToCustom" name="redirectTo" th:value="${website.redirectTo()}"
 					   placeholder="https://www.example.com"
 					   title="An address like https://www.example.com, with no path, query, or fragment">
 			</div>

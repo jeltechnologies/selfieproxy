@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -102,9 +104,11 @@ public class LocalWebsiteController {
 
 	@GetMapping("/local-websites/new")
 	public String newWebsite(Model model) {
-		model.addAttribute("website", new LocalWebsite("", boringProxyProperties.primaryDomain(), null));
+		LocalWebsite website = new LocalWebsite("", boringProxyProperties.primaryDomain(), null);
+		model.addAttribute("website", website);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());
+		addRedirectTargetAttributes(model, website, null);
 		return "edit-local-website";
 	}
 
@@ -117,6 +121,7 @@ public class LocalWebsiteController {
 		model.addAttribute("website", website);
 		model.addAttribute("isNew", false);
 		model.addAttribute("domains", domainService.allDomains());
+		addRedirectTargetAttributes(model, website, fqdn);
 		return "edit-local-website";
 	}
 
@@ -132,6 +137,7 @@ public class LocalWebsiteController {
 			model.addAttribute("isNew", true);
 			model.addAttribute("errors", errors);
 			model.addAttribute("domains", domainService.allDomains());
+			addRedirectTargetAttributes(model, website, null);
 			return "edit-local-website";
 		}
 
@@ -168,6 +174,7 @@ public class LocalWebsiteController {
 			model.addAttribute("isNew", false);
 			model.addAttribute("errors", errors);
 			model.addAttribute("domains", domainService.allDomains());
+			addRedirectTargetAttributes(model, website, fqdn);
 			return "edit-local-website";
 		}
 
@@ -228,6 +235,34 @@ public class LocalWebsiteController {
 
 	private String normalize(String value) {
 		return value == null ? "" : value.trim().toLowerCase();
+	}
+
+	/**
+	 * FQDNs of every deployed Web Application (Exposed App, not Network Service -- those have no
+	 * public web address to redirect to) and Local Website, offered as quick-pick redirect targets
+	 * on the edit page alongside the free-text address field. excludeFqdn is the site being edited
+	 * (null when adding), so a site never offers itself as a target.
+	 */
+	private List<String> redirectTargets(String excludeFqdn) {
+		Set<String> targets = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+		boringProxyClient.listTunnels().values().stream()
+				.filter(t -> !"passthrough".equals(t.tlsTermination()))
+				.filter(t -> !thisServerAgentProperties.agentName().equals(t.agentName()))
+				.map(TunnelDto::domain)
+				.forEach(targets::add);
+		localWebsiteStore.list().stream().map(LocalWebsite::fqdn).forEach(targets::add);
+		if (excludeFqdn != null) {
+			targets.removeIf(t -> t.equalsIgnoreCase(excludeFqdn));
+		}
+		return new ArrayList<>(targets);
+	}
+
+	/** redirectMatchesExisting drives which of the edit page's two redirect-target radios starts checked -- see edit-local-website.html. */
+	private void addRedirectTargetAttributes(Model model, LocalWebsite website, String excludeFqdn) {
+		List<String> targets = redirectTargets(excludeFqdn);
+		model.addAttribute("redirectTargets", targets);
+		model.addAttribute("redirectMatchesExisting", website.isRedirect()
+				&& targets.stream().anyMatch(t -> ("https://" + t).equalsIgnoreCase(website.redirectTo())));
 	}
 
 	private LocalWebsite toLocalWebsite(LocalWebsiteForm form) {
