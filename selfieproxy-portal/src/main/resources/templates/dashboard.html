@@ -50,7 +50,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}"
+				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}, data-fqdn=${app.fqdn()}"
 					th:with="offline=${appStatusMessage.containsKey(app.fqdn())}">
 					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())}">
 						<span th:text="${app.isNetworkService()} ? ${app.name()} : (${#strings.isEmpty(app.subdomain())} ? ${app.domain()} : ${app.subdomain()})"></span>
@@ -70,13 +70,13 @@
 					<td th:text="${app.homelabName()}"></td>
 					<td th:attr="data-sort-value=${app.host()} + ':' + ${app.port()}" th:text="${app.host()} + ':' + ${app.port()}"></td>
 					<td>
-						<a th:if="${app.isRemoteAccessMode()}" class="button-small"
+						<a th:if="${app.isRemoteAccessMode()}" class="button-small connect-button"
 						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
 						   th:href="${app.encryptedSecret() != null}
 						             ? 'https://' + ${consoleDomain} + '/connect/' + ${app.fqdn()}
 						             : @{/apps/{fqdn}/connect(fqdn=${app.fqdn()})}"
 						   target="_blank" rel="noopener">Connect</a>
-						<a th:if="${!app.isRemoteAccessMode() and tunnelMapper.resultIsLink(app)}" class="button-small"
+						<a th:if="${!app.isRemoteAccessMode() and tunnelMapper.resultIsLink(app)}" class="button-small connect-button"
 						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
 						   th:href="${tunnelMapper.result(app)}" target="_blank" rel="noopener">Connect</a>
 						<span th:if="${!app.isRemoteAccessMode() and !tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
@@ -97,6 +97,7 @@
 	</main>
 
 	<script th:src="@{/js/sortable-table.js}"></script>
+	<script th:src="@{/js/dashboard.js}"></script>
 
 	<footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
