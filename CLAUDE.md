@@ -263,16 +263,22 @@ no compose file or `.env` template for them here. An agent connects with just a 
 server-generated secret (`AGENT_NAME`/`AGENT_SECRET`) issued from the admin portal's Agents
 page, plus the boringproxy admin domain to dial (`REVERSE_PROXY_LISTENER_SUBDOMAIN.PRIMARY_DOMAIN` from this
 server's `.env`); the portal itself is the source of guidance for running that agent process.
-**Possible future enhancement**: agents dial a hardcoded port 22 for their SSH reverse tunnel today
-(boringproxy's own `-ssh-server-port` flag already exists and defaults to `22` -- see
-`selfieproxy-reverseproxy/CLAUDE.md` -- but nothing in this repo's `.env`/docker-compose.yaml
-exposes it yet). Some homelabs sit behind networks that only allow outbound `80`/`443` (corporate
-firewalls, hotel/campus Wi-Fi, some mobile carriers), which blocks port 22 entirely. The obvious
-fix -- move the SSH port to `443` -- doesn't work as a simple env var, though: boringproxy's own
-HTTPS listener already owns `443` on this same host, and sharing one TCP port between SSH and TLS
-traffic needs a protocol multiplexer (e.g. `sslh`, sniffing the ClientHello to route SSH vs TLS to
-different local ports) that this stack doesn't have today. Wiring this up for real is a bigger
-change than exposing the existing flag.
+`STEALTH_MODE` (default `false`) disguises every agent's SSH reverse tunnel as HTTPS on port 443
+instead of dialing port 22 directly -- for homelabs on networks that only allow outbound `80`/`443`
+(corporate firewalls, hotel/campus Wi-Fi, some mobile carriers), which block port 22 entirely.
+Rather than a separate protocol-multiplexer process (e.g. `sslh`) sharing port 443 with
+boringproxy's own HTTPS listener -- which would need `NET_ADMIN`/TPROXY/iptables to preserve the
+real client IP, and would silently reintroduce the client-IP-spoofing problem `-behind-proxy`'s
+removal (above) closed off if run in its simpler, non-transparent mode -- this is handled entirely
+in-process by `selfieproxy-reverseproxy` (its `-stealth-mode` flag, see
+`selfieproxy-reverseproxy/CLAUDE.md`'s "What this is"/"Connection flow" sections for the full
+design): the connection is real-TLS-terminated against the admin domain's already-managed cert and
+marked with a custom ALPN protocol ID, so it's indistinguishable from ordinary HTTPS to that domain
+to any network-level inspection, then the decrypted bytes are piped to the host's real, unconfigurable
+sshd on port 22. No new subdomain, DNS record, or cert is needed -- agents already dial the admin
+domain for SSH. Toggling `STEALTH_MODE` is a global switch, not a per-homelab setting: every
+connected agent picks up the new `ServerPort`/`SshTls` values on its next poll and re-bores all its
+tunnels (the same `SyncTunnels` diff-and-restart mechanism already used for any tunnel change).
 `docker-compose.yaml` passes `-acme-email "${LETSENCRYPT_EMAIL:-}"` to both boringproxy
 invocations (the main server and the colocated `selfieproxy-localsites-agent`, which does its
 own independent certmagic issuance into `this-server-certmagic`) — it's optional for ACME/Let's

@@ -328,10 +328,32 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	}
 
 	sshHost := fmt.Sprintf("%s:%d", tunnel.ServerAddress, tunnel.ServerPort)
-	client, err := ssh.Dial("tcp", sshHost, config)
+
+	var netConn net.Conn
+	if tunnel.SshTls {
+		// Stealth mode: disguise this SSH connection as an HTTPS request to the admin
+		// domain -- a real TLS handshake against its certmagic-managed cert, marked with
+		// a custom ALPN protocol ID the server (Server.handleConnection) uses to route it
+		// to the real sshd instead of the ordinary HTTP path. InsecureSkipVerify is safe
+		// here: TLS is only a disguise layer, not the trust boundary -- the SSH handshake
+		// right below still authenticates with this tunnel's own ephemeral keypair.
+		netConn, err = tls.Dial("tcp", sshHost, &tls.Config{
+			ServerName:         tunnel.ServerAddress,
+			InsecureSkipVerify: true,
+			NextProtos:         []string{stealthSshAlpn},
+		})
+	} else {
+		netConn, err = net.Dial("tcp", sshHost)
+	}
 	if err != nil {
 		return fmt.Errorf("Failed to dial: %v", err)
 	}
+
+	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, sshHost, config)
+	if err != nil {
+		return fmt.Errorf("Failed to establish SSH connection: %v", err)
+	}
+	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
 
 	bindAddr := "127.0.0.1"
@@ -404,7 +426,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 					useTls = false
 				}
 
-				go ProxyTcp(conn, tunnel.ClientAddress, tunnel.ClientPort, useTls, getCertificate, tunnel.Domain)
+				go ProxyTcp(conn, tunnel.ClientAddress, tunnel.ClientPort, useTls, getCertificate, tunnel.Domain, []string{"http/1.1", "h2", "acme-tls/1"})
 			}
 		}()
 	}

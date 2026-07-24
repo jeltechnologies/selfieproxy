@@ -56,6 +56,7 @@ type Tunnel struct {
 	Domain           string `json:"domain"`
 	ServerAddress    string `json:"server_address"`
 	ServerPort       int    `json:"server_port"`
+	SshTls           bool   `json:"ssh_tls"`
 	ServerPublicKey  string `json:"server_public_key"`
 	Username         string `json:"username"`
 	TunnelPort       int    `json:"tunnel_port"`

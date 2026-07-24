@@ -96,6 +96,7 @@ func (a *Api) handleTunnels(w http.ResponseWriter, r *http.Request) {
 					delete(tunnels, k)
 				} else {
 					tun.ServerPort = a.config.SshServerPort
+					tun.SshTls = a.config.StealthMode
 					tunnels[k] = tun
 				}
 			}

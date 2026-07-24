@@ -24,9 +24,31 @@ import (
 
 type Config struct {
 	SshServerPort  int    `json:"ssh_server_port"`
+	StealthMode    bool   `json:"stealth_mode"`
 	PublicIp       string `json:"public_ip"`
 	namedropClient *namedrop.Client
 	autoCerts      bool
+}
+
+// The custom ALPN protocol ID a stealth-mode agent offers in its TLS ClientHello to mark
+// a connection as an SSH-over-TLS tunnel bound for the admin domain, rather than ordinary
+// HTTPS traffic to it (portal/agent API calls, browser requests) -- see
+// Server.handleConnection and agent.go's BoreTunnel.
+const stealthSshAlpn = "selfieproxy-ssh"
+
+// The real, fixed port the host's own sshd listens on. Never configurable (see
+// -ssh-server-port's doc comment below) -- under stealth mode this is deliberately
+// decoupled from the public-facing port agents are told to dial (443), since stealth
+// mode only changes what's exposed on the internet, not the host's own sshd config.
+const hostSshdPort = 22
+
+func hasAlpnProto(protos []string, target string) bool {
+	for _, p := range protos {
+		if p == target {
+			return true
+		}
+	}
+	return false
 }
 
 type SmtpConfig struct {
@@ -41,6 +63,7 @@ type Server struct {
 	tunMan       *TunnelManager
 	httpClient   *http.Client
 	httpListener *PassthroughListener
+	config       *Config
 }
 
 func Listen() {
@@ -58,6 +81,7 @@ func Listen() {
 	ssoIdleMinutes := flagSet.Int("sso-idle-minutes", 30, "Minutes of inactivity before a single sign on session (portal domain or a tunnel protected with single sign on) expires; refreshed on every request")
 	ssoMaxMinutes := flagSet.Int("sso-max-minutes", 600, "Absolute maximum minutes a single sign on session stays valid, regardless of activity")
 	sshServerPort := flagSet.Int("ssh-server-port", 22, "SSH Server Port")
+	stealthMode := flagSet.Bool("stealth-mode", false, "Disguise agent SSH reverse tunnels as HTTPS on port 443 (real TLS handshake to the admin domain, custom ALPN marker) instead of dialing -ssh-server-port directly -- for agents on networks that block outbound SSH but allow 443")
 	dbDir := flagSet.String("db-dir", "", "Database file directory")
 	certDir := flagSet.String("cert-dir", "", "TLS cert directory")
 	runtimeDir := flagSet.String("runtime-dir", "", "Directory for ephemeral internal-only files (eg. the internal REST token)")
@@ -206,8 +230,14 @@ func Listen() {
 		}
 	}
 
+	effectiveSshServerPort := *sshServerPort
+	if *stealthMode {
+		effectiveSshServerPort = 443
+	}
+
 	config := &Config{
-		SshServerPort:  *sshServerPort,
+		SshServerPort:  effectiveSshServerPort,
+		StealthMode:    *stealthMode,
 		PublicIp:       ip,
 		namedropClient: namedropClient,
 		autoCerts:      autoCerts,
@@ -243,7 +273,7 @@ func Listen() {
 
 	httpListener := NewPassthroughListener()
 
-	p := &Server{db, tunMan, httpClient, httpListener}
+	p := &Server{db, tunMan, httpClient, httpListener, config}
 
 	getCertificate := withSelfSignedFallback(certConfig, tunMan.CertFallbackDecision, selfSignedCerts)
 
@@ -509,13 +539,27 @@ func (p *Server) handleConnection(clientConn net.Conn, getCertificate func(*tls.
 
 	passConn := NewProxyConn(clientConn, clientReader)
 
+	if p.config.StealthMode && clientHello.ServerName == p.db.GetAdminDomain() && hasAlpnProto(clientHello.SupportedProtos, stealthSshAlpn) {
+		// A stealth-mode agent's SSH-over-TLS connection, disguised as HTTPS to the admin
+		// domain -- terminate the (real, certmagic-managed) TLS here, same as any
+		// server-tls tunnel below, and pipe the decrypted bytes to the host's real sshd.
+		// Never reaches this branch unless the ALPN marker is present, so ordinary
+		// browser/API traffic to the admin domain (ALPN h2/http/1.1) and ACME's
+		// acme-tls/1 challenge traffic both fall through to the logic below unaffected.
+		err := ProxyTcp(passConn, "127.0.0.1", hostSshdPort, true, getCertificate, clientHello.ServerName, []string{stealthSshAlpn})
+		if err != nil {
+			log.Println(err.Error())
+		}
+		return
+	}
+
 	tunnel, exists := p.db.GetTunnel(clientHello.ServerName)
 
 	if exists && (tunnel.TlsTermination == "client" || tunnel.TlsTermination == "passthrough") || tunnel.TlsTermination == "client-tls" {
 		p.passthroughRequest(passConn, tunnel)
 	} else if exists && tunnel.TlsTermination == "server-tls" {
 		useTls := true
-		err := ProxyTcp(passConn, "127.0.0.1", tunnel.TunnelPort, useTls, getCertificate, tunnel.Domain)
+		err := ProxyTcp(passConn, "127.0.0.1", tunnel.TunnelPort, useTls, getCertificate, tunnel.Domain, []string{"http/1.1", "h2", "acme-tls/1"})
 		if err != nil {
 			log.Println(err.Error())
 			return

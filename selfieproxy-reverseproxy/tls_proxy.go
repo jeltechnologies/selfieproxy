@@ -11,14 +11,13 @@ import (
 	"sync"
 )
 
-func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error), sni string) error {
+func ProxyTcp(conn net.Conn, addr string, port int, useTls bool, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error), sni string, nextProtos []string) error {
 
 	if useTls {
 		tlsConfig := &tls.Config{
 			GetCertificate: getCertificate,
+			NextProtos:     nextProtos,
 		}
-
-		tlsConfig.NextProtos = append([]string{"http/1.1", "h2", "acme-tls/1"}, tlsConfig.NextProtos...)
 
 		tlsConn := tls.Server(conn, tlsConfig)
 
