@@ -2,25 +2,6 @@
 
 Selfie Proxy provides a simplified, selfhosting solution for accessing home labs behind NAT/CGNAT, creating HTTPS subdomains via a small internet-facing server rather than complex configurations. It avoids unnecessary enterprise features like load balancing and auditing, focusing instead on ease of use for self-hosters.
 
-## Why
-
-Homelabs typically operate on a home internet network that can't be reached from the outside. 
-
-Internet service providers introduced CGNAT, which creates a protective barrier, stopping hackers and malicious bots from scanning, targeting, or accessing home gadgets. While CGNAT is a good thing for normal consumers, it brings problems for homelabs because classic port forwarding does not work anymore.
-
-Tools like Cloudflare Tunnel, Pangolin, Tailscale, and NetBird solve this, but they require real networking knowledge to configure. With many options and configurations, it takes many clicks to get things working. As a self-hoster, you don't need all these options. 
-
-Most of these mentioned tools are built for enterprise use cases. They hide basic functions like backup and restore, terminal access, and remote desktop behind paid enterprise licenses.
-
-Selfie Proxy is designed for people selfhosting for a hobby. It includes the essential security that homelabs actually need, while deliberately skipping enterprise bloat to keep things lightweight, zero-cost, and easy to run yourself.
-
-Selfie Proxy deliberately lacks enterprise features that commercial alternatives provide:
-- No high availability or load balancing
-- No auditing and enterprise compliance tooling
-- No dedicated support
-
-If your business requires these features, use a commercial product instead!
-
 ## Features
 
 - Admin portal to manage every exposed app and website.
@@ -37,7 +18,26 @@ If your business requires these features, use a commercial product instead!
   with the exception of passwords.
 - Single Docker command to install and update.
 
-## Background
+## Why
+
+Homelabs typically operate on a home internet network that can't be reached from the outside. 
+
+Internet service providers introduced CGNAT, which creates a protective barrier, stopping hackers and malicious bots from scanning, targeting, or accessing home gadgets. While CGNAT is a good thing for normal consumers, it brings problems for homelabs because classic port forwarding does not work anymore.
+
+Tools like Cloudflare Tunnel, Pangolin, Tailscale, and NetBird solve this, but they require real networking knowledge to configure. With many options and configurations, it takes many clicks to get things working. As a self-hoster, you don't need all these options. 
+
+Most of these mentioned tools are built for enterprise use cases. They hide basic functions like backup and restore, terminal access, and remote desktop behind paid enterprise licenses.
+
+Selfie Proxy is designed for people selfhosting for a hobby. It includes the essential security that homelabs actually need, while deliberately skipping enterprise bloat to keep things lightweight, zero-cost, and easy to run yourself.
+
+Selfie Proxy deliberately lacks enterprise features that commercial alternatives provide:
+- No high availability or load balancing.
+- No auditing and enterprise compliance tooling.
+- No dedicated support.
+
+If your business requires these features, use a commercial product instead!
+
+## Implementation
 
 Selfie Proxy's reverse tunnel engine (`selfieproxy-reverseproxy`) is a fork of
 [boringproxy](https://github.com/boringproxy/boringproxy) by Anders Pitman, which is no longer
