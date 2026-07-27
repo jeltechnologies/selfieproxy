@@ -174,8 +174,23 @@ The edit page fields, in order:
 1. **Type**: Web application (default) or Network service. Selecting Network service shows a
    warning: "Use this at your own risk. Anyone on the internet who scans your domain can see that
    port is open and attempt to connect to it." (this warning, and the port-scanning risk itself,
-   only really applies to TCP mode below -- shown for every Network Service mode anyway,
-   since Selecting Network Service is the one action that turns on a whole extra section of the form).
+   only really applies to TCP mode below -- shown for every Network Service mode anyway, since
+   Selecting Network Service is the one action that turns on a whole extra section of the form).
+   TCP mode's own **Exposed port** field (point 2 below) additionally carries a `warning-icon` (the
+   same inline hover-tooltip `&#9888;` idiom the Applications list already uses for its
+   homelab-gone/domain-gone row warnings) right next to its label: "Make sure to open the exposed
+   port in your firewall." -- scoped to TCP mode alone (unlike the warning above) simply by living
+   inside the same `#exposed-port-field` div that field's own visibility toggle already hides for
+   every other mode, no separate JS needed.
+   There is deliberately no live reachability check anywhere in this flow (tried and removed, see
+   git history around 2026-07-27): a TCP-mode Network Service's port only ever becomes a real
+   listening socket once its Homelab's agent has an active connection relaying it
+   (`AllowExternalTcp`, see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section) -- so a
+   check would report "not reachable" just as readily for a disconnected/offline homelab as for an
+   actually-blocked firewall, which isn't a distinction worth the ~10-30s external scan
+   (`api.portscan.com`, the same technique `check-prerequisites.sh` still uses at startup for the
+   three fixed ports 80/443/22, root `CLAUDE.md`) would cost on every save. These two static
+   warnings are the only guidance given for this.
 2. **Mode** (Network service only): one of four --
    - **TCP** (default, label deliberately terse -- "Protocol: TCP" is already implied and no
      longer separately shown, see point 4 below) -- today's original behavior, internet-reachable

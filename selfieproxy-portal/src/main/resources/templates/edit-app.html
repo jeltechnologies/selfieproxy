@@ -44,7 +44,9 @@
 
 			<div class="field-row">
 				<div class="field" id="exposed-port-field">
-					<label for="exposedPort">Exposed port to the internet</label>
+					<label for="exposedPort">Exposed port to the internet
+						<span class="warning-icon" title="Make sure to open the exposed port in your firewall.">&#9888;</span>
+					</label>
 					<input type="number" id="exposedPort" name="exposedPort" th:value="${app.exposedPort()}" min="1024" max="65535">
 				</div>
 
