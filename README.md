@@ -81,14 +81,26 @@ On top of boringproxy we added:
    *.homelab.example.com    A    <your server IP>
    ```
 
-2. On the server, download the compose file and env template:
+2. Open ports 80, 443, and 22 on the server's firewall — Let's Encrypt needs 80/443 reachable
+   to issue certificates, and homelab agents dial 22 for their SSH tunnel (unless
+   `STEALTH_MODE=true`, which tunnels SSH over 443 instead, so 22 can stay closed in that case).
+   Ubuntu's default `ufw` only allows 22 out of the box, which blocks certificate issuance
+   entirely — if you're using it:
+
+   ```bash
+   sudo ufw allow 80/tcp
+   sudo ufw allow 443/tcp
+   sudo ufw enable
+   ```
+
+3. On the server, download the compose file and env template:
 
    ```bash
    curl -O https://raw.githubusercontent.com/jeltechnologies/selfieproxy/main/docker-compose.yaml
    curl -o .env https://raw.githubusercontent.com/jeltechnologies/selfieproxy/main/.env.example
    ```
 
-3. Edit `.env`:
+4. Edit `.env`:
 
    ```
    PRIMARY_DOMAIN=example.com
@@ -99,13 +111,13 @@ On top of boringproxy we added:
    `ADMIN_PORTAL_BOOTSTRAP_PASSWORD` is a one-time seed — you're forced to change it on
    first login, after which it's no longer used.
 
-4. Start it:
+5. Start it:
 
    ```bash
    docker compose up -d
    ```
 
-5. Visit `selfieproxy.<your domain>`, log in with the credentials from step 3, and set a
+6. Visit `selfieproxy.<your domain>`, log in with the credentials from step 4, and set a
    new password. The portal then walks you through connecting your first homelab and
    exposing your first app.
 
