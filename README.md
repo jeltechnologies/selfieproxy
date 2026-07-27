@@ -62,7 +62,12 @@ On top of boringproxy we added:
 
 - A domain name — cheap domains run around $10-15/year.
 - A small VPS with a public IPv4 address, Linux, and Docker (~$5/month tier is enough —
-  e.g. Hetzner, Vultr, DigitalOcean).
+  e.g. Hetzner, Vultr, DigitalOcean). On Ubuntu, install Docker with:
+
+  ```bash
+  curl -fsSL https://get.docker.com | sh
+  ```
+
 - A machine at home capable of running Docker, to connect as a homelab agent.
 
 ## Installation
