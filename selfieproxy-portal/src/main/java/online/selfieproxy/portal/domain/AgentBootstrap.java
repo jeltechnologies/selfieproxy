@@ -47,13 +47,18 @@ public class AgentBootstrap {
 		}
 
 		String name = properties.defaultName();
-		Map<String, AgentStatusDto> agents = boringProxyClient.listAgents();
-		if (agents.containsKey(name)) {
-			log.info("Default agent '{}' already exists, skipping bootstrap.", name);
-		} else {
-			boringProxyClient.createAgent(OWNER, name);
-			boringProxyClient.createToken(OWNER, name);
-			log.info("Created default agent '{}'. View its secret on the Agents page.", name);
+		try {
+			Map<String, AgentStatusDto> agents = boringProxyClient.listAgents();
+			if (agents.containsKey(name)) {
+				log.info("Default agent '{}' already exists, skipping bootstrap.", name);
+			} else {
+				boringProxyClient.createAgent(OWNER, name);
+				boringProxyClient.createToken(OWNER, name);
+				log.info("Created default agent '{}'. View its secret on the Agents page.", name);
+			}
+		} catch (Exception e) {
+			log.warn("Default homelab bootstrap failed, will retry on next startup: {}", e.getMessage());
+			return;
 		}
 
 		writeMarker(markerPath);
