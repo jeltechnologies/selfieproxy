@@ -420,6 +420,12 @@ code,
   color: var(--text-faint);
 }
 
+.steps-note {
+  margin-top: var(--space-6);
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
 .shot-trigger {
   width: 100%;
   border: none;
