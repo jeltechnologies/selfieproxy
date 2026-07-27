@@ -2,6 +2,7 @@ services:
   check-prerequisites:
     image: ghcr.io/jeltechnologies/selfieproxy-check-prerequisites:latest
     build: ./selfieproxy-check-prerequisites
+    network_mode: host
     env_file: .env
 
   selfieproxy-reverseproxy:

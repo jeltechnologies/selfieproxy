@@ -31,15 +31,32 @@ runtime config/volumes they use:
   that serves every Local Website (see `selfieproxy-portal/CLAUDE.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
-- `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + `check-prerequisites.sh`
-  baked in via its own Dockerfile) that fails fast before anything else starts if `PRIMARY_DOMAIN` and a
-  `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP (checked as the literal
-  DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and future subdomain — the
-  fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-app/tunnel subdomain created later
-  — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites` service. This
-  check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
+- `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + netcat-openbsd +
+  `check-prerequisites.sh` baked in via its own Dockerfile) that fails fast before anything else starts if
+  `PRIMARY_DOMAIN` and a `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP
+  (checked as the literal DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and
+  future subdomain — the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-app/tunnel
+  subdomain created later — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites`
+  service. This check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
   "Domains" section) is registered and DNS-checked entirely at runtime through the portal's own Domains
-  settings page instead, since it's added long after this container has already started.
+  settings page instead, since it's added long after this container has already started. After the DNS check,
+  it also verifies ports 80/443/22 are actually reachable, not just resolvable — the incident this exists to
+  prevent is a host firewall silently blocking inbound 80/443 (e.g. Ubuntu's default `ufw`, which only allows
+  22 out of the box), which otherwise burns through Let's Encrypt's per-identifier rate limit via repeated
+  failed ACME attempts before anyone notices. The check is a self-listen + self-dial: for 80/443, since nothing
+  is listening yet at this point in startup, it binds a temporary `nc -l` listener on that port itself, then
+  dials back out to the host's own public IP (not `127.0.0.1`) with `nc -z -w`, one retry, before tearing the
+  listener down; for 22 it dials directly, since the host's real `sshd` is already listening. 80/443 failures
+  are fatal (`exit 1`, same severity as the DNS check, since Let's Encrypt needs both); a closed 22 is only a
+  warning (agents just can't connect yet, no rate-limit consequence) and is skipped entirely when
+  `STEALTH_MODE=true`, which tunnels agent SSH over 443 instead. This requires `network_mode: host` on the
+  `check-prerequisites` service so the temporary listeners bind real host ports and the self-dial traverses the
+  same interface/firewall path a real external client would. Dialing the box's own public IP is reliable
+  precisely because every supported deployment of Selfie Proxy has one bound directly to the host — see
+  `README.md`'s "Requirements" section; a deployment behind NAT/CGNAT is not supported, so there is no
+  hairpin-NAT edge case to hedge against here or in any future check like this one. The check only verifies reachability at
+  the Docker host boundary — a VPS provider's own upstream firewall/security-group layer is out of scope by
+  design, not something this check can or tries to see.
 - `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
   template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
   admin portal as three of the four Network Service Modes an Application can have ("Terminal
@@ -79,7 +96,7 @@ runtime config/volumes they use:
 │       │                            # configuration export/import)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
-├── selfieproxy-check-prerequisites/ # DNS pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
+├── selfieproxy-check-prerequisites/ # DNS + port-reachability pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
 ├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent + selfieproxy-remote-console + selfieproxy-guacd (depends_on selfieproxy-reverseproxy)
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
