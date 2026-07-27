@@ -146,6 +146,58 @@ func (m *TunnelManager) startCertRetryLoop() {
 	}
 }
 
+// retryFixedDomainCerts is startCertRetryLoop's counterpart for boringproxy's own
+// fixed-purpose domains (admin, portal, sso, console) -- these are never Tunnel DB
+// records, so they never appear in db.GetTunnels() and startCertRetryLoop above never
+// sees them. A free function rather than a TunnelManager method since it has nothing
+// to do with tunnels; called once at startup with whichever fixed domains failed their
+// initial ManageSync (see boringproxy.go's main). Reuses the same backoff constants.
+// Exits once every domain has obtained a real certificate.
+func retryFixedDomainCerts(certConfig *certmagic.Config, domains []string) {
+	backoff := map[string]time.Duration{}
+	nextRetry := map[string]time.Time{}
+	pending := map[string]bool{}
+	for _, domain := range domains {
+		pending[domain] = true
+		nextRetry[domain] = time.Now().Add(certRetryBaseInterval)
+	}
+
+	ticker := time.NewTicker(certRetryCheckInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+
+		for domain := range pending {
+			if now.Before(nextRetry[domain]) {
+				continue
+			}
+
+			err := certConfig.ManageSync(context.Background(), []string{domain})
+			if err == nil {
+				log.Printf("CertMagic: successfully obtained certificate for fixed domain %s after retrying\n", domain)
+				delete(pending, domain)
+				continue
+			}
+
+			next := backoff[domain] * 2
+			if next == 0 {
+				next = certRetryBaseInterval
+			}
+			if next > certRetryMaxInterval {
+				next = certRetryMaxInterval
+			}
+			backoff[domain] = next
+			nextRetry[domain] = now.Add(next)
+			log.Printf("CertMagic: retry failed for fixed domain %s, next attempt in %s\n", domain, next)
+		}
+
+		if len(pending) == 0 {
+			return
+		}
+	}
+}
+
 func (m *TunnelManager) GetTunnels() map[string]Tunnel {
 	return m.db.GetTunnels()
 }

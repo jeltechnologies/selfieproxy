@@ -167,6 +167,18 @@ func Listen() {
 
 	adminDomain := db.GetAdminDomain()
 
+	// A failed ManageSync for any of these four fixed-purpose domains used to be fatal,
+	// which meant a rate-limited or otherwise briefly-unreachable ACME CA (e.g. Let's
+	// Encrypt's per-identifier "too many failed authorizations" limit) took the whole
+	// server down in a crash-restart loop -- on a fresh install this can even be
+	// self-inflicted (a few failed attempts while DNS was still propagating). None of
+	// these domains are Tunnel DB records, so TunnelManager.CertFallbackDecision already
+	// treats them as "no tunnel" and serves a self-signed cert via withSelfSignedFallback
+	// once it's wired up below -- the only thing missing was surviving long enough to
+	// reach that point. pendingFixedDomains collects whichever of these still need a
+	// real cert so retryFixedDomainCerts can keep trying in the background.
+	var pendingFixedDomains []string
+
 	if adminDomain == "" {
 
 		err = setAdminDomain(certConfig, db, namedropClient, autoCerts)
@@ -177,34 +189,46 @@ func Listen() {
 		if autoCerts {
 			err = certConfig.ManageSync(context.Background(), []string{adminDomain})
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("CertMagic error obtaining certificate for admin domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", adminDomain, err)
+				pendingFixedDomains = append(pendingFixedDomains, adminDomain)
+			} else {
+				log.Print(fmt.Sprintf("Successfully acquired certificate for admin domain (%s)", adminDomain))
 			}
-			log.Print(fmt.Sprintf("Successfully acquired certificate for admin domain (%s)", adminDomain))
 		}
 	}
 
 	if *portalDomain != "" && autoCerts {
 		err = certConfig.ManageSync(context.Background(), []string{*portalDomain})
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("CertMagic error obtaining certificate for portal domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", *portalDomain, err)
+			pendingFixedDomains = append(pendingFixedDomains, *portalDomain)
+		} else {
+			log.Print(fmt.Sprintf("Successfully acquired certificate for portal domain (%s)", *portalDomain))
 		}
-		log.Print(fmt.Sprintf("Successfully acquired certificate for portal domain (%s)", *portalDomain))
 	}
 
 	if *ssoDomain != "" && autoCerts {
 		err = certConfig.ManageSync(context.Background(), []string{*ssoDomain})
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("CertMagic error obtaining certificate for sso domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", *ssoDomain, err)
+			pendingFixedDomains = append(pendingFixedDomains, *ssoDomain)
+		} else {
+			log.Print(fmt.Sprintf("Successfully acquired certificate for sso domain (%s)", *ssoDomain))
 		}
-		log.Print(fmt.Sprintf("Successfully acquired certificate for sso domain (%s)", *ssoDomain))
 	}
 
 	if *consoleDomain != "" && autoCerts {
 		err = certConfig.ManageSync(context.Background(), []string{*consoleDomain})
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("CertMagic error obtaining certificate for console domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", *consoleDomain, err)
+			pendingFixedDomains = append(pendingFixedDomains, *consoleDomain)
+		} else {
+			log.Print(fmt.Sprintf("Successfully acquired certificate for console domain (%s)", *consoleDomain))
 		}
-		log.Print(fmt.Sprintf("Successfully acquired certificate for console domain (%s)", *consoleDomain))
+	}
+
+	if len(pendingFixedDomains) > 0 {
+		go retryFixedDomainCerts(certConfig, pendingFixedDomains)
 	}
 
 	StartOidcAuth(*oidcIssuer, *oidcClientId, *oidcClientSecret, adminDomain, *portalDomain, *consoleDomain,
