@@ -82,14 +82,12 @@ On top of boringproxy we added:
    ```
 
 2. Open ports 80, 443, and 22 on the server's firewall — Let's Encrypt needs 80/443 reachable
-   to issue certificates, and homelab agents dial 22 for their SSH tunnel (unless
-   `STEALTH_MODE=true`, which tunnels SSH over 443 instead, so 22 can stay closed in that case).
-   Ubuntu's default `ufw` only allows 22 out of the box, which blocks certificate issuance
-   entirely — if you're using it:
+   to issue certificates, and homelab agents dial 22 for their SSH tunnel:
 
    ```bash
    sudo ufw allow 80/tcp
    sudo ufw allow 443/tcp
+   sudo ufw allow 22/tcp
    sudo ufw enable
    ```
 
