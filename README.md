@@ -81,15 +81,22 @@ On top of boringproxy we added:
    *.homelab.example.com    A    <your server IP>
    ```
 
-2. Open ports 80, 443, and 22 on the server's firewall — Let's Encrypt needs 80/443 reachable
-   to issue certificates, and homelab agents dial 22 for their SSH tunnel:
+2. Make sure ports 80, 443, and 22 are reachable — Let's Encrypt needs 80/443 reachable to
+   issue certificates, and homelab agents dial 22 for their SSH tunnel. If the server has no
+   firewall active, this is already true and there's nothing to do. If it does (e.g. `ufw`),
+   allow these three ports through it — don't enable a firewall solely to do this, since that
+   also switches unrelated ports from open to blocked by default:
 
    ```bash
    sudo ufw allow 80/tcp
    sudo ufw allow 443/tcp
    sudo ufw allow 22/tcp
-   sudo ufw enable
    ```
+
+   If you later expose an application as a TCP-mode Network Service (see the admin portal's
+   Applications page), also open whichever port you choose as its "Exposed port to the internet"
+   — that's a separate, arbitrary port you pick per application, so it isn't covered by the three
+   above and needs its own firewall rule (`sudo ufw allow <port>/tcp`) before it's reachable.
 
 3. On the server, download the compose file and env template:
 

@@ -1,6 +1,6 @@
 FROM alpine:3.24
 
-RUN apk add --no-cache curl bind-tools netcat-openbsd
+RUN apk add --no-cache curl bind-tools netcat-openbsd jq
 
 COPY check-prerequisites.sh /check-prerequisites.sh
 RUN chmod +x /check-prerequisites.sh

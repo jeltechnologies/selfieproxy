@@ -43,20 +43,27 @@ runtime config/volumes they use:
   it also verifies ports 80/443/22 are actually reachable, not just resolvable — the incident this exists to
   prevent is a host firewall silently blocking inbound 80/443 (e.g. Ubuntu's default `ufw`, which only allows
   22 out of the box), which otherwise burns through Let's Encrypt's per-identifier rate limit via repeated
-  failed ACME attempts before anyone notices. The check is a self-listen + self-dial: for 80/443, since nothing
-  is listening yet at this point in startup, it binds a temporary `nc -l` listener on that port itself, then
-  dials back out to the host's own public IP (not `127.0.0.1`) with `nc -z -w`, one retry, before tearing the
-  listener down; for 22 it dials directly, since the host's real `sshd` is already listening. 80/443 failures
-  are fatal (`exit 1`, same severity as the DNS check, since Let's Encrypt needs both); a closed 22 is only a
+  failed ACME attempts before anyone notices. For 80/443, since nothing is listening yet at this point in
+  startup, it binds temporary `nc -l` listeners on both first. It deliberately does **not** verify reachability
+  by dialing back out to its own public IP from the same host — that self-dial was the original design and it
+  cannot be trusted: Linux routes traffic addressed to a locally-assigned IP via the local/loopback path
+  (`RTN_LOCAL`) rather than out over the real NIC no matter which local address is used as the source, and
+  ufw's default rules unconditionally `ACCEPT` everything on `lo` — so a host with 80/443 actually firewalled
+  off from the internet still reported itself as reachable, silently defeating the entire check. There is no
+  socket option that forces a host to route to its own address over the wire, so the only way to get a real
+  answer is a genuine external vantage point: it calls `api.portscan.com`'s free scan API (POST `/v1/fast` to
+  queue, poll GET until `status: "complete"`, no key/params needed — it scans whichever IP the request
+  originated from), which covers ports 22/80/443 in one fast scan. 80/443 reported closed/filtered is fatal
+  (`exit 1`, same severity as the DNS check, since Let's Encrypt needs both); 22 reported closed is only a
   warning (agents just can't connect yet, no rate-limit consequence) and is skipped entirely when
-  `STEALTH_MODE=true`, which tunnels agent SSH over 443 instead. This requires `network_mode: host` on the
-  `check-prerequisites` service so the temporary listeners bind real host ports and the self-dial traverses the
-  same interface/firewall path a real external client would. Dialing the box's own public IP is reliable
-  precisely because every supported deployment of Selfie Proxy has one bound directly to the host — see
-  `README.md`'s "Requirements" section; a deployment behind NAT/CGNAT is not supported, so there is no
-  hairpin-NAT edge case to hedge against here or in any future check like this one. The check only verifies reachability at
-  the Docker host boundary — a VPS provider's own upstream firewall/security-group layer is out of scope by
-  design, not something this check can or tries to see.
+  `STEALTH_MODE=true`, which tunnels agent SSH over 443 instead. If `api.portscan.com` itself is unreachable,
+  rate-limited, or times out, the check WARNs and proceeds rather than blocking startup on a third party being
+  down — there is no meaningful fallback once the self-dial is known not to test anything real. This still
+  requires `network_mode: host` on the `check-prerequisites` service, now so the temporary listeners bind real
+  host ports for the external scanner to actually see. Because the scan genuinely originates outside the host,
+  it also now incidentally catches a VPS provider's own upstream firewall/security-group layer blocking 80/443
+  — previously explicitly out of scope for this check, now just a side effect of testing from a real external
+  vantage point instead of self-dialing.
 - `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
   template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
   admin portal as three of the four Network Service Modes an Application can have ("Terminal
