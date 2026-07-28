@@ -1,9 +1,16 @@
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   check-prerequisites:
     image: ghcr.io/jeltechnologies/selfieproxy-check-prerequisites:latest
     build: ./selfieproxy-check-prerequisites
     network_mode: host
     env_file: .env
+    logging: *default-logging
 
   selfieproxy-reverseproxy:
     image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
@@ -24,6 +31,7 @@ services:
     environment:
       USER: "root"
       HOME: "/root"
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "wget --no-check-certificate -O /dev/null https://${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}/ 2>&1 | grep -qE 'saved|HTTP/1.1'"]
       interval: 60s
@@ -49,6 +57,7 @@ services:
       - ./data/selfieproxy/sites:/sites
     ports:
       - "127.0.0.1:8081:8080"
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null"]
       interval: 10s
@@ -75,6 +84,7 @@ services:
       - ./data/selfieproxy:/data
     ports:
       - "127.0.0.1:8082:8080"
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' 2>/dev/null"]
       interval: 10s
@@ -100,6 +110,7 @@ services:
       - ./data/selfieproxy/sites:/sites:ro
     ports:
       - "127.0.0.1:8090:80"
+    logging: *default-logging
 
   selfieproxy-localsites-agent:
     image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
@@ -127,6 +138,7 @@ services:
       - ./data/selfieproxy:/selfieproxy-data:ro
       - ./data/reverseproxy/this-server-certmagic:/certmagic
       - /etc/ssl/certs/:/etc/ssl/certs/:ro
+    logging: *default-logging
 
   selfieproxy-guacd:
     # Unmodified upstream Apache Guacamole daemon -- the one deliberate exception to every
@@ -148,6 +160,7 @@ services:
     command: ["-b", "127.0.0.1", "-l", "4822"]
     environment:
       LOG_LEVEL: "info"
+    logging: *default-logging
 
   selfieproxy-remote-console:
     image: ghcr.io/jeltechnologies/selfieproxy-remote-console:latest
@@ -168,6 +181,7 @@ services:
       DEBUG_MODE: "${DEBUG_MODE:-false}"
     volumes:
       - ./data/selfieproxy:/data
+    logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8083' 2>/dev/null"]
       interval: 10s
