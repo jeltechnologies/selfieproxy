@@ -42,6 +42,9 @@
 	var cancelRemove = document.getElementById("cancel-remove");
 	var deleteForm = document.getElementById("delete-form");
 
+	var appForm = document.getElementById("app-form");
+	var updatingOverlay = document.getElementById("updating-overlay");
+
 	var tlsModeRadios = document.querySelectorAll('input[name="tlsMode"]');
 
 	var defaultModePorts = { SSH: 22, RDP: 3389, VNC: 5900 };
@@ -165,6 +168,13 @@
 			deleteForm.submit();
 		});
 	}
+
+	// Recreating the tunnel and obtaining its certificate takes a few seconds -- shown only on an
+	// actual submission (the native "submit" event only fires once HTML5 validation passes), left
+	// up until the browser navigates away on redirect.
+	appForm.addEventListener("submit", function () {
+		updatingOverlay.style.display = "flex";
+	});
 
 	refresh();
 })();

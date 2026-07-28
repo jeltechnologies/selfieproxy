@@ -21,6 +21,8 @@ import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
 import online.selfieproxy.portal.domain.ExposedAppType;
+import online.selfieproxy.portal.domain.LastUsedAppDefaults;
+import online.selfieproxy.portal.domain.LastUsedAppDefaultsStore;
 import online.selfieproxy.portal.domain.NetworkServiceLabel;
 import online.selfieproxy.portal.domain.NetworkServiceMode;
 import online.selfieproxy.portal.domain.Protocol;
@@ -45,11 +47,12 @@ public class ExposedAppController {
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final DomainService domainService;
 	private final AgentStatusService agentStatusService;
+	private final LastUsedAppDefaultsStore lastUsedAppDefaultsStore;
 
 	public ExposedAppController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			BoringProxyProperties properties, ExposedAppStore exposedAppStore, NetworkServiceCredentialCipher cipher,
 			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
-			AgentStatusService agentStatusService) {
+			AgentStatusService agentStatusService, LastUsedAppDefaultsStore lastUsedAppDefaultsStore) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.properties = properties;
@@ -58,14 +61,20 @@ public class ExposedAppController {
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.domainService = domainService;
 		this.agentStatusService = agentStatusService;
+		this.lastUsedAppDefaultsStore = lastUsedAppDefaultsStore;
 	}
 
 	@GetMapping("/apps/new")
 	public String newApp(Model model) {
 		List<String> homelabs = homelabs();
-		ExposedApp app = new ExposedApp("", null, homelabs.stream().findFirst().orElse(null),
+		LastUsedAppDefaults lastUsed = lastUsedAppDefaultsStore.load();
+		String defaultDomain = lastUsed != null && lastUsed.domain() != null && domainService.exists(lastUsed.domain())
+				? lastUsed.domain() : properties.primaryDomain();
+		String defaultHomelab = lastUsed != null && lastUsed.homelabName() != null && homelabs.contains(lastUsed.homelabName())
+				? lastUsed.homelabName() : homelabs.stream().findFirst().orElse(null);
+		ExposedApp app = new ExposedApp("", null, defaultHomelab,
 				ExposedAppType.WEB_APPLICATION, Protocol.HTTPS, "127.0.0.1", 443, null, null, true,
-				properties.primaryDomain(), null, null, null, false);
+				defaultDomain, null, null, null, false);
 		model.addAttribute("app", app);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());
@@ -109,8 +118,21 @@ public class ExposedAppController {
 		if (app.isRemoteAccessMode()) {
 			app = app.withExposedPort(tunnel.tunnelPort());
 		}
+		rememberDefaults(app);
 		exposedAppStore.save(app);
 		return "redirect:/apps";
+	}
+
+	/**
+	 * Remote-access modes (SSH/RDP/VNC) never show a domain field (always forced to the primary
+	 * domain -- see toExposedApp), so that's not a real domain choice worth overwriting the
+	 * remembered one with; Homelab is always a real user choice regardless of mode, so it's always
+	 * updated.
+	 */
+	private void rememberDefaults(ExposedApp app) {
+		LastUsedAppDefaults current = lastUsedAppDefaultsStore.load();
+		String domain = app.isRemoteAccessMode() ? (current != null ? current.domain() : null) : app.domain();
+		lastUsedAppDefaultsStore.save(new LastUsedAppDefaults(domain, app.homelabName()));
 	}
 
 	@PostMapping("/apps/{fqdn}")
