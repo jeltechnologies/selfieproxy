@@ -121,7 +121,6 @@ services:
         -secret "$$(cat /selfieproxy-data/selfieproxy-localsites-agent-secret)"
         -agent-name selfieproxy-internal-agent
         -user admin
-        -poll-interval-ms 300000
         -acme-email "${LETSENCRYPT_EMAIL:-}"
         -cert-dir /certmagic
     volumes:
