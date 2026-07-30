@@ -31,39 +31,25 @@ runtime config/volumes they use:
   that serves every Local Website (see `selfieproxy-portal/CLAUDE.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
-- `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + netcat-openbsd +
+- `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools +
   `check-prerequisites.sh` baked in via its own Dockerfile) that fails fast before anything else starts if
   `PRIMARY_DOMAIN` and a `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP
   (checked as the literal DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and
   future subdomain — the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-app/tunnel
   subdomain created later — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites`
-  service. This check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
+  service (`network_mode: host`). This check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
   "Domains" section) is registered and DNS-checked entirely at runtime through the portal's own Domains
-  settings page instead, since it's added long after this container has already started. After the DNS check,
-  it also verifies ports 80/443/22 are actually reachable, not just resolvable — the incident this exists to
-  prevent is a host firewall silently blocking inbound 80/443 (e.g. Ubuntu's default `ufw`, which only allows
-  22 out of the box), which otherwise burns through Let's Encrypt's per-identifier rate limit via repeated
-  failed ACME attempts before anyone notices. For 80/443, since nothing is listening yet at this point in
-  startup, it binds temporary `nc -l` listeners on both first. It deliberately does **not** verify reachability
-  by dialing back out to its own public IP from the same host — that self-dial was the original design and it
-  cannot be trusted: Linux routes traffic addressed to a locally-assigned IP via the local/loopback path
-  (`RTN_LOCAL`) rather than out over the real NIC no matter which local address is used as the source, and
-  ufw's default rules unconditionally `ACCEPT` everything on `lo` — so a host with 80/443 actually firewalled
-  off from the internet still reported itself as reachable, silently defeating the entire check. There is no
-  socket option that forces a host to route to its own address over the wire, so the only way to get a real
-  answer is a genuine external vantage point: it calls `api.portscan.com`'s free scan API (POST `/v1/fast` to
-  queue, poll GET until `status: "complete"`, no key/params needed — it scans whichever IP the request
-  originated from), which covers ports 22/80/443 in one fast scan. 80/443 reported closed/filtered is fatal
-  (`exit 1`, same severity as the DNS check, since Let's Encrypt needs both); 22 reported closed is only a
-  warning (agents just can't connect yet, no rate-limit consequence) and is skipped entirely when
-  `STEALTH_MODE=true`, which tunnels agent SSH over 443 instead. If `api.portscan.com` itself is unreachable,
-  rate-limited, or times out, the check WARNs and proceeds rather than blocking startup on a third party being
-  down — there is no meaningful fallback once the self-dial is known not to test anything real. This still
-  requires `network_mode: host` on the `check-prerequisites` service, now so the temporary listeners bind real
-  host ports for the external scanner to actually see. Because the scan genuinely originates outside the host,
-  it also now incidentally catches a VPS provider's own upstream firewall/security-group layer blocking 80/443
-  — previously explicitly out of scope for this check, now just a side effect of testing from a real external
-  vantage point instead of self-dialing.
+  settings page instead, since it's added long after this container has already started.
+  **Does not check port reachability** — an earlier version also verified 80/443/22 were reachable from the
+  internet via `api.portscan.com` (a same-host self-dial can't be trusted for this, see git history), but that
+  was removed: it produced more false positives and operational noise (flaky third-party scans, garbage public-IP
+  lookups, log spam) than the port-blocking incidents it actually caught, and unlike the DNS check there was no
+  way for an operator to independently and quickly re-verify a failure. If inbound 80/443 turn out to be
+  firewalled, the failure now simply surfaces as boringproxy's own ACME attempts failing at startup (see the
+  cert-rate-limit-resilience behavior below) rather than a dedicated pre-flight check — check the server's
+  firewall/security-group rules manually if that happens (e.g. `curl https://api.portscan.com/v1/fast` and poll
+  it, or any other external port scanner, from a vantage point outside the host itself — a self-dial back to the
+  host's own public IP is unreliable, see above).
 - `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
   template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
   admin portal as three of the four Network Service Modes an Application can have ("Terminal
@@ -103,7 +89,7 @@ runtime config/volumes they use:
 │       │                            # configuration export/import)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
-├── selfieproxy-check-prerequisites/ # DNS + port-reachability pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
+├── selfieproxy-check-prerequisites/ # DNS pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
 ├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent + selfieproxy-remote-console + selfieproxy-guacd (depends_on selfieproxy-reverseproxy)
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
