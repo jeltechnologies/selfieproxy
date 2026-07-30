@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +30,7 @@ import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.SitesWebserverProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.DnsLabelValidator;
+import online.selfieproxy.portal.domain.DomainFilterPreferenceStore;
 import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.LocalWebsite;
 import online.selfieproxy.portal.domain.LocalWebsiteDemoStatus;
@@ -67,11 +69,13 @@ public class LocalWebsiteController {
 	private final BoringProxyProperties boringProxyProperties;
 	private final DomainService domainService;
 	private final LocalWebsiteDemoStatus localWebsiteDemoStatus;
+	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
 
 	public LocalWebsiteController(BoringProxyClient boringProxyClient, LocalWebsiteStore localWebsiteStore,
 			StaticSiteProvisioner staticSiteProvisioner, SitesWebserverProperties sitesWebserverProperties,
 			ThisServerAgentProperties thisServerAgentProperties, BoringProxyProperties boringProxyProperties,
-			DomainService domainService, LocalWebsiteDemoStatus localWebsiteDemoStatus) {
+			DomainService domainService, LocalWebsiteDemoStatus localWebsiteDemoStatus,
+			DomainFilterPreferenceStore domainFilterPreferenceStore) {
 		this.boringProxyClient = boringProxyClient;
 		this.localWebsiteStore = localWebsiteStore;
 		this.staticSiteProvisioner = staticSiteProvisioner;
@@ -80,6 +84,7 @@ public class LocalWebsiteController {
 		this.boringProxyProperties = boringProxyProperties;
 		this.domainService = domainService;
 		this.localWebsiteDemoStatus = localWebsiteDemoStatus;
+		this.domainFilterPreferenceStore = domainFilterPreferenceStore;
 	}
 
 	@GetMapping("/local-websites")
@@ -88,6 +93,7 @@ public class LocalWebsiteController {
 		model.addAttribute("websites", websites);
 		model.addAttribute("domainService", domainService);
 		model.addAttribute("domains", domainService.allDomains());
+		model.addAttribute("selectedDomainFilter", domainFilterPreferenceStore.load().localWebsitesDomain());
 
 		// Domains still waiting on a Let's Encrypt certificate (e.g. after hitting a rate limit) --
 		// boringproxy serves those over a temporary self-signed certificate in the meantime and
@@ -114,6 +120,13 @@ public class LocalWebsiteController {
 		}
 
 		return "local-websites";
+	}
+
+	/** Fired by sortable-table.js on every domain-filter change so the choice survives navigation and a server reboot -- see DomainFilterPreferenceStore. */
+	@PostMapping("/local-websites/domain-filter")
+	public ResponseEntity<Void> saveDomainFilter(@RequestParam(value = "domain", required = false) String domain) {
+		domainFilterPreferenceStore.saveLocalWebsitesDomain(domain == null || domain.isBlank() ? null : domain);
+		return ResponseEntity.noContent().build();
 	}
 
 	@GetMapping("/local-websites/new")

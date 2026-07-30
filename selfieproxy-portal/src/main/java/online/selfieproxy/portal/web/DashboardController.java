@@ -7,9 +7,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import online.selfieproxy.portal.boringproxy.AgentStatusService;
@@ -17,6 +20,7 @@ import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.DomainFilterPreferenceStore;
 import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
@@ -32,10 +36,12 @@ public class DashboardController {
 	private final DomainService domainService;
 	private final AgentStatusService agentStatusService;
 	private final BoringProxyProperties properties;
+	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
 
 	public DashboardController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			ExposedAppStore exposedAppStore, ThisServerAgentProperties thisServerAgentProperties,
-			DomainService domainService, AgentStatusService agentStatusService, BoringProxyProperties properties) {
+			DomainService domainService, AgentStatusService agentStatusService, BoringProxyProperties properties,
+			DomainFilterPreferenceStore domainFilterPreferenceStore) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.exposedAppStore = exposedAppStore;
@@ -43,6 +49,7 @@ public class DashboardController {
 		this.domainService = domainService;
 		this.agentStatusService = agentStatusService;
 		this.properties = properties;
+		this.domainFilterPreferenceStore = domainFilterPreferenceStore;
 	}
 
 	@GetMapping("/apps")
@@ -81,6 +88,7 @@ public class DashboardController {
 		model.addAttribute("domainService", domainService);
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("consoleDomain", properties.consoleDomain());
+		model.addAttribute("selectedDomainFilter", domainFilterPreferenceStore.load().appsDomain());
 		return "dashboard";
 	}
 
@@ -90,6 +98,13 @@ public class DashboardController {
 	public List<AppStatusItem> status() {
 		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
 		return loadAppStatusItems(loadExposedApps(tunnels), tunnels);
+	}
+
+	/** Fired by sortable-table.js on every domain-filter change so the choice survives navigation and a server reboot -- see DomainFilterPreferenceStore. */
+	@PostMapping("/apps/domain-filter")
+	public ResponseEntity<Void> saveDomainFilter(@RequestParam(value = "domain", required = false) String domain) {
+		domainFilterPreferenceStore.saveAppsDomain(domain == null || domain.isBlank() ? null : domain);
+		return ResponseEntity.noContent().build();
 	}
 
 	// Renaming/removing a homelab has no effect on the tunnels that

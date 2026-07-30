@@ -34,11 +34,28 @@
 
 	var domainFilter = document.getElementById("domainFilter");
 	if (domainFilter) {
-		domainFilter.addEventListener("change", function () {
+		var applyFilter = function () {
 			document.querySelectorAll("table[data-sortable] tbody tr").forEach(function (row) {
 				var domain = row.getAttribute("data-domain");
 				row.style.display = (!domainFilter.value || domain === domainFilter.value) ? "" : "none";
 			});
+		};
+
+		// The server pre-selects the remembered option (DomainFilterPreferenceStore), but that alone
+		// doesn't hide rows -- apply it once on load, same as every later change.
+		applyFilter();
+
+		domainFilter.addEventListener("change", function () {
+			applyFilter();
+			var saveUrl = domainFilter.getAttribute("data-save-url");
+			if (saveUrl) {
+				fetch(saveUrl, {
+					method: "POST",
+					headers: { "Content-Type": "application/x-www-form-urlencoded" },
+					body: "domain=" + encodeURIComponent(domainFilter.value),
+					credentials: "same-origin"
+				});
+			}
 		});
 	}
 })();
