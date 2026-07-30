@@ -28,6 +28,16 @@ import (
 // process is restarted.
 const controlPlaneRequestTimeout = 30 * time.Second
 
+// Bounds how many tunnels may be dialing/handshaking their SSH connection at once
+// (see boreSem below). A fresh agent process re-bores every tunnel simultaneously
+// (SyncTunnels treats them all as "new"), and firing dozens of concurrent SSH
+// connections at the server's sshd trips its own connection-flood protection
+// (MaxStartups), which resets a random subset of handshakes mid-flight -- exactly
+// what caused a tunnel to sit unreachable for tens of seconds after an agent
+// restart. Only the connect+handshake phase holds a slot, so this never delays a
+// single tunnel being added/changed in isolation.
+const maxConcurrentBores = 4
+
 type Agent struct {
 	httpClient       *http.Client
 	tunnels          map[string]Tunnel
@@ -41,6 +51,7 @@ type Agent struct {
 	certConfig       *certmagic.Config
 	selfSignedCerts  *SelfSignedCertProvider
 	pollInterval     int
+	boreSem          chan struct{}
 }
 
 type AgentConfig struct {
@@ -134,6 +145,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		certConfig:       certConfig,
 		selfSignedCerts:  NewSelfSignedCertProvider(),
 		pollInterval:     config.PollInterval,
+		boreSem:          make(chan struct{}, maxConcurrentBores),
 	}, nil
 }
 
@@ -329,6 +341,10 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 
 	sshHost := fmt.Sprintf("%s:%d", tunnel.ServerAddress, tunnel.ServerPort)
 
+	// Acquired for the connect+handshake phase only -- released right after
+	// ssh.NewClientConn returns, below, regardless of outcome. See maxConcurrentBores.
+	c.boreSem <- struct{}{}
+
 	var netConn net.Conn
 	if tunnel.SshTls {
 		// Stealth mode: disguise this SSH connection as an HTTPS request to the admin
@@ -346,10 +362,12 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 		netConn, err = net.Dial("tcp", sshHost)
 	}
 	if err != nil {
+		<-c.boreSem
 		return fmt.Errorf("Failed to dial: %v", err)
 	}
 
 	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, sshHost, config)
+	<-c.boreSem
 	if err != nil {
 		return fmt.Errorf("Failed to establish SSH connection: %v", err)
 	}
