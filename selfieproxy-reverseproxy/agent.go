@@ -38,6 +38,24 @@ const controlPlaneRequestTimeout = 30 * time.Second
 // single tunnel being added/changed in isolation.
 const maxConcurrentBores = 4
 
+// BoreTunnel sends an SSH keepalive on this interval and treats a missing reply
+// within sshKeepaliveTimeout as a dead connection (see connDead below). x/crypto/ssh
+// has no built-in liveness check, and a connection silently dropped by a NAT/
+// firewall (no FIN, no RST) otherwise looks "alive" to Go indefinitely.
+const (
+	sshKeepaliveInterval = 20 * time.Second
+	sshKeepaliveTimeout  = 10 * time.Second
+)
+
+// boreTunnelWithRetry's backoff when BoreTunnel returns because the SSH connection
+// died rather than because the tunnel was changed/removed (ctx cancelled). Kept
+// short relative to certRetryBaseInterval/certRetryMaxInterval above -- unlike ACME,
+// there's no external rate limit to respect here, just the server's own sshd.
+const (
+	tunnelReboreBaseInterval = 2 * time.Second
+	tunnelReboreMaxInterval  = 60 * time.Second
+)
+
 type Agent struct {
 	httpClient       *http.Client
 	tunnels          map[string]Tunnel
@@ -295,12 +313,7 @@ func (c *Agent) SyncTunnels(ctx context.Context, serverTunnels map[string]Tunnel
 			c.cancelFuncs[k] = cancel
 			c.cancelFuncsMutex.Unlock()
 
-			go func(closureCtx context.Context, tun Tunnel) {
-				err := c.BoreTunnel(closureCtx, tun)
-				if err != nil {
-					log.Println("BoreTunnel error: ", err)
-				}
-			}(cancelCtx, newTun)
+			go c.boreTunnelWithRetry(cancelCtx, newTun)
 		}
 	}
 
@@ -315,6 +328,43 @@ func (c *Agent) SyncTunnels(ctx context.Context, serverTunnels map[string]Tunnel
 
 			delete(c.cancelFuncs, k)
 			delete(c.tunnels, k)
+		}
+	}
+}
+
+// boreTunnelWithRetry keeps re-dialing a tunnel whenever BoreTunnel returns because its
+// SSH connection died on its own (network blip, silently-dropped connection, sshd
+// restart) rather than because the tunnel was changed/removed -- SyncTunnels only
+// re-invokes BoreTunnel on the latter, so without this a dead connection would
+// otherwise sit unreachable until the tunnel's config happens to change. Same
+// exponential-backoff shape as retryCertUntilSuccess below; stops as soon as ctx is
+// cancelled, i.e. exactly when SyncTunnels would have re-bored it anyway.
+func (c *Agent) boreTunnelWithRetry(ctx context.Context, tunnel Tunnel) {
+	backoff := tunnelReboreBaseInterval
+	for {
+		start := time.Now()
+		err := c.BoreTunnel(ctx, tunnel)
+		if ctx.Err() != nil {
+			return
+		}
+
+		log.Printf("BoreTunnel %s lost, retrying in %s: %v", tunnel.Domain, backoff, err)
+
+		// A tunnel that stayed up for a while before dying gets a fresh backoff
+		// rather than compounding off however long a previous crash loop took.
+		if time.Since(start) > tunnelReboreMaxInterval {
+			backoff = tunnelReboreBaseInterval
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+
+		backoff *= 2
+		if backoff > tunnelReboreMaxInterval {
+			backoff = tunnelReboreMaxInterval
 		}
 	}
 }
@@ -374,6 +424,47 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	client := ssh.NewClient(sshConn, chans, reqs)
 	defer client.Close()
 
+	// connDead is how any part of this tunnel's plumbing (keepalive below, the accept
+	// loop, or the client-mode HTTP server further down) reports that the underlying
+	// SSH connection is gone, so the final select can return promptly instead of
+	// blocking on ctx.Done() forever -- see reportDead's callers.
+	connDead := make(chan error, 1)
+	reportDead := func(err error) {
+		select {
+		case connDead <- err:
+		default:
+		}
+	}
+
+	go func() {
+		ticker := time.NewTicker(sshKeepaliveInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				replied := make(chan error, 1)
+				go func() {
+					_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+					replied <- err
+				}()
+				select {
+				case err := <-replied:
+					if err != nil {
+						reportDead(fmt.Errorf("keepalive failed: %v", err))
+						return
+					}
+				case <-time.After(sshKeepaliveTimeout):
+					reportDead(fmt.Errorf("keepalive timed out"))
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
 	bindAddr := "127.0.0.1"
 	if tunnel.AllowExternalTcp {
 		bindAddr = "0.0.0.0"
@@ -420,7 +511,10 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 		// but the code is much simpler. The only alternative I've thought of so far involves storing
 		// all the tunnels in a mutexed map and retrieving them from a single HTTP server, same as the
 		// boringproxy server does.
-		go httpServer.Serve(tlsListener)
+		go func() {
+			err := httpServer.Serve(tlsListener)
+			reportDead(err)
+		}()
 
 	} else {
 
@@ -428,11 +522,12 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 			for {
 				conn, err := listener.Accept()
 				if err != nil {
-					// TODO: Currently assuming an error means the
-					// tunnel was manually deleted, but there
-					// could be other errors that we should be
-					// attempting to recover from rather than
-					// breaking.
+					// The SSH-forwarded listener only ever errors out when the
+					// underlying connection is gone (agent-initiated close on ctx
+					// cancellation, or the connection died) -- report it so the
+					// final select below returns promptly instead of relying on
+					// the keepalive to notice separately.
+					reportDead(err)
 					break
 					//continue
 				}
@@ -459,9 +554,12 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 		}
 	}
 
-	<-ctx.Done()
-
-	return nil
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-connDead:
+		return fmt.Errorf("ssh connection lost: %v", err)
+	}
 }
 
 // retryCertUntilSuccess retries certificate issuance for domain with the same exponential
