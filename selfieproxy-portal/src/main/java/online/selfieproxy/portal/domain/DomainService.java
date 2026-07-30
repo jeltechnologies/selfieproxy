@@ -64,10 +64,9 @@ public class DomainService {
 
 	/**
 	 * This server's own public IP, resolved via the primary domain rather than an external lookup
-	 * (e.g. ifconfig.me) -- PrerequisitesCheckService already validates *.PRIMARY_DOMAIN resolves
-	 * here on every portal startup (and on demand, see its "Recheck now" dashboard action), so the
-	 * primary domain itself is a trusted way to find "our own IP". Null if resolution fails for
-	 * some reason.
+	 * (e.g. ifconfig.me) -- check-prerequisites already validated *.PRIMARY_DOMAIN resolves here at
+	 * container startup, so the primary domain itself is already a trusted way to find "our own IP".
+	 * Null if resolution fails for some reason.
 	 */
 	public String serverIp() {
 		return resolveIp(properties.primaryDomain());
