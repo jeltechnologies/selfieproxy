@@ -19,7 +19,7 @@ class LocalWebsiteDemoStatusTest {
 	private LocalWebsiteStore localWebsiteStore;
 
 	private static final BoringProxyProperties DOMAIN = new BoringProxyProperties("example.com", "proxylistener",
-			"selfieproxy", "auth", "console");
+			"selfieproxy", "auth", "console", false);
 	private static final LocalWebsiteDemoProperties PROPERTIES = new LocalWebsiteDemoProperties("www",
 			"/tmp/content-marker", "/tmp/redirect-marker");
 

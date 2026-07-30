@@ -29,6 +29,17 @@
 			the background.
 		</p>
 
+		<div class="warning"
+				th:if="${prerequisitesCheck != null and (prerequisitesCheck.hasError() or prerequisitesCheck.hasWarning())}">
+			<p>Selfie Proxy found a problem with this server's DNS or port reachability:</p>
+			<ul>
+				<li th:each="line : ${prerequisitesCheck.problems()}" th:text="${line.message()}"></li>
+			</ul>
+			<form method="post" th:action="@{/apps/recheck-prerequisites}">
+				<button type="submit" class="link-button">Recheck now</button>
+			</form>
+		</div>
+
 		<div class="list-filter" th:if="${not #lists.isEmpty(exposedApps)}">
 			<label for="domainFilter">Filter by domain</label>
 			<select id="domainFilter" th:attr="data-save-url=@{/apps/domain-filter}">

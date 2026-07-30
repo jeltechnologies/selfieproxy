@@ -17,7 +17,9 @@ runtime config/volumes they use:
 - `selfieproxy-portal/` — the Selfie Proxy admin portal (Java/Spring), the product-facing UI
   that manages `boringproxy` tunnels/clients through its REST API. Has its own `CLAUDE.md` with
   the full product spec (login flow, homelabs, exposed apps, tunnel mapping). No login of its
-  own anymore — see `selfieproxy-identity-provider/` below.
+  own anymore — see `selfieproxy-identity-provider/` below. Also owns the DNS/port-reachability
+  prerequisites check (`PrerequisitesCheckService`) that used to be a standalone blocking
+  pre-flight container — see this file's "Running" section.
 - `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, OIDC Identity Provider with simplified admin/User management
   (Java/Spring, same Maven/Dockerfile template as `selfieproxy-portal/`). Used by default to
   authenticate the admin portal and any exposed app with single sign on protection enabled; a BYO
@@ -31,39 +33,6 @@ runtime config/volumes they use:
   that serves every Local Website (see `selfieproxy-portal/CLAUDE.md`) — one shared container, one
   `server_name` block per domain, since boringproxy always forwards a tunnel's own domain as
   the Host header end to end. Run as the `selfieproxy-local-websites` service.
-- `selfieproxy-check-prerequisites/` — a tiny Alpine image (curl + bind-tools + netcat-openbsd +
-  `check-prerequisites.sh` baked in via its own Dockerfile) that fails fast before anything else starts if
-  `PRIMARY_DOMAIN` and a `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP
-  (checked as the literal DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and
-  future subdomain — the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-app/tunnel
-  subdomain created later — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites`
-  service. This check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
-  "Domains" section) is registered and DNS-checked entirely at runtime through the portal's own Domains
-  settings page instead, since it's added long after this container has already started. After the DNS check,
-  it also verifies ports 80/443/22 are actually reachable, not just resolvable — the incident this exists to
-  prevent is a host firewall silently blocking inbound 80/443 (e.g. Ubuntu's default `ufw`, which only allows
-  22 out of the box), which otherwise burns through Let's Encrypt's per-identifier rate limit via repeated
-  failed ACME attempts before anyone notices. For 80/443, since nothing is listening yet at this point in
-  startup, it binds temporary `nc -l` listeners on both first. It deliberately does **not** verify reachability
-  by dialing back out to its own public IP from the same host — that self-dial was the original design and it
-  cannot be trusted: Linux routes traffic addressed to a locally-assigned IP via the local/loopback path
-  (`RTN_LOCAL`) rather than out over the real NIC no matter which local address is used as the source, and
-  ufw's default rules unconditionally `ACCEPT` everything on `lo` — so a host with 80/443 actually firewalled
-  off from the internet still reported itself as reachable, silently defeating the entire check. There is no
-  socket option that forces a host to route to its own address over the wire, so the only way to get a real
-  answer is a genuine external vantage point: it calls `api.portscan.com`'s free scan API (POST `/v1/fast` to
-  queue, poll GET until `status: "complete"`, no key/params needed — it scans whichever IP the request
-  originated from), which covers ports 22/80/443 in one fast scan. 80/443 reported closed/filtered is fatal
-  (`exit 1`, same severity as the DNS check, since Let's Encrypt needs both); 22 reported closed is only a
-  warning (agents just can't connect yet, no rate-limit consequence) and is skipped entirely when
-  `STEALTH_MODE=true`, which tunnels agent SSH over 443 instead. If `api.portscan.com` itself is unreachable,
-  rate-limited, or times out, the check WARNs and proceeds rather than blocking startup on a third party being
-  down — there is no meaningful fallback once the self-dial is known not to test anything real. This still
-  requires `network_mode: host` on the `check-prerequisites` service, now so the temporary listeners bind real
-  host ports for the external scanner to actually see. Because the scan genuinely originates outside the host,
-  it also now incidentally catches a VPS provider's own upstream firewall/security-group layer blocking 80/443
-  — previously explicitly out of scope for this check, now just a side effect of testing from a real external
-  vantage point instead of self-dialing.
 - `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
   template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
   admin portal as three of the four Network Service Modes an Application can have ("Terminal
@@ -103,8 +72,7 @@ runtime config/volumes they use:
 │       │                            # configuration export/import)
 │       ├── sites/                  # per-domain content roots for Local Websites — see StaticSiteProvisioner
 │       └── sites-conf/             # generated NGINX server-block files, one per domain, consumed by selfieproxy-local-websites
-├── selfieproxy-check-prerequisites/ # DNS + port-reachability pre-flight check, own Dockerfile — published as selfieproxy-check-prerequisites
-├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-portal + selfieproxy-identity-provider + selfieproxy-local-websites + selfieproxy-localsites-agent + selfieproxy-remote-console + selfieproxy-guacd (depends_on selfieproxy-reverseproxy)
+├── docker-compose.yaml            # builds and runs selfieproxy-reverseproxy + selfieproxy-identity-provider + selfieproxy-portal + selfieproxy-localsites-agent + selfieproxy-guacd + selfieproxy-remote-console + selfieproxy-local-websites, in that strict sequential order
 ├── selfieproxy-reverseproxy/      # forked engine + embedded OIDC Relying Party — subdirectory of this repo, own CLAUDE.md
 ├── selfieproxy-portal/           # admin portal — Java/Spring, no login of its own (see selfieproxy-identity-provider)
 ├── selfieproxy-identity-provider/ # bundled OIDC Identity Provider with simplified admin/User management — Java/Spring, same build template as selfieproxy-portal
@@ -146,9 +114,7 @@ the registry image first and only falls back to a local build if the pull fails 
 who only has `docker-compose.yaml` and `.env` (no git checkout of this repo at all) can run
 `docker compose up -d` with no `--build` and no source directories present; `--build` is only
 needed by someone iterating on source in this checkout (see `feedback_rebuild_after_source_edit`
-in memory). This is why `selfieproxy-check-prerequisites/` has its own Dockerfile rather than
-being a bare `alpine` image with the script bind-mounted in — a bind mount would require the
-script file to exist on disk, defeating the self-contained deploy.
+in memory).
 
 This repo only runs the server side. Agent hosts are not provisioned or run from here — the
 admin portal's Agents page is the source of truth for connecting a homelab (it issues the
@@ -157,11 +123,67 @@ there, not in a compose file or `.env` template in this repo.
 
 The admin portal only runs alongside the server (it manages that server's tunnels via the
 boringproxy REST API), so it's defined as a second service in `docker-compose.yaml`
-rather than its own compose file, with `depends_on: selfieproxy-reverseproxy`. The
-`selfieproxy-reverseproxy` container's `-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`PRIMARY_DOMAIN` and the
+rather than its own compose file, with `depends_on: selfieproxy-identity-provider` (which itself
+depends on `selfieproxy-reverseproxy`, so both are guaranteed up by the time the portal starts —
+see the startup-order paragraph below). The `selfieproxy-reverseproxy` container's
+`-portal-domain`/`-portal-port` flags (set from `SELFPROXY_ADMIN_DOMAIN`/`PRIMARY_DOMAIN` and the
 selfieproxy-portal's published port, `8081`) make the portal reachable at startup by reverse-proxying
 that domain directly to selfieproxy-portal, without going through any Agent/Tunnel — this is what lets
 a fresh deployment reach the portal to create its first agent, before any agent exists.
+
+Startup order is a single strict sequential chain, every service's `depends_on` pointing at
+exactly the one before it: `selfieproxy-reverseproxy` (no `depends_on` at all — the first thing to
+start) → `selfieproxy-identity-provider` → `selfieproxy-portal` → `selfieproxy-localsites-agent` →
+`selfieproxy-guacd` → `selfieproxy-remote-console` → `selfieproxy-local-websites`. A fully linear
+chain like this makes total time-to-fully-up additive rather than overlapping (several of these
+have no real functional dependency on their immediate predecessor — `selfieproxy-identity-provider`
+does no network call to `selfieproxy-reverseproxy` at boot, `selfieproxy-localsites-agent` already
+tolerates starting before `selfieproxy-portal` exists via its own
+`until [ -s ...secret ]; do sleep 1; done` polling loop in its entrypoint, and
+`selfieproxy-guacd`/`selfieproxy-remote-console` don't need each other until a live console session
+is actually opened, well after boot) — a deliberate trade, preferring one easy-to-follow sequential
+story in the logs over a faster but branchier parallel graph, since this stack is started rarely
+(not a hot path worth optimizing). `selfieproxy-identity-provider` specifically sits right after
+`selfieproxy-reverseproxy` (not later in the chain) to bound a different kind of log noise:
+`selfieproxy-reverseproxy` starts its OIDC discovery retry goroutine (`StartOidcAuth`, see
+`selfieproxy-reverseproxy/CLAUDE.md`) immediately at its own boot, polling its own admin domain
+(routed to `selfieproxy-identity-provider`) every startup regardless of chain position, and logs a
+`OIDC discovery against ... failed, retrying in ...` line on every failed attempt until identity-provider
+answers. Placing identity-provider any later in the chain (e.g. after `selfieproxy-portal`, as this
+once briefly was) stacks other services' own boot time in front of it and inflates that retry
+window/log noise for no functional reason, since nothing else in the chain needs to come before it.
+This used to be gated by a standalone
+`selfieproxy-check-prerequisites` container that blocked the whole stack from starting until it
+confirmed `PRIMARY_DOMAIN`/`*.PRIMARY_DOMAIN` DNS pointed at the host and ports 80/443/22 were
+actually reachable from the internet (not just resolvable) — the incident that check existed to
+prevent is a host firewall silently blocking inbound 80/443 (e.g. Ubuntu's default `ufw`, which
+only allows 22 out of the box), which otherwise burns through Let's Encrypt's per-identifier rate
+limit via repeated failed ACME attempts before anyone notices. That check now lives in the portal
+instead (`PrerequisitesCheckService`, `selfieproxy-portal/CLAUDE.md`), running once automatically
+on every portal boot and again on demand via a "Recheck now" button on the dashboard whenever a
+problem is found — solving the old container's biggest practical problem, that its temporary
+`nc -l` listeners only existed for a few seconds during the scan, giving an operator no stable
+target to independently re-verify against. Because this check now runs well after
+`selfieproxy-reverseproxy` already holds real 80/443 sockets (rather than before anything starts),
+it needs no temporary-listener trick at all — it scans the real, already-bound ports directly.
+It still verifies reachability the same way the old container did — a same-host self-dial to this
+server's own public IP cannot be trusted, since Linux routes traffic addressed to a
+locally-assigned IP via the local/loopback path (`RTN_LOCAL`) rather than out over the real NIC no
+matter which local address is used as the source, and `ufw`'s default rules unconditionally
+`ACCEPT` everything on `lo` — so a host with 80/443 actually firewalled off from the internet would
+still report itself as reachable. The only way to get a real answer is a genuine external vantage
+point: `api.portscan.com`'s free scan API (`PortScanClient`), which scans whichever IP the request
+originated from, no key/params needed. Port 80/443 not reachable is surfaced as an error-level
+banner line; port 22 not reachable is a warning only (agents just can't connect yet) and is
+skipped entirely when `STEALTH_MODE=true`, which tunnels agent SSH over 443 instead. If
+`api.portscan.com` itself is unreachable, rate-limited, or times out, the check warns and moves on
+rather than blocking anything — there's no meaningful fallback once a self-dial is known not to
+test anything real. **Accepted trade-off**: `selfieproxy-reverseproxy` unconditionally attempts
+ACME certificate issuance for its four fixed domains at every startup regardless of this check
+(`certConfig.ManageSync` in `boringproxy.go`), so removing the old blocking pre-flight gate means
+those attempts now happen on every boot even when ports are closed, instead of zero — softened by
+the cert-rate-limit backoff + self-signed-fallback behavior described below, but a real cost
+accepted in favor of a check an operator can actually re-run without restarting the whole stack.
 
 `docker-compose.yaml` also runs two more services, both existing solely to power the
 Local Websites feature (see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-local-websites` (the `selfieproxy-localsites-webserver/`
@@ -172,11 +194,9 @@ the Homelabs page and the Exposed Applications homelab dropdown, since it's not 
 user picks or manages directly). Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
 copy-pasted into `.env` — its entrypoint blocks on `data/selfieproxy/selfieproxy-localsites-agent-secret`
 existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on every startup, so
-it self-provisions. `selfieproxy-local-websites` is deliberately the last service to start in
-the stack — its `depends_on` waits on both `check-prerequisites` (`service_completed_successfully`)
-and `selfieproxy-localsites-agent` (`service_started`, the last service in every other service's
-dependency chain), so the shared NGINX only comes up once everything upstream of it — DNS
-preflight, the OIDC IdP, boringproxy, the portal, and the colocated agent — has already started.
+it self-provisions. `selfieproxy-local-websites` is the last link in the sequential startup chain
+described above — its `depends_on` waits on `selfieproxy-remote-console` (`service_healthy`), so
+the shared NGINX only comes up once every other service has already started.
 
 On first boot, `selfieproxy-portal` also auto-creates two default Local Websites through this
 same `selfieproxy-local-websites` infrastructure: a demo content site at `www.PRIMARY_DOMAIN`

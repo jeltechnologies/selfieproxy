@@ -24,6 +24,7 @@ import online.selfieproxy.portal.domain.DomainFilterPreferenceStore;
 import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.ExposedApp;
 import online.selfieproxy.portal.domain.ExposedAppStore;
+import online.selfieproxy.portal.domain.PrerequisitesCheckService;
 import online.selfieproxy.portal.domain.TunnelMapper;
 
 @Controller
@@ -37,11 +38,13 @@ public class DashboardController {
 	private final AgentStatusService agentStatusService;
 	private final BoringProxyProperties properties;
 	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
+	private final PrerequisitesCheckService prerequisitesCheckService;
 
 	public DashboardController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			ExposedAppStore exposedAppStore, ThisServerAgentProperties thisServerAgentProperties,
 			DomainService domainService, AgentStatusService agentStatusService, BoringProxyProperties properties,
-			DomainFilterPreferenceStore domainFilterPreferenceStore) {
+			DomainFilterPreferenceStore domainFilterPreferenceStore,
+			PrerequisitesCheckService prerequisitesCheckService) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.exposedAppStore = exposedAppStore;
@@ -50,6 +53,7 @@ public class DashboardController {
 		this.agentStatusService = agentStatusService;
 		this.properties = properties;
 		this.domainFilterPreferenceStore = domainFilterPreferenceStore;
+		this.prerequisitesCheckService = prerequisitesCheckService;
 	}
 
 	@GetMapping("/apps")
@@ -89,7 +93,15 @@ public class DashboardController {
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("consoleDomain", properties.consoleDomain());
 		model.addAttribute("selectedDomainFilter", domainFilterPreferenceStore.load().appsDomain());
+		model.addAttribute("prerequisitesCheck", prerequisitesCheckService.current());
 		return "dashboard";
+	}
+
+	/** "Recheck now" on the DNS/port reachability banner -- see PrerequisitesCheckService. */
+	@PostMapping("/apps/recheck-prerequisites")
+	public String recheckPrerequisites() {
+		prerequisitesCheckService.recheck();
+		return "redirect:/apps";
 	}
 
 	/** Polled every 2s by dashboard.js to refresh the Status column and Connect buttons without a full page reload. */

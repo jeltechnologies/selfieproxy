@@ -5,22 +5,12 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
-  check-prerequisites:
-    image: ghcr.io/jeltechnologies/selfieproxy-check-prerequisites:latest
-    build: ./selfieproxy-check-prerequisites
-    network_mode: host
-    env_file: .env
-    logging: *default-logging
-
   selfieproxy-reverseproxy:
     image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest
     build: ./selfieproxy-reverseproxy
     container_name: selfieproxy-reverseproxy
     restart: unless-stopped
     init: true
-    depends_on:
-      selfieproxy-identity-provider:
-        condition: service_healthy
     network_mode: host
     volumes:
       - ./data/reverseproxy/storage:/storage/
@@ -47,7 +37,7 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      selfieproxy-reverseproxy:
+      selfieproxy-identity-provider:
         condition: service_healthy
     env_file: .env
     volumes:
@@ -73,8 +63,8 @@ services:
     restart: unless-stopped
     init: true
     depends_on:
-      check-prerequisites:
-        condition: service_completed_successfully
+      selfieproxy-reverseproxy:
+        condition: service_healthy
     env_file: .env
     environment:
       SSO_ISSUER_URL: "https://${SELFPROXY_AUTH_DOMAIN:-auth}.${PRIMARY_DOMAIN}"
@@ -99,10 +89,8 @@ services:
     container_name: selfieproxy-local-websites
     restart: unless-stopped
     depends_on:
-      check-prerequisites:
-        condition: service_completed_successfully
-      selfieproxy-localsites-agent:
-        condition: service_started
+      selfieproxy-remote-console:
+        condition: service_healthy
     environment:
       DEBUG_MODE: "${DEBUG_MODE:-false}"
     volumes:
@@ -156,6 +144,9 @@ services:
     container_name: selfieproxy-guacd
     restart: unless-stopped
     init: true
+    depends_on:
+      selfieproxy-localsites-agent:
+        condition: service_started
     network_mode: host
     command: ["-b", "127.0.0.1", "-l", "4822"]
     environment:
@@ -172,8 +163,6 @@ services:
     depends_on:
       selfieproxy-guacd:
         condition: service_started
-      selfieproxy-reverseproxy:
-        condition: service_healthy
     environment:
       SERVER_PORT: "8083"
       GUACD_HOST: "127.0.0.1"

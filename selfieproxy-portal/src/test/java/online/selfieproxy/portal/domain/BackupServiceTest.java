@@ -57,7 +57,7 @@ class BackupServiceTest {
 	Path tempDir;
 
 	private final BoringProxyProperties boringProxyProperties =
-			new BoringProxyProperties("example.com", "proxylistener", "selfieproxy", "auth", "console");
+			new BoringProxyProperties("example.com", "proxylistener", "selfieproxy", "auth", "console", false);
 	private final ThisServerAgentProperties thisServerAgentProperties =
 			new ThisServerAgentProperties("selfieproxy-internal-agent", "/dev/null");
 	private final SitesWebserverProperties sitesWebserverProperties =

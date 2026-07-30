@@ -106,6 +106,32 @@ container. After a successful login the user lands on the exposed applications p
   import wizard's per-item domain picker) lists the primary domain first, labeled e.g.
   `example.com (primary)`, then every other registered domain alphabetically with no special label.
 
+## System prerequisites check
+
+The dashboard (`/apps`) shows a `.warning` banner whenever `PrerequisitesCheckService` finds a
+problem with this server's own DNS or port reachability -- this used to be a standalone
+`selfieproxy-check-prerequisites` container that blocked the whole stack from starting (see root
+`CLAUDE.md`'s "Running" section for the full history/rationale); it's now a portal feature
+instead, since a blocking pre-flight gate can't also be something an operator re-runs on demand.
+It checks two things, mirroring what the old container did: `PRIMARY_DOMAIN`/`*.PRIMARY_DOMAIN`
+DNS resolves to this server's public IP (reusing `DomainService.resolveIp`, the same trick the
+Domains page itself uses), and ports 80/443/22 are reachable from the internet via
+`PortScanClient` (`api.portscan.com`'s free scan API -- a same-host self-dial can't be trusted,
+see root `CLAUDE.md`). Severities match the old script: a DNS mismatch or port 80/443 closed is an
+**ERROR** line; port 22 closed is a **WARN** (agents just can't connect yet), skipped entirely
+when `STEALTH_MODE` is enabled; the external scan itself being unreachable/rate-limited is a single
+WARN line with no port results. Only ERROR/WARN lines are shown in the banner -- OK lines aren't
+interesting to surface. Runs once automatically on every portal boot
+(`@EventListener(ApplicationReadyEvent.class)`, same trigger as `AgentBootstrap`) and again on
+demand via the banner's own "Recheck now" button (`POST /apps/recheck-prerequisites`) -- unlike
+`AgentBootstrap`/`LocalWebsiteDemoBootstrap` this is never marker-gated, since it must catch a
+still-misconfigured firewall on every restart, not just once ever. Never blocks or crashes portal
+startup -- every failure mode becomes a WARN/ERROR line, not an exception. This is a different
+kind of check from the "no live reachability check" decision under "Exposed applications" below:
+that one is about a single Network Service's own port on every save (rejected as not worth an
+external scan's cost that often); this one is a rare, whole-server check that only ever runs at
+boot or on an explicit admin click.
+
 ## Homelabs
 
 - Each exposed web service is bound to one subdomain of whichever domain it's assigned to (see
@@ -188,9 +214,9 @@ The edit page fields, in order:
    (`AllowExternalTcp`, see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section) -- so a
    check would report "not reachable" just as readily for a disconnected/offline homelab as for an
    actually-blocked firewall, which isn't a distinction worth the ~10-30s external scan
-   (`api.portscan.com`, the same technique `check-prerequisites.sh` still uses at startup for the
-   three fixed ports 80/443/22, root `CLAUDE.md`) would cost on every save. These two static
-   warnings are the only guidance given for this.
+   (`api.portscan.com`, the same technique `PortScanClient` uses for the "System prerequisites
+   check" above, but that one is a rare whole-server check, not a per-item one) would cost on
+   every save. These two static warnings are the only guidance given for this.
 2. **Mode** (Network service only): one of four --
    - **TCP** (default, label deliberately terse -- "Protocol: TCP" is already implied and no
      longer separately shown, see point 4 below) -- today's original behavior, internet-reachable

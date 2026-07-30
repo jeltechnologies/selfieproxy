@@ -41,7 +41,7 @@ class LocalWebsiteDemoBootstrapTest {
 	Path tempDir;
 
 	private static final BoringProxyProperties DOMAIN = new BoringProxyProperties("example.com", "proxylistener",
-			"selfieproxy", "auth", "console");
+			"selfieproxy", "auth", "console", false);
 	private static final ThisServerAgentProperties AGENT = new ThisServerAgentProperties("selfieproxy-internal-agent",
 			"/data/secret");
 	private static final SitesWebserverProperties SITES = new SitesWebserverProperties("127.0.0.1", 8090,
