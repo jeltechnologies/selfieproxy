@@ -148,106 +148,106 @@ container. After a successful login the user lands on the Servers page.
 
 ## Servers
 
+A Server is not a single-protocol thing -- one Server can simultaneously expose up to four
+independent protocols (Web, Terminal, Remote Desktop, Port Forwarding, see "Editing, adding, and
+removing a Server" below), each becoming its own boringproxy tunnel (`TunnelMapper`). There is no
+"Type"/"Mode" choice anymore (the old Web-server-vs-Network-service, TCP/SSH/RDP/VNC-exclusive
+model, and the `NetworkServiceLabel`-derived internal Name it required, are gone) -- every protocol
+is just an independent enable checkbox on the same Server, sharing one Homelab and one homelab-side
+host/IP.
+
 - The top of the page manages Homelab selection: a dropdown of Homelab names in alphabetical
   order, first one auto-selected. The user cannot add or delete Homelabs from this page.
 - Servers are listed with sortable column headers (Name, Domain, Homelab, Local address --
   click any header to sort ascending/descending, plain client-side JS,
-  `static/js/sortable-table.js`, no server round-trip) and a domain-only filter dropdown above the
-  table (populated from every registered domain, see "Domains"). Each row shows Name (the subdomain
-  for a Server's Web protocol; the user-entered Name for a Network service, since its internal, Name-derived
-  subdomain -- see `NetworkServiceLabel` -- is never shown), Domain (with a warning icon if that domain was since removed from the
-  Domains page -- the Server keeps working, it's just orphaned from Selfie Proxy's own domain
-  registry; always the primary domain for an SSH/RDP/VNC-mode Server, which still shows normally here
-  like any other domain, warning icon included, rather than being special-cased -- see
-  `ServerController.toServer`), the Homelab, the address within the homelab, and a
-  right-most unlabeled, unsortable column right before the Edit button: a **Connect** button
-  (opening the Server's URL in a new tab) for a Server's Web protocol, `domain:port` as plain text for a
-  TCP-mode Network Service (nothing to open -- it's just an address, not a page), or a **Connect**
-  button for an SSH/RDP/VNC-mode one (see "Connecting to an SSH/RDP/VNC-mode Server" below)
-  -- there is no separate "not exposed to the internet" indicator anywhere on this list, since the
-  Connect button itself already makes that mode's nature obvious without needing to spell it out.
-  Whenever that row's Status dot is red (`appStatusMessage` -- homelab disconnected and/or a DNS
-  mismatch, see DashboardController), its Connect button stays visible but is disabled
-  (`aria-disabled="true"` + `tabindex="-1"`, `.button-small[aria-disabled="true"]` in style.css --
-  an `<a>` has no native disabled state, and removing `href` instead would also drop its title/
-  styling context) rather than hidden, so the row still reads the same at a glance either way.
+  `static/js/sortable-table.js`, no server round-trip), and two independently remembered filter
+  dropdowns side by side above the table (`DomainFilterPreferenceStore`, persisted across page
+  loads and logins): "Filter by domain" (populated from every registered domain, see "Domains")
+  and "Filter by homelab" (populated from every Homelab). Each row shows Name (the subdomain, or
+  the bare domain itself if blank -- there is no separate user-entered Name field anymore), Domain
+  (with a warning icon if that domain was since removed from the Domains page -- the Server keeps
+  working, it's just orphaned from Selfie Proxy's own domain registry), the Homelab, the address
+  within the homelab, then three independent columns -- **Web**, **Terminal**, **Remote desktop**
+  -- each showing a **Connect** button only when that Server has that protocol enabled (blank
+  otherwise; Port Forwarding is never shown as a column here, its entries stay hidden). Web's
+  Connect opens the Server's own public URL directly in a new tab; Terminal's/Remote desktop's
+  open the browser console flow instead (see "Connecting to a Server's Terminal or Remote Desktop"
+  below). There is no separate "not exposed to the internet" indicator anywhere on this list, since
+  which Connect buttons a row shows already makes that obvious. Whenever a row's Status dot is red
+  (`serverStatusMessage` -- homelab disconnected and/or a DNS mismatch, see `DashboardController`),
+  every Connect button in that row stays visible but is disabled (`aria-disabled="true"` +
+  `tabindex="-1"`, `.button-small[aria-disabled="true"]` in style.css -- an `<a>` has no native
+  disabled state, and removing `href` instead would also drop its title/styling context) rather
+  than hidden, so the row still reads the same at a glance either way.
 
 ### Editing, adding, and removing a Server
 
-The edit page fields, in order:
+The edit page has one shared section, then one independent fieldset per protocol, each with its
+own enable checkbox -- toggling one on/off never touches the others' fields or their live tunnels
+(see `ServerController.syncTunnels`):
 
-1. **Type**: Web server (default) or Network service. Selecting Network service shows a
-   warning: "Use this at your own risk. Anyone on the internet who scans your domain can see that
-   port is open and attempt to connect to it." (this warning, and the port-scanning risk itself,
-   only really applies to TCP mode below -- shown for every Network Service mode anyway, since
-   Selecting Network Service is the one action that turns on a whole extra section of the form).
-   TCP mode's own **Exposed port** field (point 2 below) additionally carries a `warning-icon` (the
-   same inline hover-tooltip `&#9888;` idiom the Servers list already uses for its
-   homelab-gone/domain-gone row warnings) right next to its label: "Make sure to open the exposed
-   port in your firewall." -- scoped to TCP mode alone (unlike the warning above) simply by living
-   inside the same `#exposed-port-field` div that field's own visibility toggle already hides for
-   every other mode, no separate JS needed.
-   There is deliberately no live reachability check anywhere in this flow (tried and removed, see
-   git history around 2026-07-27): a TCP-mode Network Service's port only ever becomes a real
-   listening socket once its Homelab's agent has an active connection relaying it
-   (`AllowExternalTcp`, see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section) -- so a
-   check would report "not reachable" just as readily for a disconnected/offline homelab as for an
-   actually-blocked firewall, which isn't a distinction worth the ~10-30s external scan
-   (`api.portscan.com`, the same technique `check-prerequisites.sh` still uses at startup for the
-   three fixed ports 80/443/22, root `CLAUDE.md`) would cost on every save. These two static
-   warnings are the only guidance given for this.
-2. **Mode** (Network service only): one of four --
-   - **TCP** (default, label deliberately terse -- "Protocol: TCP" is already implied and no
-     longer separately shown, see point 4 below) -- today's original behavior, internet-reachable
-     at a chosen **Exposed port** (ports 1-1023 are reserved for system services and cannot be
-     exposed; a port can only be exposed by one server at a time), on a subdomain of a chosen
-     **Domain** (dropdown of every registered domain, primary first -- same ordering/labeling as a
-     Web server's Domain field). The subdomain itself is never shown to the user -- a
-     generated internal value derived from Name (see `NetworkServiceLabel`, lowercased/sanitized,
-     with a numeric suffix on collision), exactly like every mode below.
-   - **Terminal Access: SSH**, **Desktop Access: RDP**, **Desktop Access: VNC** -- a browser
-     SSH/RDP/VNC session instead, reached through a **Connect** action on the Servers list
-     (see below) rather than a public URL: the underlying tunnel is created with
-     `allow-external-tcp: false` (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section
-     on `Tunnel.AllowExternalTcp`) and always lives on an internal, never-shown subdomain of the
-     *primary* domain -- there is no Domain/Exposed port field for these modes at all, since
-     there's no public FQDN concept for them. Selecting one of these three reveals, inside the
-     "Address in the homelab" fieldset (see below): **Username** (optional -- VNC often has none)
-     and **Password** side by side on one line, always a real `<input type="password">` with no
-     view/reveal button -- there is no private-key auth option, every mode authenticates with a
-     password only -- and **Accept a self-signed certificate on the target** (RDP/VNC only). On
-     edit, the password field shows a `••••••••` placeholder when a credential is already stored
-     (a fixed decoy, not the real password -- `<input placeholder>` is never submitted and never
-     puts the actual secret in the page) and no placeholder when adding or when none is stored yet,
-     so it's visually obvious whether a credential exists without ever exposing it. Port defaults
-     per mode when Mode is changed (22/3389/5900), the same auto-fill idiom the Protocol dropdown
-     already has for HTTP/HTTPS. Leaving the password field blank on an
-     edit keeps the previously stored one unchanged; leaving it blank when adding is allowed too
-     (eg. a VNC target with no password) -- see "Connecting" below for what happens then.
-   **Subdomain** (Web server only): the label, composing the FQDN as `<subdomain>.<domain>` --
-   optional; leaving it blank exposes the server at the bare domain itself (see "Homelabs" above).
-3. The FQDN itself (Web server and TCP mode only): a label (not a text field), shown
-   immediately after the subdomain/exposed port, updated live as the user edits the form
-   (including changing the domain dropdown). Not a hyperlink.
-4. The "Address in the homelab" fieldset: **Name** (Network service only, required, for every
-   mode -- a label shown in the list, not part of the domain, unique across every Network Service
-   -- see "Validation" below -- and the basis for the generated internal subdomain above), Homelab, then a row with
-   Protocol (HTTP/HTTPS dropdown, Web server only -- no equivalent field for a Network
-   Service, since Mode already says TCP/SSH/RDP/VNC and repeating "Protocol: TCP" next to it added
-   nothing), host/IP (always shown, needed for every type/mode), and port (defaults to 80 for HTTP,
-   443 for HTTPS, or the SSH/RDP/VNC mode's own default above), then (SSH/RDP/VNC mode only) a
-   second row with Username and Password side by side, then Accept a self-signed certificate --
-   see Mode above for these last three.
+- **Shared fields**: **Homelab** (dropdown), **IP or hostname to homelab server** -- one value
+  used by every protocol this Server enables, echoed read-only inside each protocol's own fieldset
+  next to its own Protocol/port fields (`.host-echo`, kept live via JS as the shared field changes).
+- **Web**: HTTP/HTTPS **Protocol** dropdown (defaults its port to 80/443 unless the admin already
+  typed a custom one, `bindProtocolPortFollow` in `edit-server.js`), **Homelab server port**, and a
+  "Protect by forcing authentication through Selfieproxy login" checkbox (`webSsoProtected` -- see
+  "Login" above). **Subdomain**/**Domain** (dropdown, primary domain first) live in the shared
+  top-of-form row, composing the FQDN shown live as a label -- they only matter for Web, since
+  every other protocol lives on its own hidden, never-shown FQDN (see below) regardless of what
+  Subdomain/Domain are set to.
+- **Terminal**: always SSH, no Protocol choice. **Homelab server port** (default 22), **Username**
+  (optional) and **Password** side by side -- always a real `<input type="password">`, no
+  view/reveal button, no private-key option. On edit, the password field shows a `••••••••`
+  placeholder when a credential is already stored (a fixed decoy, never the real password) and no
+  placeholder otherwise, so it's visually obvious whether one exists without exposing it; leaving
+  it blank on edit keeps the previous credential, leaving it blank when adding is allowed too (see
+  "Connecting" below for what happens then). Username and Password mirror live into Remote
+  Desktop's own Username/Password fields and vice versa (`bindMirrored` -- the common case is the
+  same login on the same machine for both).
+- **Remote Desktop**: RDP/VNC **Protocol** dropdown (defaults port 3389/5900 the same way Web's
+  does), **Homelab server port**, Username/Password (as above). There is no "Accept a self-signed
+  certificate" checkbox anymore -- `RemoteDesktopConfig.ignoreCertificate` is hardcoded `true` for
+  every Remote Desktop Server (RDP/VNC targets are essentially always self-signed, e.g. Windows'
+  own default RDP certificate, so there was never a real choice to expose).
+- **Port Forwarding**: up to 8 individual forwarded TCP ports -- never a range, each is its own
+  boringproxy tunnel (`MAX_PORT_FORWARDING_ENTRIES` in `ServerController`). Shown as a small table
+  (`Homelab server port` | `Port exposed to the internet` | blank), modeled on a typical router's
+  port-forwarding page: each already-added row is read-only with a **Remove** button (no
+  confirmation needed -- the page's own Cancel already covers "I didn't mean to change this"); a
+  trailing blank row is always directly submittable as-is (typing into it and clicking the form's
+  OK works without ever clicking the row's own **Add**), and clicking **Add** just locks that row
+  read-only and appends a fresh blank row unless the 8-entry cap is reached. Every port field is
+  constrained to 1-65535 (`min`/`max`/`step` plus server-side `validatePortRange`); Add and direct
+  submit both block, client-side, a homelab-server-port or public-port value that duplicates
+  another row already in the table, ahead of the authoritative server-side check. Two static
+  warnings are shown above the table: using this is at the admin's own risk (anyone scanning the
+  domain can see the port is open), and to make sure the port is open in the firewall too. Always
+  TCP -- no protocol choice, since nothing else exists yet (`PortForwardingProtocol`).
 
-### Connecting to an SSH/RDP/VNC-mode Server
+Terminal's and Remote Desktop's tunnels each live on an internal, never-shown FQDN under the
+*primary* domain (`allow-external-tcp: false`, see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core
+types" section) -- there's no Domain/public-port concept for them at all. That hidden FQDN's
+subdomain is a derived, collision-free label (`HiddenTunnelFqdnAssigner`/`HiddenTunnelLabel`) built
+from the Server's own FQDN plus a fixed suffix -- `-terminal` / `-remotedesktop` -- rather than the
+homelab-side port number the way it briefly used to be: the reverseproxy agent's tunnel-lifecycle
+logs print every tunnel's FQDN unconditionally (no debug gate), and these FQDNs get real,
+publicly-logged Certificate Transparency entries too, so embedding the port (e.g. `...-3389....`)
+would leak which service a homelab is running to anyone who can read either. Port Forwarding's
+hidden FQDN keeps its numeric suffix (the public port itself) instead, since that port is already
+meant to be public and the number is what keeps multiple entries on the same Server distinct from
+each other.
 
-The Servers list shows a **Connect** action (alongside Edit) for any Server in one of these
-three modes, opening `https://console.<domain>/connect/<fqdn>` in a new tab -- a live browser
-session served by the separate `selfieproxy-remote-console` service (Apache Guacamole, consumed
-unmodified -- see `THIRD-PARTY-NOTICES.md`), paired with the `selfieproxy-guacd` container. If no
-credential has ever been stored for that Server (left blank when adding, or arrived via a
-configuration import -- imports never carry a password, see "Backup and restore" below), Connect
-instead opens a portal page prompting for one; submitting it encrypts and saves the credential
+### Connecting to a Server's Terminal or Remote Desktop
+
+The Servers list's Terminal/Remote desktop columns show a **Connect** button whenever that
+protocol is enabled on the row's Server, opening `https://console.<domain>/connect/<hidden fqdn>`
+in a new tab -- a live browser session served by the separate `selfieproxy-remote-console` service
+(Apache Guacamole, consumed unmodified -- see `THIRD-PARTY-NOTICES.md`), paired with the
+`selfieproxy-guacd` container. If no credential has ever been stored for that protocol on that
+Server (left blank when adding/enabling, or arrived via a configuration import -- imports never
+carry a password, see "Backup and restore" below), Connect instead opens a portal page
+(`ConsoleConnectController`) prompting for one; submitting it encrypts and saves the credential
 (`NetworkServiceCredentialCipher`, AES-256-GCM, key self-provisioned into
 `data/selfieproxy/network-service-secret-key` the first time it's needed, same idiom as
 `selfieproxy-identity-provider`'s `sso-signing-key.pem`) and proceeds straight into the session --
@@ -262,18 +262,25 @@ modes (`TlsMode.BYO_CERT`/`HOP_BY_HOP`) this used to expose through an "Advanced
 Button panel: Cancel (returns to the list, no changes), OK (add/update), Remove (edit only, red
 background/white text, asks for confirmation in an overlay first).
 
-Validation: before adding, check the subdomain isn't already taken on the chosen domain
-(case-insensitive) — this also applies to a Network service's generated internal subdomain
-(derived from its Name, see point 4 above), regenerated on every save until it doesn't collide, so
-a rename keeps the tunnel's label in sync with the current Name. A Network Service's Name must
-also be unique across every other Network Service (case-insensitive, any mode/domain --
-`ServerController.validate`), independent of the subdomain-collision check. `proxylistener`/`selfieproxy`/`auth` (or their env overrides,
-`REVERSE_PROXY_LISTENER_SUBDOMAIN`/`SELFPROXY_ADMIN_DOMAIN`/`SELFPROXY_AUTH_DOMAIN`) are reserved and
-cannot be used for a user's own Servers -- but only when the primary domain is selected, since
-those reserved subdomains are hardcoded to the primary domain alone (`docker-compose.yaml`); the same
-label under any other registered domain is a perfectly ordinary, unreserved Server. Updating a
-Server (including just changing its domain) removes the boringproxy tunnel, waits 2 seconds, then
-recreates it with the new values (no in-place tunnel update).
+Validation (`ServerController.validate`): before adding, check the subdomain isn't already taken on
+the chosen domain (case-insensitive). At least one protocol must be enabled. Every port field
+(Web/Terminal/Remote Desktop's homelab-side port, Port Forwarding's homelab-side and public ports)
+must be 1-65535. Port Forwarding additionally requires: no more than 8 entries; each entry's
+homelab-side port unique across this Server's own forwarded ports; each entry's public port not
+reserved (<=1023, system services), unique across this Server's own forwarded ports, and unique
+across every exposed port on this entire Selfie Proxy instance (one physical server, one port
+namespace) -- checked against live boringproxy tunnels, excluding this Server's own previous
+Port Forwarding FQDNs so editing an entry never collides with the tunnel it's about to replace.
+`proxylistener`/`selfieproxy`/`auth`/`console` (or their env overrides,
+`REVERSE_PROXY_LISTENER_SUBDOMAIN`/`SELFPROXY_ADMIN_DOMAIN`/`SELFPROXY_AUTH_DOMAIN`/
+`SELFPROXY_CONSOLE_DOMAIN`) are reserved and cannot be used for a user's own Servers -- but only
+when the primary domain is selected, since those reserved subdomains are hardcoded to the primary
+domain alone (`docker-compose.yaml`); the same label under any other registered domain is a
+perfectly ordinary, unreserved Server. Updating a Server diffs each protocol's (and each Port
+Forwarding entry's) desired tunnel against what's already live (`ServerController.syncTunnels`) --
+an unchanged protocol/entry is left completely alone, a removed one is deleted, an added or changed
+one is deleted-then-recreated after a 2-second wait (no in-place tunnel update); only one 2-second
+wait total is paid per save no matter how many protocols/entries actually changed.
 
 ## Local websites
 
@@ -359,7 +366,7 @@ this section is the portal-side UI behavior.
   ZIP-upload field while in redirect mode, since there's nothing to download or replace. The target
   is picked either from a dropdown of every currently deployed Server exposing a Web protocol and other Local
   Website (`LocalWebsiteController.redirectTargets` -- excludes the site being edited itself, and
-  every Network Service, since those have no public web address to redirect to) or typed as a
+  any Server with no Web protocol enabled, since those have no public web address to redirect to) or typed as a
   custom address -- the two share one underlying `redirectTo` value, so which UI mode was used to
   set it doesn't change how it's stored or applied.
 
@@ -396,8 +403,8 @@ Local Websites wizard steps' per-item domain picker below. `BackupService` does 
   narrows it down to the submitted selection before it's serialized and zipped.
 - **What's included** in a selected item: Homelab names; each selected Server's full settings
   (the same stored record `ServerController` itself edits, read directly from
-  `ServerStore`) -- including, for an SSH/RDP/VNC-mode Server, its username, but
-  never its stored credential (see below); each selected Local Website's settings
+  `ServerStore`) -- including every enabled protocol's own settings, and, for Terminal/Remote
+  Desktop, their username, but never their stored credential (see below); each selected Local Website's settings
   (`LocalWebsiteStore`) plus its content directory, zipped under `local-websites/<fqdn>/` alongside
   a root-level `manifest.json` describing everything else. `manifest.json` is pretty-printed
   (Jackson `INDENT_OUTPUT`) since it's meant to be readable/hand-editable before an import, not
@@ -412,12 +419,12 @@ Local Websites wizard steps' per-item domain picker below. `BackupService` does 
   never exported. Importing a Homelab that doesn't already exist on the target server always mints
   it a **brand-new** secret -- the import wizard's Homelabs step warns about this per item (only
   for the ones flagged New, see below), and the operator must re-paste the new secret into that
-  homelab's `.env` afterward. An SSH/RDP/VNC-mode Server's encrypted credential is never
-  exported either (`Server.withoutSecrets`, `BackupService.buildManifest`) -- it's encrypted
-  with a key that never leaves this server (`NetworkServiceCredentialCipher`), so an exported
-  ciphertext would be undecryptable elsewhere; importing one of these Servers lands it in the same
-  "no credential stored yet" state as a freshly added one left blank, prompting for a password on
-  its first Connect (see "Servers" above). Also excluded:
+  homelab's `.env` afterward. A Server's Terminal/Remote Desktop encrypted credentials are never
+  exported either (`Server.withoutSecrets`, `BackupService.buildManifest`) -- they're encrypted
+  with a key that never leaves this server (`NetworkServiceCredentialCipher`), so exported
+  ciphertext would be undecryptable elsewhere; importing a Server with Terminal and/or Remote
+  Desktop enabled lands each in the same "no credential stored yet" state as freshly enabling one
+  with a blank password, prompting for it on the first Connect (see "Servers" above). Also excluded:
   `selfieproxy-identity-provider`'s admin account and RSA signing key -- a configuration export
   must never be able to grant login access to a different server, so import never touches
   server-local auth material, only goes through the same `BoringProxyClient` REST calls the rest
@@ -512,13 +519,18 @@ ones:
 | Portal concept | BoringProxy concept |
 |---|---|
 | Homelab | Agent |
-| Server | Tunnel |
+| Server | Tunnel(s) |
 
-When creating a tunnel: the Server becomes a Tunnel, the Domain is the FQDN, the Agent Name
-is the Homelab's name, the Client Address/Port are the homelab-side host/IP and port, and TLS
-termination follows the Connectivity option chosen above. Integration happens through the forked
-BoringProxy's REST API — changes are written to its database and tunnels take effect immediately
-(`BoringProxyClient`).
+Unlike Homelab/Agent, a Server doesn't map onto exactly one Tunnel: each protocol a Server has
+enabled (Web, Terminal, Remote Desktop) becomes its own Tunnel, and Port Forwarding becomes one
+more Tunnel per forwarded port (up to 8) -- so a single Server can correspond to anywhere from one
+to eleven live Tunnels at once (`TunnelMapper.tunnelPlans`/`portForwardingTunnelPlans`,
+`ServerController.syncTunnels`). For each: the Domain is the FQDN (the Server's own public FQDN for
+Web and Port Forwarding, a derived hidden FQDN under the primary domain for Terminal/Remote
+Desktop -- see "Servers" above), the Agent Name is the Homelab's name, the Client Address/Port are
+the homelab-side host/IP and port, and TLS termination is always `MANAGED` for Web, passthrough
+(`AllowExternalTcp`) for Port Forwarding. Integration happens through the forked BoringProxy's REST
+API — changes are written to its database and tunnels take effect immediately (`BoringProxyClient`).
 
 ## Implementation conventions
 

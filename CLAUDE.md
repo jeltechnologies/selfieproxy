@@ -70,7 +70,7 @@ runtime config/volumes they use:
 ├── data/                         # runtime volumes — not committed
 │   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
 │   └── selfieproxy/                # Selfie Proxy's own state: servers.json (ServerStore --
-│       │                            # also covers every SSH/RDP/VNC-mode Network Service, read by
+│       │                            # also covers every Server's Terminal/Remote Desktop protocol, read by
 │       │                            # selfieproxy-remote-console over the shared volume) + network-service-secret-key
 │       │                            # (self-provisioned, see selfieproxy-portal/CLAUDE.md's "Servers"),
 │       │                            # local-websites.json (LocalWebsiteStore), domains.json (DomainStore --
@@ -171,9 +171,8 @@ and a redirect from the bare `PRIMARY_DOMAIN` to it — see `LocalWebsiteDemoBoo
 one-time, marker-file-gated pattern `AgentBootstrap` already uses for the default homelab above,
 applied independently to each of the two.
 
-Two further services power the browser SSH/RDP/VNC console feature (the "Terminal Access: SSH"/
-"Desktop Access: RDP"/"Desktop Access: VNC" Network Service Modes in the portal, see
-`selfieproxy-portal/CLAUDE.md`): `selfieproxy-guacd` (the official, unmodified
+Two further services power the browser SSH/RDP/VNC console feature (a Server's Terminal and Remote
+Desktop protocols in the portal, see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-guacd` (the official, unmodified
 `guacamole/guacd` Docker image — the one deliberate exception to every other service here
 carrying both `image:` and `build:`, since there is nothing of ours to build) and
 `selfieproxy-remote-console` (the WebSocket bridge between a browser and `guacd`, own
