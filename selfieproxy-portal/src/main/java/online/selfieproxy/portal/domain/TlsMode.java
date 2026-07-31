@@ -1,8 +1,12 @@
 package online.selfieproxy.portal.domain;
 
 /**
- * The 3 "Advanced settings" connectivity options shown when a Web Application's
- * Homelab protocol is HTTPS. Only relevant for ExposedAppType.WEB_APPLICATION.
+ * The 3 connectivity options for a Web Application whose Homelab protocol is HTTPS. The portal no
+ * longer exposes a picker for this -- every Web Application is always MANAGED
+ * (ExposedAppController.toExposedApp always passes tlsMode=null, and effectiveTlsMode() defaults
+ * null to MANAGED) and the "Advanced settings" UI that let a user pick BYO_CERT/HOP_BY_HOP has
+ * been removed from edit-app.html. The enum, TunnelMapper's mapping, and ExposedApp.canProtectWithSso()
+ * are kept as-is in case this is reintroduced later. Only relevant for ExposedAppType.WEB_APPLICATION.
  */
 public enum TlsMode {
 

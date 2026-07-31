@@ -43,7 +43,7 @@
 			</div>
 
 			<div class="field-row">
-				<div class="field" id="exposed-port-field">
+				<div class="field" id="exposed-port-field" style="display:none">
 					<label for="exposedPort">Exposed port to the internet
 						<span class="warning-icon" title="Make sure to open the exposed port in your firewall.">&#9888;</span>
 					</label>
@@ -138,26 +138,6 @@
 						<input type="checkbox" id="ignoreCertificate" name="ignoreCertificate" value="true"
 							   th:checked="${app.ignoreCertificate()}">
 						Accept a self-signed certificate on the target
-					</label>
-				</div>
-			</fieldset>
-
-			<div id="https-warning" class="warning" style="display:none">
-				<strong>A reverse proxy (such as NGINX) in front of your web application is not supported for
-				this option.</strong> The agent must connect directly to your web application, which must
-				provide its own valid signed certificate from Let's Encrypt and handle any authentication
-				itself -- Selfie Proxy does not protect this connection.
-			</div>
-
-			<button type="button" id="advanced-settings-toggle" class="link-button">Advanced settings</button>
-
-			<fieldset id="advanced-settings" class="advanced-settings">
-				<legend>Connectivity between Selfie Proxy and homelab</legend>
-				<div class="field" th:each="mode : ${T(online.selfieproxy.portal.domain.TlsMode).values()}">
-					<label>
-						<input type="radio" name="tlsMode" th:value="${mode.name()}"
-							   th:checked="${app.effectiveTlsMode() == mode}">
-						<strong th:text="${mode.label()}"></strong> - <span th:text="${mode.description()}"></span>
 					</label>
 				</div>
 			</fieldset>

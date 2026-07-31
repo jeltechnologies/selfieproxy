@@ -26,11 +26,14 @@ OIDC/env-var picture) — boringproxy gates the portal domain before any request
 container. After a successful login the user lands on the exposed applications page.
 
 - A Web Application exposed app can opt in to the same single sign on gate (the authentication
-  checkbox on its edit page) — available whenever Selfie Proxy itself terminates the public TLS connection: always for
-  a plain HTTP homelab app (Selfie Proxy still adds the managed cert and converts to HTTPS at the
-  server, forwarding plain HTTP onward), and for an HTTPS homelab app only under Server HTTPS (the
-  recommended connectivity option). Client Raw TLS and Server Raw TLS are excluded since boringproxy
-  never HTTP-parses those tunnels, so it has nothing to gate (see `ExposedApp.canProtectWithSso()`).
+  checkbox on its edit page) — available for both HTTP and HTTPS homelab apps, since every Web
+  Application is always end-to-end encrypted (`TlsMode.MANAGED`, boringproxy's "server" TLS
+  termination either way -- see `ExposedApp.canProtectWithSso()`). The edit page used to expose an
+  "Advanced settings" picker letting the admin choose two alternate HTTPS connectivity modes
+  (`TlsMode.BYO_CERT`/`HOP_BY_HOP`, which boringproxy never HTTP-parses and so can't gate with
+  single sign on); that picker has been removed from the UI since nobody used it, but the
+  underlying `TlsMode` enum and `TunnelMapper` mapping are kept as-is in case it's reintroduced
+  later -- every Web Application submitted through the portal today is unconditionally MANAGED.
 - The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds a theme toggle button (its
   label flips between "Change to dark mode"/"Change to light mode" depending on the current
   setting, `POST /appearance/toggle`, `web/AppearanceController.java` -- a one-click toggle rather
@@ -250,26 +253,9 @@ every later Connect skips that prompt. `selfieproxy-remote-console` only ever re
 `exposed-apps.json`/that key (shared `/data` volume) at connect time, never writes either --
 credential entry always goes through the portal, keeping a single writer for the whole file.
 
-When HTTPS is selected as the homelab-side protocol, an "Advanced settings" button reveals three
-Connectivity options between Selfie Proxy and the homelab:
-
-1. **End-to-end encrypted** (default, recommended, "Server HTTPS") — Selfie Proxy automatically
-   creates and renews a signed certificate, and is the only HTTPS connectivity option that can
-   also be protected with single sign on (see `ExposedApp.canProtectWithSso()` and the "Protect by forcing
-   authentication through Selfieproxy login" checkbox above).
-2. **End-to-end encrypted, self-provided** ("Client Raw TLS") — **not supported behind a reverse
-   proxy** (e.g. NGINX) in the homelab: the agent must connect directly to the web application,
-   which provides its own certificate and handles authentication itself. This isn't a soft
-   recommendation -- Selfie Proxy sends the tunnel's public domain as the TLS SNI straight to
-   whatever the agent dials (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Agent tunnel lifecycle"
-   section), and a reverse proxy in between would need to itself recognize that same SNI to route
-   the connection, which isn't a topology Selfie Proxy supports. Shows a warning: "A reverse proxy
-   (such as NGINX) in front of your web application is not supported for this option. The agent
-   must connect directly to your web application, which must provide its own valid signed
-   certificate from Let's Encrypt and handle any authentication itself -- Selfie Proxy does not
-   protect this connection."
-3. **Hop-by-hop encryption** ("Server Raw TLS", compatibility mode) — Selfie Proxy automatically
-   creates and renews a signed certificate; use when a web application breaks on normal HTTPS.
+Every Web Application is always end-to-end encrypted (`TlsMode.MANAGED`) with no user-facing
+choice about it -- see the "Login" section above for why, and for the two alternate connectivity
+modes (`TlsMode.BYO_CERT`/`HOP_BY_HOP`) this used to expose through an "Advanced settings" picker.
 
 Button panel: Cancel (returns to the list, no changes), OK (add/update), Remove (edit only, red
 background/white text, asks for confirmation in an overlay first).

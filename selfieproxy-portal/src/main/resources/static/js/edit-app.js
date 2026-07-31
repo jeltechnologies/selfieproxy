@@ -30,9 +30,6 @@
 	var usernameField = document.getElementById("username-field");
 	var secretField = document.getElementById("secret-field");
 	var ignoreCertificateField = document.getElementById("ignore-certificate-field");
-	var httpsWarning = document.getElementById("https-warning");
-	var advancedToggle = document.getElementById("advanced-settings-toggle");
-	var advancedSettings = document.getElementById("advanced-settings");
 	var ssoProtectedField = document.getElementById("sso-protected-field");
 	var ssoProtectedCheckbox = document.getElementById("ssoProtected");
 
@@ -45,16 +42,10 @@
 	var appForm = document.getElementById("app-form");
 	var updatingOverlay = document.getElementById("updating-overlay");
 
-	var tlsModeRadios = document.querySelectorAll('input[name="tlsMode"]');
-
 	var defaultModePorts = { SSH: 22, RDP: 3389, VNC: 5900 };
 	var defaultProtocolPorts = { HTTP: 80, HTTPS: 443 };
 	var portTouched = false;
 	var lastProtocol = protocolSelect.value;
-
-	// Collapsed until the user clicks "Advanced settings" -- updateVisibility()
-	// only ever hides this (when switching away from HTTPS), never shows it.
-	advancedSettings.style.display = "none";
 
 	function isNetworkService() {
 		return typeSelect.value === "NETWORK_SERVICE";
@@ -62,11 +53,6 @@
 
 	function isRemoteAccessMode() {
 		return isNetworkService() && modeSelect.value !== "RAW_TCP";
-	}
-
-	function selectedTlsMode() {
-		var checked = document.querySelector('input[name="tlsMode"]:checked');
-		return checked ? checked.value : null;
 	}
 
 	function updateVisibility() {
@@ -89,19 +75,10 @@
 		secretField.style.display = remoteAccess ? "" : "none";
 		ignoreCertificateField.style.display = remoteAccess && modeSelect.value !== "SSH" ? "" : "none";
 
-		var showHttpsSettings = !networkService && protocolSelect.value === "HTTPS";
-		httpsWarning.style.display = (showHttpsSettings && selectedTlsMode() === "BYO_CERT") ? "" : "none";
-		advancedToggle.style.display = showHttpsSettings ? "" : "none";
-		if (!showHttpsSettings) {
-			advancedSettings.style.display = "none";
-		}
-
-		// Plain HTTP is always server-terminated (see TunnelMapper), and HTTPS only under
-		// "Server HTTPS" -- MANAGED is boringproxy's own name for it, and the default TLS
-		// mode when nothing else has been chosen yet (mirrors ExposedApp.canProtectWithSso()
-		// server-side).
-		var canProtectWithSso = !networkService && (protocolSelect.value === "HTTP" ||
-			(showHttpsSettings && (selectedTlsMode() === "MANAGED" || selectedTlsMode() === null)));
+		// Every Web Application is always end-to-end encrypted (server-terminated, see
+		// TunnelMapper/ExposedApp.canProtectWithSso()), so single sign on is available for
+		// any Web Application regardless of protocol.
+		var canProtectWithSso = !networkService;
 		ssoProtectedField.style.display = canProtectWithSso ? "" : "none";
 		if (!canProtectWithSso) {
 			ssoProtectedCheckbox.checked = false;
@@ -154,15 +131,8 @@
 	subdomainInput.addEventListener("input", refresh);
 	domainSelect.addEventListener("change", updateResult);
 	exposedPortInput.addEventListener("input", updateResult);
-	tlsModeRadios.forEach(function (radio) {
-		radio.addEventListener("change", updateVisibility);
-	});
 	ssoProtectedCheckbox.addEventListener("change", function () {
 		ssoUserTouched = true;
-	});
-
-	advancedToggle.addEventListener("click", function () {
-		advancedSettings.style.display = advancedSettings.style.display === "none" ? "" : "none";
 	});
 
 	if (removeButton) {

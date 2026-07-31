@@ -207,10 +207,18 @@ public class ExposedAppController {
 						? existing != null ? existing.encryptedSecret() : null
 						: cipher.encrypt(form.secret());
 
+		// Only a RAW_TCP-mode Network Service has a real internet-facing exposed port -- a Web
+		// Application is always reached at the standard port (443/HTTPS or Selfie Proxy's own
+		// managed HTTPS termination), never a user-chosen one, and SSH/RDP/VNC mode gets its port
+		// auto-assigned by boringproxy instead (see ExposedApp.withExposedPort). The exposedPort
+		// input stays in the DOM (just hidden) when Type isn't Network Service, so a stale value
+		// from switching Type back and forth must be discarded here rather than trusted from the form.
+		Integer exposedPort = networkService && !remoteAccess ? form.exposedPort() : null;
+
 		return new ExposedApp(subdomain, name, form.homelabName(), form.type(),
 				networkService ? null : form.protocol(),
-				form.host(), form.port() != null ? form.port() : 0, remoteAccess ? null : form.exposedPort(),
-				form.tlsMode(), !networkService && Boolean.TRUE.equals(form.ssoProtected()), domain,
+				form.host(), form.port() != null ? form.port() : 0, exposedPort,
+				null, !networkService && Boolean.TRUE.equals(form.ssoProtected()), domain,
 				mode, username, encryptedSecret, ignoreCertificate);
 	}
 
