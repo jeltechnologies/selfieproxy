@@ -11,7 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * registration, any /authorize request with a different redirect_uri is
  * rejected. sessionIdleMinutes/sessionMaxMinutes: this IdP's own login
  * session (see IdpSessionService) -- the same SSO_SESSION_IDLE_MINUTES/
- * SSO_SESSION_MAX_MINUTES env vars that size boringproxy's per-app RP
+ * SSO_SESSION_MAX_MINUTES env vars that size boringproxy's per-server RP
  * cookie also size this session, since both represent the same "how long
  * am I logged in for" concept. primaryDomain: this deployment's own
  * PRIMARY_DOMAIN (read directly from the same env var the rest of the stack

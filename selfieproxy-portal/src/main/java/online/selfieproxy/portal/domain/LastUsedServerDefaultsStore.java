@@ -16,30 +16,30 @@ import tools.jackson.databind.json.JsonMapper;
  * Remembers the domain and homelab most recently used to add an Exposed Application, so the Add
  * Application page's Domain/Homelab dropdowns default to them instead of always the primary
  * domain/first homelab -- same self-contained single-value JSON store shape as ThemeStore. A
- * missing or corrupt file is never fatal (load() returns null and ExposedAppController falls back
+ * missing or corrupt file is never fatal (load() returns null and ServerController falls back
  * to those defaults), since this is a convenience default, not load-bearing state.
  */
 @Component
-public class LastUsedAppDefaultsStore {
+public class LastUsedServerDefaultsStore {
 
-	private static final Logger log = LoggerFactory.getLogger(LastUsedAppDefaultsStore.class);
+	private static final Logger log = LoggerFactory.getLogger(LastUsedServerDefaultsStore.class);
 
 	private final Path filePath;
 	private final ObjectMapper objectMapper = JsonMapper.builder().build();
 	private final Object lock = new Object();
 
-	public LastUsedAppDefaultsStore(@Value("${selfieproxy.last-used-app-defaults-path}") String path) {
+	public LastUsedServerDefaultsStore(@Value("${selfieproxy.last-used-server-defaults-path}") String path) {
 		this.filePath = Path.of(path);
 	}
 
 	/** Null if nothing has been recorded yet (or the record is unreadable) -- otherwise either field may still individually be null. */
-	public LastUsedAppDefaults load() {
+	public LastUsedServerDefaults load() {
 		synchronized (lock) {
 			if (!Files.exists(filePath)) {
 				return null;
 			}
 			try {
-				return objectMapper.readValue(filePath.toFile(), LastUsedAppDefaults.class);
+				return objectMapper.readValue(filePath.toFile(), LastUsedServerDefaults.class);
 			} catch (Exception e) {
 				log.warn("Failed to read {}, falling back to no remembered defaults", filePath, e);
 				return null;
@@ -47,7 +47,7 @@ public class LastUsedAppDefaultsStore {
 		}
 	}
 
-	public void save(LastUsedAppDefaults defaults) {
+	public void save(LastUsedServerDefaults defaults) {
 		synchronized (lock) {
 			try {
 				Files.createDirectories(filePath.getParent());

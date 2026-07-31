@@ -13,9 +13,9 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Remembers the "Filter by domain" dropdown's selected value on the Applications and Local
+ * Remembers the "Filter by domain" dropdown's selected value on the Servers and Local
  * Websites list pages, so it survives page navigation and a server reboot -- same self-contained
- * single-value JSON store shape as ThemeStore/LastUsedAppDefaultsStore. A missing or corrupt file
+ * single-value JSON store shape as ThemeStore/LastUsedServerDefaultsStore. A missing or corrupt file
  * is never fatal (load() falls back to "no filter selected" on both fields), since this is a
  * cosmetic UI preference, not load-bearing state.
  */
@@ -46,7 +46,7 @@ public class DomainFilterPreferenceStore {
 		}
 	}
 
-	public void saveAppsDomain(String domain) {
+	public void saveServersDomain(String domain) {
 		synchronized (lock) {
 			DomainFilterPreference current = load();
 			save(new DomainFilterPreference(domain, current.localWebsitesDomain()));
@@ -56,7 +56,7 @@ public class DomainFilterPreferenceStore {
 	public void saveLocalWebsitesDomain(String domain) {
 		synchronized (lock) {
 			DomainFilterPreference current = load();
-			save(new DomainFilterPreference(current.appsDomain(), domain));
+			save(new DomainFilterPreference(current.serversDomain(), domain));
 		}
 	}
 

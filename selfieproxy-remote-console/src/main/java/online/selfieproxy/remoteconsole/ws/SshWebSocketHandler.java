@@ -78,7 +78,7 @@ public class SshWebSocketHandler implements WebSocketHandler {
 		String fqdn = (String) session.getAttributes().get(ConsoleIdHandshakeInterceptor.CONSOLE_FQDN_ATTRIBUTE);
 		RemoteConsole console = fqdn == null ? null : remoteConsoleStore.find(fqdn);
 		if (console == null || console.mode() != RemoteConsoleProtocol.SSH) {
-			log.warn("No SSH-mode application found for fqdn={}", fqdn);
+			log.warn("No SSH-mode server found for fqdn={}", fqdn);
 			session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Unknown console"));
 			return;
 		}
@@ -107,7 +107,7 @@ public class SshWebSocketHandler implements WebSocketHandler {
 		AuthFuture authFuture = clientSession.auth().verify(AUTH_TIMEOUT);
 		if (!authFuture.isSuccess()) {
 			clientSession.close(true);
-			throw new IOException("SSH authentication failed for " + console.username() + "@" + console.host());
+			throw new IOException("SSH authentication failed for " + console.username() + "@127.0.0.1");
 		}
 
 		ChannelShell channel = clientSession.createShellChannel();

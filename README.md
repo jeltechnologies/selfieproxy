@@ -4,11 +4,11 @@ Selfie Proxy provides a simplified, selfhosting solution for accessing home labs
 
 ## Features
 
-- Admin portal to manage every exposed app and website.
+- Admin portal to manage every exposed server and website.
 - Automatic, auto-renewing HTTPS certificates.
-- Built-in login (single sign on) protecting the admin portal and, optionally, individual exposed apps.
+- Built-in login (single sign on) protecting the admin portal and, optionally, individual exposed servers.
 - Simplified user management: one admin account runs the portal, plus any number of additional
-  Users who can only log in to the apps you've protected — nothing more.
+  Users who can only log in to the servers you've protected — nothing more.
 - Static website hosting under your own domain/subdomain.
 - Multiple homelabs (locations) can connect to one server.
 - Remote Desktop and SSH terminal access to your homelab machines, right in your browser —
@@ -48,13 +48,13 @@ our own code, not part of the fork.
 On top of boringproxy we added:
 - A new admin portal aimed at home users instead of boringproxy's networking-first UI.
 - WebSocket support.
-- Per-app authentication for exposed applications.
+- Per-server authentication for exposed servers.
 - Centralized agent ("client") management from the admin portal.
 - Built-in single sign on login for the portal, with support for swapping in an external OIDC provider.
-- Users management, so you can share login access to your apps without sharing the admin account.
+- Users management, so you can share login access to your servers without sharing the admin account.
 - Static website hosting.
 - Browser-based Remote Desktop and SSH terminal access to homelab machines.
-- Export/import configuration for every homelab, application, and static website.
+- Export/import configuration for every homelab, server, and static website.
 - Improved security by replacing RSA keys with Ed25519 encryption between agent and server.
 - A one-command Docker install.
 
@@ -98,9 +98,9 @@ On top of boringproxy we added:
    sudo ufw allow 22/tcp
    ```
 
-   If you later expose an application as a TCP-mode Network Service (see the admin portal's
-   Applications page), also open whichever port you choose as its "Exposed port to the internet"
-   — that's a separate, arbitrary port you pick per application, so it isn't covered by the three
+   If you later expose a server using Port Forwarding (see the admin portal's
+   Servers page), also open whichever port you choose as its "Port exposed to the internet"
+   — that's a separate, arbitrary port you pick per server, so it isn't covered by the three
    above and needs its own firewall rule (`sudo ufw allow <port>/tcp`) before it's reachable.
 
 3. On the server, download the compose file and env template:
@@ -129,7 +129,7 @@ On top of boringproxy we added:
 
 6. Visit `selfieproxy.<your domain>`, log in with the credentials from step 4, and set a
    new password. The portal then walks you through connecting your first homelab and
-   exposing your first app.
+   exposing your first server.
 
    > [!CAUTION]
    > There's no "forgot password" flow. Losing this password locks you out of the portal.
@@ -140,8 +140,8 @@ On top of boringproxy we added:
 [License](#license). For business-critical use cases, we recommend using supported enterprise products instead.
 
 **Is this secure?** The homelab-to-server tunnel is encrypted, the server is under your own
-control, every exposed app gets HTTPS automatically, and the admin portal (optionally any
-app) sits behind login. Repeated failed login attempts are throttled with an increasing
+control, every exposed server gets HTTPS automatically, and the admin portal (optionally any
+server) sits behind login. Repeated failed login attempts are throttled with an increasing
 delay, capped at 15 minutes, so password-guessing scripts get slower with every attempt
 without ever locking a legitimate user out for longer than that. It's open source.
 
@@ -152,8 +152,8 @@ when adding the homelab. On macOS/Windows, remove `network_mode: host` from the 
 server has no such flexibility: it requires `network_mode: host`, so it must run on Linux.
 
 **Can I point Selfie Proxy at an NGINX reverse proxy already running in my homelab?** No —
-point it directly at the application (HTTP, or HTTPS with a self-signed cert). Connecting
-straight to the app is what lets Selfie Proxy manage certificates and auth for it;
+point it directly at the server (HTTP, or HTTPS with a self-signed cert). Connecting
+straight to the server is what lets Selfie Proxy manage certificates and auth for it;
 forwarding through another reverse proxy breaks both.
 
 **What's in a configuration export?** Everything, with the exception of passwords. Importing

@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working on
 `selfieproxy-remote-console`. See the root `CLAUDE.md` for how this module fits into the rest of
-the repo, and `selfieproxy-portal/CLAUDE.md`'s "Exposed applications" section (specifically the
-"Terminal Access: SSH"/"Desktop Access: RDP"/"Desktop Access: VNC" Network Service Modes and
-"Connecting to an SSH/RDP/VNC-mode application") for the product-facing config/CRUD behavior,
+the repo, and `selfieproxy-portal/CLAUDE.md`'s "Servers" section (specifically the
+"Terminal Access: SSH"/"Desktop Access: RDP"/"Desktop Access: VNC" protocols and
+"Connecting to an SSH/RDP/VNC-mode server") for the product-facing config/CRUD behavior,
 which lives entirely in the portal, not here -- there is no separate "Remote consoles" concept or
-nav tab anymore, this is just three of the four modes an ordinary Application can have.
+nav tab anymore, this is just three of the four protocols an ordinary Server can have.
 
 ## What this is
 
@@ -15,18 +15,18 @@ The live half of Selfie Proxy's browser SSH/RDP/VNC console feature: a small Jav
 bridges a browser WebSocket to [Apache Guacamole](https://guacamole.apache.org/)'s `guacd`
 daemon (`selfieproxy-guacd` in `docker-compose.yaml`, the official unmodified
 `guacamole/guacd` image — see `THIRD-PARTY-NOTICES.md`). This module owns none of the
-configuration — every Application (name, homelab, mode, host/port, credentials) is created and
-edited entirely in `selfieproxy-portal` (`ExposedAppController`, `ExposedAppStore`), written to
-`data/selfieproxy/exposed-apps.json`. This service only *reads* that same file (shared `/data`
+configuration — every Server (homelab, protocol, host/port, credentials) is created and
+edited entirely in `selfieproxy-portal` (`ServerController`, `ServerStore`), written to
+`data/selfieproxy/servers.json`. This service only *reads* that same file (shared `/data`
 volume, read-only in spirit though the mount isn't literally `:ro` since nothing here ever writes
 it) at connect time, filtered down to the SSH/RDP/VNC-mode entries by this module's own
-`RemoteConsoleStore` (a deliberately partial mirror of `ExposedApp`, see its own javadoc) — the
+`RemoteConsoleStore` (a deliberately partial mirror of `Server`, see its own javadoc) — the
 same loose, shared-filesystem coupling `selfieproxy-local-websites`/`selfieproxy-localsites-agent`
 already have with the portal, no API calls between the two at all.
 
 ## Why it's a separate service, and why it's `network_mode: host`
 
-An SSH/RDP/VNC-mode application's tunnel is created (by the portal, via boringproxy's REST API) with
+An SSH/RDP/VNC-mode server's tunnel is created (by the portal, via boringproxy's REST API) with
 `allow-external-tcp: false` — see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section.
 That binds the tunnel's listener to `127.0.0.1` on the server host, not `0.0.0.0`: deliberately
 never reachable from the internet, only from a process in the **same network namespace as the
@@ -55,7 +55,7 @@ tidiness) to keep the live session in its own service.
 ## Architecture
 
 - `domain/RemoteConsole.java` + `domain/RemoteConsoleStore.java` — a deliberate small, partial
-  duplication of `selfieproxy-portal`'s own `ExposedApp`/`ExposedAppStore` (read-only here,
+  duplication of `selfieproxy-portal`'s own `Server`/`ServerStore` (read-only here,
   trimmed to the fields this service needs, filtered to SSH/RDP/VNC-mode Network Services --
   see `RemoteConsole`'s own javadoc), rather than a shared Java library between two independently-
   built Maven projects — same precedent as portal/identity-provider never sharing Java code either.

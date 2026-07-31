@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Encrypts/decrypts an SSH/RDP/VNC-mode Network Service's credential (SSH
- * password or private key, RDP/VNC password) at rest in exposed-apps.json,
+ * password or private key, RDP/VNC password) at rest in servers.json,
  * using a symmetric key self-provisioned into network-service-secret-key the
  * first time it's needed -- same idiom as selfieproxy-identity-provider's
  * sso-signing-key.pem and ThisServerBootstrap's secret republishing.
@@ -61,7 +61,7 @@ public class NetworkServiceCredentialCipher {
 		}
 	}
 
-	/** Returns null for a null/blank input -- eg. an app with no stored credential yet. */
+	/** Returns null for a null/blank input -- eg. an server with no stored credential yet. */
 	public String decrypt(String encoded) {
 		if (encoded == null || encoded.isEmpty()) {
 			return null;

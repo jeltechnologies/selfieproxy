@@ -14,7 +14,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * proxying, the same trust boundary already relied on for X-Forwarded-*
  * (server.forward-headers-strategy=native). On first sight of the header
  * for a given HttpSession, establishes a PortalSession so the rest of the
- * app can keep reading PortalSessions as before; a request reaching here
+ * portal can keep reading PortalSessions as before; a request reaching here
  * without either an existing PortalSession or the header should be
  * unreachable in practice (it would mean something bypassed boringproxy
  * entirely) and is rejected outright rather than redirected anywhere, since

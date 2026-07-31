@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Persisted list of non-admin Users -- login-only identities that can
- * authenticate against any exposed app protected with single sign on but never the portal
+ * authenticate against any exposed server protected with single sign on but never the portal
  * (see User, and the is_admin claim gate in selfieproxy-reverseproxy's
  * oidc_auth.go). Mirrors AdminUserStore's persist-to-JSON/lock pattern, but
  * over a list instead of a singleton, and with no bootstrap event: the file

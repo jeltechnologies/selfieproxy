@@ -29,13 +29,13 @@ import online.selfieproxy.identityprovider.internalapi.dto.UserSummaryDto;
 
 /**
  * Backend for selfieproxy-portal's Users UI -- data/validation stay here
- * (UserStore/AdminUserStore/PasswordPolicy never leave this app), only the
+ * (UserStore/AdminUserStore/PasswordPolicy never leave this service), only the
  * front-end moved to the portal. Reachable only over the second, unpublished
  * Tomcat connector InternalApiFilterConfig/TomcatInternalConnectorConfig set
  * up (see internal-api.port) -- never routed to from the public internet.
  *
  * Every handler here is a direct port of what UsersController used to do in
- * this same app; the only thing that changed is the transport (JSON in/out
+ * this same service; the only thing that changed is the transport (JSON in/out
  * instead of Model/Thymeleaf) and that requireAdmin()'s IdpSessionService
  * check is gone -- callers of this API are authenticated at the network/token
  * level (InternalApiFilterConfig), not per-request via a browser session.

@@ -36,16 +36,20 @@
 				</label>
 			</fieldset>
 
-			<fieldset th:if="${#lists.isEmpty(manifest.exposedApps())}">
-				<legend>Applications</legend>
-				<p class="muted">No applications on this server.</p>
+			<fieldset th:if="${#lists.isEmpty(manifest.servers())}">
+				<legend>Servers</legend>
+				<p class="muted">No servers on this server.</p>
 			</fieldset>
 
-			<fieldset th:unless="${#lists.isEmpty(manifest.exposedApps())}">
-				<legend>Applications</legend>
-				<label class="restore-item" th:each="app : ${manifest.exposedApps()}">
-					<input type="checkbox" name="exposedApps" th:value="${app.fqdn()}" checked>
-					<span th:text="${(app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())) + ' (' + app.homelabName() + ')'}"></span>
+			<fieldset th:unless="${#lists.isEmpty(manifest.servers())}">
+				<legend>Servers</legend>
+				<label class="restore-item" th:each="server : ${manifest.servers()}">
+					<input type="checkbox" name="servers" th:value="${server.fqdn()}" checked>
+					<span th:text="${(#strings.isEmpty(server.subdomain()) ? server.domain() : server.subdomain()) + ' (' + server.homelabName() + ')'}"></span>
+					<span th:if="${server.hasWeb()}" class="status-badge status-badge-primary">Web</span>
+					<span th:if="${server.hasTerminal()}" class="status-badge status-badge-primary">Terminal</span>
+					<span th:if="${server.hasRemoteDesktop()}" class="status-badge status-badge-primary">Remote desktop</span>
+					<span th:if="${server.hasPortForwarding()}" class="status-badge status-badge-primary">Port forwarding</span>
 				</label>
 			</fieldset>
 

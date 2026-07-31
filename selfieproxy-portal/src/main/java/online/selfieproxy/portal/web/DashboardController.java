@@ -22,29 +22,26 @@ import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.DomainFilterPreferenceStore;
 import online.selfieproxy.portal.domain.DomainService;
-import online.selfieproxy.portal.domain.ExposedApp;
-import online.selfieproxy.portal.domain.ExposedAppStore;
-import online.selfieproxy.portal.domain.TunnelMapper;
+import online.selfieproxy.portal.domain.Server;
+import online.selfieproxy.portal.domain.ServerStore;
 
 @Controller
 public class DashboardController {
 
 	private final BoringProxyClient boringProxyClient;
-	private final TunnelMapper tunnelMapper;
-	private final ExposedAppStore exposedAppStore;
+	private final ServerStore serverStore;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final DomainService domainService;
 	private final AgentStatusService agentStatusService;
 	private final BoringProxyProperties properties;
 	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
 
-	public DashboardController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
-			ExposedAppStore exposedAppStore, ThisServerAgentProperties thisServerAgentProperties,
-			DomainService domainService, AgentStatusService agentStatusService, BoringProxyProperties properties,
+	public DashboardController(BoringProxyClient boringProxyClient, ServerStore serverStore,
+			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
+			AgentStatusService agentStatusService, BoringProxyProperties properties,
 			DomainFilterPreferenceStore domainFilterPreferenceStore) {
 		this.boringProxyClient = boringProxyClient;
-		this.tunnelMapper = tunnelMapper;
-		this.exposedAppStore = exposedAppStore;
+		this.serverStore = serverStore;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.domainService = domainService;
 		this.agentStatusService = agentStatusService;
@@ -52,105 +49,95 @@ public class DashboardController {
 		this.domainFilterPreferenceStore = domainFilterPreferenceStore;
 	}
 
-	@GetMapping("/apps")
+	@GetMapping("/servers")
 	public String dashboard(Model model) {
 		List<String> homelabs = boringProxyClient.listAgents().keySet().stream()
 				.filter(name -> !name.equals(thisServerAgentProperties.agentName()))
 				.sorted()
 				.toList();
 
-		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
-		List<ExposedApp> exposedApps = loadExposedApps(tunnels).stream()
-				.sorted(Comparator.comparing(app -> app.subdomain() == null ? "" : app.subdomain()))
-				.toList();
+		List<Server> servers = loadServers();
 
-		boolean hasOrphanedApps = exposedApps.stream()
-				.anyMatch(app -> !homelabs.contains(app.homelabName()));
+		boolean hasOrphanedServers = servers.stream()
+				.anyMatch(server -> !homelabs.contains(server.homelabName()));
 
-		// Single source of truth for reachability/cert-pending, shared with the /apps/status
+		// Single source of truth for reachability/cert-pending, shared with the /servers/status
 		// endpoint dashboard.js polls to refresh the Status column and Connect buttons without a
 		// full page reload -- see the Homelabs page's own agents.js/AgentController.status().
-		List<AppStatusItem> statusItems = loadAppStatusItems(exposedApps, tunnels);
-		Map<String, String> appStatusMessage = statusItems.stream()
-				.filter(AppStatusItem::offline)
-				.collect(Collectors.toMap(AppStatusItem::fqdn, AppStatusItem::statusMessage));
+		List<ServerStatusItem> statusItems = loadServerStatusItems(servers);
+		Map<String, String> serverStatusMessage = statusItems.stream()
+				.filter(ServerStatusItem::offline)
+				.collect(Collectors.toMap(ServerStatusItem::fqdn, ServerStatusItem::statusMessage));
 		Map<String, Boolean> certPendingByDomain = statusItems.stream()
-				.collect(Collectors.toMap(AppStatusItem::fqdn, AppStatusItem::certPending));
+				.collect(Collectors.toMap(ServerStatusItem::fqdn, ServerStatusItem::certPending));
 		boolean hasPendingCerts = certPendingByDomain.values().stream().anyMatch(Boolean::booleanValue);
 
 		model.addAttribute("homelabs", homelabs);
-		model.addAttribute("exposedApps", exposedApps);
-		model.addAttribute("hasOrphanedApps", hasOrphanedApps);
+		model.addAttribute("servers", servers);
+		model.addAttribute("hasOrphanedServers", hasOrphanedServers);
 		model.addAttribute("certPendingByDomain", certPendingByDomain);
 		model.addAttribute("hasPendingCerts", hasPendingCerts);
-		model.addAttribute("appStatusMessage", appStatusMessage);
-		model.addAttribute("tunnelMapper", tunnelMapper);
+		model.addAttribute("serverStatusMessage", serverStatusMessage);
 		model.addAttribute("domainService", domainService);
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("consoleDomain", properties.consoleDomain());
-		model.addAttribute("selectedDomainFilter", domainFilterPreferenceStore.load().appsDomain());
+		model.addAttribute("selectedDomainFilter", domainFilterPreferenceStore.load().serversDomain());
 		return "dashboard";
 	}
 
 	/** Polled every 2s by dashboard.js to refresh the Status column and Connect buttons without a full page reload. */
-	@GetMapping(value = "/apps/status", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/servers/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public List<AppStatusItem> status() {
-		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
-		return loadAppStatusItems(loadExposedApps(tunnels), tunnels);
+	public List<ServerStatusItem> status() {
+		return loadServerStatusItems(loadServers());
 	}
 
 	/** Fired by sortable-table.js on every domain-filter change so the choice survives navigation and a server reboot -- see DomainFilterPreferenceStore. */
-	@PostMapping("/apps/domain-filter")
+	@PostMapping("/servers/domain-filter")
 	public ResponseEntity<Void> saveDomainFilter(@RequestParam(value = "domain", required = false) String domain) {
-		domainFilterPreferenceStore.saveAppsDomain(domain == null || domain.isBlank() ? null : domain);
+		domainFilterPreferenceStore.saveServersDomain(domain == null || domain.isBlank() ? null : domain);
 		return ResponseEntity.noContent().build();
 	}
 
-	// Renaming/removing a homelab has no effect on the tunnels that
-	// already point at it (boringproxy has no cascade), and we deliberately
-	// don't touch or hide that config -- it's still fully functional data,
-	// just orphaned from a homelab that no longer exists. Surfaced
-	// to the user instead via hasOrphanedApps / the per-row warning icon.
-	// This Server's own tunnels are excluded entirely -- they belong to the
-	// separate Local Websites feature (see LocalWebsiteController) and must
-	// never get auto-captured back into ExposedAppStore/this dashboard.
-	private List<ExposedApp> loadExposedApps(Map<String, TunnelDto> tunnels) {
-		return tunnels.values().stream()
-				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
-				.map(tunnelMapper::toExposedApp)
-				.map(exposedAppStore::reconcile)
+	/**
+	 * ServerStore is the sole source of truth for the Server list now -- unlike the old
+	 * single-protocol model, a hidden Terminal/RemoteDesktop/PortForwarding tunnel's generated FQDN
+	 * can't be reverse-parsed back to "which Server, which protocol", so the list can no
+	 * longer be derived by listing live boringproxy tunnels. A tunnel created outside Selfie Proxy
+	 * (eg. directly via boringproxy's own legacy API) no longer auto-appears here as a result.
+	 */
+	private List<Server> loadServers() {
+		return serverStore.values().stream()
+				.sorted(Comparator.comparing(server -> server.subdomain() == null ? "" : server.subdomain()))
 				.toList();
 	}
 
 	/**
-	 * Whether each app is actually reachable right now: its homelab connected and its domain's DNS
-	 * actually pointing at this server (offline=false means fully OK -- green dot, no column text;
-	 * true means red, with the specific problem(s) named rather than one generic label -- see the
-	 * Status column on dashboard.html), plus whether its certificate is still a temporary
-	 * self-signed one (see selfieproxy-reverseproxy's TunnelManager). tunnels is passed in rather
-	 * than re-fetched so a caller that already has it (dashboard(), which also needs it for
-	 * hasOrphanedApps context) doesn't hit boringproxy twice.
+	 * Whether each server is actually reachable right now: its homelab connected and (for a Web-enabled
+	 * server) its domain's DNS actually pointing at this server (offline=false means fully OK -- green
+	 * dot, no column text; true means red, with the specific problem(s) named rather than one
+	 * generic label -- see the Status column on dashboard.html), plus whether Web's certificate is
+	 * still a temporary self-signed one (see selfieproxy-reverseproxy's TunnelManager) -- only Web
+	 * ever gets a managed cert, so this is skipped entirely for an server with Web disabled.
 	 */
-	private List<AppStatusItem> loadAppStatusItems(List<ExposedApp> exposedApps, Map<String, TunnelDto> tunnels) {
+	private List<ServerStatusItem> loadServerStatusItems(List<Server> servers) {
 		Map<String, Boolean> onlineByAgent = agentStatusService.onlineByAgentName();
 		String serverIp = domainService.serverIp();
-		Map<String, Boolean> certPendingByDomain = tunnels.values().stream()
-				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
-				.collect(Collectors.toMap(TunnelDto::domain, TunnelDto::certPending));
+		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
 
-		List<AppStatusItem> items = new ArrayList<>();
-		for (ExposedApp app : exposedApps) {
+		List<ServerStatusItem> items = new ArrayList<>();
+		for (Server server : servers) {
 			List<String> issues = new ArrayList<>();
-			if (!onlineByAgent.getOrDefault(app.homelabName(), false)) {
-				issues.add("Homelab " + app.homelabName() + " is disconnected.");
+			if (!onlineByAgent.getOrDefault(server.homelabName(), false)) {
+				issues.add("Homelab " + server.homelabName() + " is disconnected.");
 			}
-			if (domainService.hasDnsMismatch(app.fqdn(), serverIp)) {
+			if (server.hasWeb() && domainService.hasDnsMismatch(server.fqdn(), serverIp)) {
 				issues.add("Domain not correctly configured.");
 			}
 			boolean offline = !issues.isEmpty();
-			items.add(new AppStatusItem(app.fqdn(), offline, offline ? String.join(" ", issues) : null,
-					certPendingByDomain.getOrDefault(app.fqdn(), false)));
+			TunnelDto webTunnel = server.hasWeb() ? tunnels.get(server.fqdn()) : null;
+			boolean certPending = webTunnel != null && webTunnel.certPending();
+			items.add(new ServerStatusItem(server.fqdn(), offline, offline ? String.join(" ", issues) : null, certPending));
 		}
 		return items;
 	}

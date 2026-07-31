@@ -111,7 +111,7 @@
 						dot.classList.toggle("status-dot-online", agent.online);
 						dot.classList.toggle("status-dot-offline", !agent.online);
 						text.textContent = agent.online ? "Connected" : "Disconnected";
-						row.querySelector(".app-count").textContent = agent.app_count;
+						row.querySelector(".server-count").textContent = agent.server_count;
 					});
 				})
 				.catch(function () {

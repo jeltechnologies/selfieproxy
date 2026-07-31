@@ -89,12 +89,12 @@
   if (heroImg && heroTrigger && heroDotsWrap && heroShot) {
     var slides = [
       {
-        src: "screenshots/edit-application.jpg",
-        alt: "Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields."
+        src: "screenshots/edit-server.jpg",
+        alt: "Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields."
       },
       {
         src: "screenshots/homelabs.jpg",
-        alt: "Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 applications, and iot-gadgets shown Disconnected in red with 1 application."
+        alt: "Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 servers, and iot-gadgets shown Disconnected in red with 1 server."
       },
       {
         src: "screenshots/edit-homelab.jpg",

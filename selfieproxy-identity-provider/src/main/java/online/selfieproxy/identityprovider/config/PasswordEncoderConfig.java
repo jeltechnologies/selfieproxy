@@ -6,7 +6,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * Just the hashing primitive (spring-security-crypto) -- this app has no
+ * Just the hashing primitive (spring-security-crypto) -- this service has no
  * Spring Security filter chain, and none is added here.
  */
 @Configuration

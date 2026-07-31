@@ -25,7 +25,7 @@ import online.selfieproxy.identityprovider.domain.IdpSessionService;
  * 400 -- never a redirect, since the redirect_uri itself isn't trusted yet.
  *
  * This endpoint is shared by every single-sign-on-protected domain's round trip
- * (portal and every exposed app alike), so it's also where single sign-on
+ * (portal and every exposed server alike), so it's also where single sign-on
  * actually happens: startNew checks IdpSessionService for an existing IdP
  * login session before falling back to the login form -- if the browser
  * already proved its identity for any other domain, the request completes

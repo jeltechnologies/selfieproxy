@@ -1,44 +1,44 @@
 <!DOCTYPE html>
 <html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Applications')}"></head>
+<head th:replace="~{fragments/layout :: head(title='Selfie Proxy - Servers')}"></head>
 <body>
-	<header th:replace="~{fragments/layout :: topbar(active='apps')}"></header>
+	<header th:replace="~{fragments/layout :: topbar(active='servers')}"></header>
 
 	<main class="page">
 		<section class="page-header">
 			<div>
-				<h1>Applications</h1>
-				<p class="page-subtitle">Expose applications running in your homelab to the internet.</p>
+				<h1>Servers</h1>
+				<p class="page-subtitle">Expose servers running in your homelab to the internet.</p>
 			</div>
-			<a class="button" th:if="${not #lists.isEmpty(homelabs)}" th:href="@{/apps/new}">Add</a>
+			<a class="button" th:if="${not #lists.isEmpty(homelabs)}" th:href="@{/servers/new}">Add</a>
 		</section>
 
 		<p class="muted" th:if="${#lists.isEmpty(homelabs)}">
 			No homelabs are registered yet. Add one and connect it first.
 		</p>
 
-		<p class="warning" th:if="${hasOrphanedApps}">
-			One of the applications is not configured to a homelab. Please update the application to assign
+		<p class="warning" th:if="${hasOrphanedServers}">
+			One of the servers is not configured to a homelab. Please update the server to assign
 			them to a working homelab.
 		</p>
 
 		<p class="warning" th:if="${hasPendingCerts}">
-			One or more applications are temporarily using a self-signed certificate -- browsers will show a
+			One or more servers are temporarily using a self-signed certificate -- browsers will show a
 			security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can
-			happen after creating many applications in a short time; Selfie Proxy retries automatically in
+			happen after creating many servers in a short time; Selfie Proxy retries automatically in
 			the background.
 		</p>
 
-		<div class="list-filter" th:if="${not #lists.isEmpty(exposedApps)}">
+		<div class="list-filter" th:if="${not #lists.isEmpty(servers)}">
 			<label for="domainFilter">Filter by domain</label>
-			<select id="domainFilter" th:attr="data-save-url=@{/apps/domain-filter}">
+			<select id="domainFilter" th:attr="data-save-url=@{/servers/domain-filter}">
 				<option value="" th:selected="${#strings.isEmpty(selectedDomainFilter)}">All domains</option>
 				<option th:each="d : ${domains}" th:value="${d.name()}" th:text="${d.name()}"
 						th:selected="${d.name() == selectedDomainFilter}"></option>
 			</select>
 		</div>
 
-		<table class="apps-table" data-sortable th:if="${not #lists.isEmpty(exposedApps)}">
+		<table class="list-table" data-sortable th:if="${not #lists.isEmpty(servers)}">
 			<thead>
 				<tr>
 					<th></th>
@@ -46,55 +46,65 @@
 					<th data-sort-key="domain">Domain</th>
 					<th data-sort-key="homelab">Homelab</th>
 					<th data-sort-key="localAddress">Local address</th>
-					<th></th>
+					<th>Connect</th>
+					<th>Terminal</th>
+					<th>Remote desktop</th>
 					<th></th>
 				</tr>
 			</thead>
 			<tbody>
-				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}, data-fqdn=${app.fqdn()}"
-					th:with="offline=${appStatusMessage.containsKey(app.fqdn())}">
+				<tr th:each="server : ${servers}" th:attr="data-domain=${server.domain()}, data-fqdn=${server.fqdn()}"
+					th:with="offline=${serverStatusMessage.containsKey(server.fqdn())}">
 					<td>
-						<span class="status" th:title="${appStatusMessage.get(app.fqdn())}">
+						<span class="status" th:title="${serverStatusMessage.get(server.fqdn())}">
 							<span class="status-dot" th:classappend="${offline} ? 'status-dot-offline' : 'status-dot-online'"></span>
 						</span>
 					</td>
-					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())}">
-						<span th:text="${app.isNetworkService()} ? ${app.name()} : (${#strings.isEmpty(app.subdomain())} ? ${app.domain()} : ${app.subdomain()})"></span>
-						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
-							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
+					<td th:attr="data-sort-value=${#strings.isEmpty(server.subdomain()) ? server.domain() : server.subdomain()}">
+						<span th:text="${#strings.isEmpty(server.subdomain())} ? ${server.domain()} : ${server.subdomain()}"></span>
+						<span th:if="${!#lists.contains(homelabs, server.homelabName())}"
+							  class="warning-icon" title="This server's homelab no longer exists">&#9888;</span>
 					</td>
-					<td th:attr="data-sort-value=${app.domain()}">
-						<span th:text="${app.domain()}"></span>
-						<span th:if="${!domainService.exists(app.domain())}"
-							  class="warning-icon" title="This application's domain no longer exists">&#9888;</span>
+					<td th:attr="data-sort-value=${server.domain()}">
+						<span th:text="${server.domain()}"></span>
+						<span th:if="${!domainService.exists(server.domain())}"
+							  class="warning-icon" title="This server's domain no longer exists">&#9888;</span>
 					</td>
-					<td th:text="${app.homelabName()}"></td>
-					<td th:with="localAddress=${app.isWebApplication()} ? (${app.protocol().name().toLowerCase()} + '://' + ${app.host()} + ':' + ${app.port()}) : (${app.host()} + ':' + ${app.port()})"
-						th:attr="data-sort-value=${localAddress}" th:text="${localAddress}"></td>
+					<td th:text="${server.homelabName()}"></td>
+					<td th:attr="data-sort-value=${server.host()}" th:text="${server.host()}"></td>
 					<td>
-						<a th:if="${app.isRemoteAccessMode()}" class="button-small connect-button"
+						<a th:if="${server.hasWeb()}" class="button-small connect-button"
 						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
-						   th:href="${app.encryptedSecret() != null}
-						             ? 'https://' + ${consoleDomain} + '/connect/' + ${app.fqdn()}
-						             : @{/apps/{fqdn}/connect(fqdn=${app.fqdn()})}"
-						   target="_blank" rel="noopener">Connect</a>
-						<a th:if="${!app.isRemoteAccessMode() and tunnelMapper.resultIsLink(app)}" class="button-small connect-button"
-						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
-						   th:href="${tunnelMapper.result(app)}" target="_blank" rel="noopener">Connect</a>
-						<span th:if="${!app.isRemoteAccessMode() and !tunnelMapper.resultIsLink(app)}" th:text="${tunnelMapper.result(app)}"></span>
-						<span th:if="${certPendingByDomain.get(tunnelMapper.fqdn(app))}"
+						   th:href="'https://' + ${server.fqdn()}" target="_blank" rel="noopener">Connect</a>
+						<span th:if="${server.hasWeb() and certPendingByDomain.get(server.fqdn())}"
 							  class="cert-pending-badge"
 							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
 					</td>
 					<td>
-						<a class="button-small" th:href="@{/apps/{fqdn}/edit(fqdn=${app.fqdn()})}">Edit</a>
+						<a th:if="${server.hasTerminal()}" class="button-small connect-button"
+						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
+						   th:href="${server.terminal().encryptedSecret() != null}
+						             ? 'https://' + ${consoleDomain} + '/connect/' + ${server.terminal().fqdn()}
+						             : @{/servers/{fqdn}/connect/terminal(fqdn=${server.fqdn()})}"
+						   target="_blank" rel="noopener">Terminal</a>
+					</td>
+					<td>
+						<a th:if="${server.hasRemoteDesktop()}" class="button-small connect-button"
+						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
+						   th:href="${server.remoteDesktop().encryptedSecret() != null}
+						             ? 'https://' + ${consoleDomain} + '/connect/' + ${server.remoteDesktop().fqdn()}
+						             : @{/servers/{fqdn}/connect/remote-desktop(fqdn=${server.fqdn()})}"
+						   target="_blank" rel="noopener">Remote desktop</a>
+					</td>
+					<td>
+						<a class="button-small" th:href="@{/servers/{fqdn}/edit(fqdn=${server.fqdn()})}">Edit</a>
 					</td>
 				</tr>
 			</tbody>
 		</table>
 
-		<p class="muted" th:if="${not #lists.isEmpty(homelabs) and #lists.isEmpty(exposedApps)}">
-			No applications yet.
+		<p class="muted" th:if="${not #lists.isEmpty(homelabs) and #lists.isEmpty(servers)}">
+			No servers yet.
 		</p>
 	</main>
 

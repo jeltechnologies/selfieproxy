@@ -196,7 +196,7 @@ h1 { font-size: 32px; }
 
 .muted { color: var(--muted); }
 
-.app-footer {
+.page-footer {
 	flex-shrink: 0;
 	padding: 1rem 0;
 	text-align: center;
@@ -392,6 +392,19 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	cursor: help;
 }
 
+/* One fieldset per protocol on the add/edit server page's advanced view -- the enable checkbox +
+   label is the fieldset's own legend-like toggle, its row's fields sit below it once checked. */
+.protocol-row-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 0.75rem;
+}
+
+.protocol-row-toggle input[type="checkbox"] {
+	margin: 0;
+}
+
 .cert-pending-badge {
 	display: inline-block;
 	margin-left: 0.5rem;
@@ -427,12 +440,12 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 .page-tagline { margin: 0.3rem 0 0.75rem; color: var(--text); font-weight: 500; }
 .page-subtitle { margin: 0.3rem 0 0; color: var(--muted); }
 
-.apps-table {
+.list-table {
 	width: 100%;
 	border-collapse: collapse;
 }
 
-.apps-table th, .apps-table td {
+.list-table th, .list-table td {
 	text-align: left;
 	padding: 0.6rem 0.5rem;
 	border-bottom: 1px solid var(--border);

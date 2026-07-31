@@ -8,7 +8,7 @@
 		<section class="page-header">
 			<div>
 				<h1>Homelabs</h1>
-				<p class="page-subtitle">Connect your homelabs to Selfie Proxy, to expose applications to the internet.</p>
+				<p class="page-subtitle">Connect your homelabs to Selfie Proxy, to expose servers to the internet.</p>
 			</div>
 			<a class="button" th:href="@{/agents/new}">Add</a>
 		</section>
@@ -17,13 +17,13 @@
 			No homelabs yet. Add one, then copy its name and secret into that homelab's .env.
 		</p>
 
-		<table class="apps-table" th:if="${not #lists.isEmpty(agents)}">
+		<table class="list-table" th:if="${not #lists.isEmpty(agents)}">
 			<thead>
 				<tr>
 					<th></th>
 					<th>Name</th>
 					<th>Status</th>
-					<th>Applications</th>
+					<th>Servers</th>
 					<th></th>
 				</tr>
 			</thead>
@@ -36,7 +36,7 @@
 					<td>
 						<span class="status-text" th:text="${agent.online()} ? 'Connected' : 'Disconnected'"></span>
 					</td>
-					<td class="app-count" th:text="${agent.appCount()}"></td>
+					<td class="server-count" th:text="${agent.serverCount()}"></td>
 					<td>
 						<a class="button-small" th:href="@{/agents/{name}/edit(name=${agent.name()})}">Edit</a>
 					</td>

@@ -14,47 +14,55 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Read-only view of exposed-apps.json (selfieproxy-portal owns writing it -- see that module's
- * ExposedAppStore/ExposedAppController), keyed by FQDN exactly as that module writes it, filtered
- * to SSH/RDP/VNC-mode Network Services -- every other entry (a Web Application, or a RAW_TCP
- * Network Service) isn't something this service ever bridges. Reread on every find() rather than
- * cached, since the portal can add/edit/remove an app at any time and this service has no way to
- * be notified of that.
+ * Read-only view of servers.json (selfieproxy-portal owns writing it -- see that module's
+ * ServerStore/ServerController). Since one Application can now expose up to 4 protocols at
+ * once, the file's top-level map is keyed by each Application's own public FQDN, not by the hidden
+ * Terminal/RemoteDesktop tunnel FQDN this service is actually asked to dial (that hidden FQDN lives
+ * nested inside the Application's own terminal/remoteDesktop fields instead -- see
+ * HiddenTunnelFqdnAssigner on the portal side). find() therefore builds a small in-memory index
+ * from hidden FQDN to its RemoteConsole on every call, rather than a direct map lookup. Reread on
+ * every find() rather than cached, since the portal can add/edit/remove an server at any time and this
+ * service has no way to be notified of that.
  */
 @Component
 public class RemoteConsoleStore {
 
-	private static final String NETWORK_SERVICE = "NETWORK_SERVICE";
-
 	private final Path filePath;
-	// Unknown properties (subdomain, protocol, tlsMode, ssoProtected, domain, Jackson's own
-	// derived isX()-style properties, and any future addition) are expected and ignored --
-	// this is a deliberately partial mirror of ExposedApp, see RemoteConsole's own javadoc.
+	// Unknown properties (subdomain, domain, host, web, portForwarding, and any future addition)
+	// are expected and ignored -- this is a deliberately partial mirror of Server, see
+	// RemoteConsole's own javadoc.
 	private final ObjectMapper objectMapper = JsonMapper.builder()
 			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 			.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
 			.build();
 
-	public RemoteConsoleStore(@Value("${selfieproxy.exposed-apps-path}") String path) {
+	public RemoteConsoleStore(@Value("${selfieproxy.servers-path}") String path) {
 		this.filePath = Path.of(path);
 	}
 
-	public RemoteConsole find(String fqdn) {
-		RemoteConsole app = readAll().get(fqdn);
-		return isRemoteAccessApp(app) ? app : null;
+	/** hiddenFqdn is a Terminal or Remote Desktop tunnel's own FQDN (never an Application's public-facing one). */
+	public RemoteConsole find(String hiddenFqdn) {
+		for (RemoteConsoleServer server : readAll().values()) {
+			RemoteConsoleTerminal terminal = server.terminal();
+			if (terminal != null && hiddenFqdn.equalsIgnoreCase(terminal.fqdn())) {
+				return new RemoteConsole(RemoteConsoleProtocol.SSH, terminal.exposedPort(), terminal.username(),
+						terminal.encryptedSecret(), false);
+			}
+			RemoteConsoleRemoteDesktop remoteDesktop = server.remoteDesktop();
+			if (remoteDesktop != null && hiddenFqdn.equalsIgnoreCase(remoteDesktop.fqdn())) {
+				return new RemoteConsole(remoteDesktop.protocol(), remoteDesktop.exposedPort(),
+						remoteDesktop.username(), remoteDesktop.encryptedSecret(), remoteDesktop.ignoreCertificate());
+			}
+		}
+		return null;
 	}
 
-	private boolean isRemoteAccessApp(RemoteConsole app) {
-		return app != null && NETWORK_SERVICE.equals(app.type()) && app.mode() != null
-				&& app.mode() != RemoteConsoleProtocol.RAW_TCP;
-	}
-
-	private Map<String, RemoteConsole> readAll() {
+	private Map<String, RemoteConsoleServer> readAll() {
 		if (!Files.exists(filePath)) {
 			return new LinkedHashMap<>();
 		}
 		JavaType mapType = objectMapper.getTypeFactory().constructMapType(LinkedHashMap.class, String.class,
-				RemoteConsole.class);
+				RemoteConsoleServer.class);
 		try {
 			return objectMapper.readValue(filePath.toFile(), mapType);
 		} catch (Exception e) {

@@ -10,7 +10,7 @@ import java.util.List;
  */
 public record RestoreResult(
 		int homelabsRestored,
-		int exposedAppsRestored,
+		int serversRestored,
 		int localWebsitesRestored,
 		List<String> failures) {
 

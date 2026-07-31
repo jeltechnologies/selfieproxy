@@ -16,7 +16,7 @@ import java.util.Map;
  */
 public record RestoreSelection(
 		List<String> homelabs,
-		List<String> exposedAppFqdns,
+		List<String> serverFqdns,
 		List<String> localWebsiteFqdns,
 		Map<String, String> domainOverridesByFqdn) {
 }

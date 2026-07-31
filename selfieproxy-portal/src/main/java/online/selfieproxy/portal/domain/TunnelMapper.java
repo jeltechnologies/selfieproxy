@@ -1,155 +1,87 @@
 package online.selfieproxy.portal.domain;
 
-import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
 import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
-import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 
 /**
- * Translates between Selfie Proxy's ExposedApp/Homelab model and
- * BoringProxy's Tunnel/CreateTunnelRequest, per the TLS-termination mapping
- * table in the project plan (derived from selfieproxy-portal/CLAUDE.md's own
- * parenthetical BoringProxy-mode hints).
+ * Translates an Application's up-to-4 enabled protocols into their independent boringproxy
+ * CreateTunnelRequests. A pure mapper with no store/domain dependencies -- unlike the
+ * single-protocol model this replaces, there's no reverse "reconstruct an Server from a live
+ * Tunnel" direction anymore: ServerStore is now the sole source of truth for an Application's
+ * shape (see its own javadoc), tunnels are just a derived side-effect kept in sync on save.
  */
 @Component
 public class TunnelMapper {
 
 	private static final String HTTPS_PREFIX = "https://";
 
-	private final DomainService domainService;
-	private final ExposedAppStore exposedAppStore;
-
-	public TunnelMapper(DomainService domainService, ExposedAppStore exposedAppStore) {
-		this.domainService = domainService;
-		this.exposedAppStore = exposedAppStore;
+	public record ProtocolTunnel(String fqdn, CreateTunnelRequestDto request) {
 	}
 
-	public String fqdn(ExposedApp app) {
-		return app.fqdn();
+	public String fqdn(Server server) {
+		return server.fqdn();
+	}
+
+	/** Only entries for the server's currently-enabled protocols. */
+	public Map<ServerProtocol, ProtocolTunnel> tunnelPlans(Server server, String owner) {
+		Map<ServerProtocol, ProtocolTunnel> plans = new EnumMap<>(ServerProtocol.class);
+		if (server.hasWeb()) {
+			plans.put(ServerProtocol.WEB, webTunnel(server, owner));
+		}
+		if (server.hasTerminal()) {
+			plans.put(ServerProtocol.TERMINAL, terminalTunnel(server, owner));
+		}
+		if (server.hasRemoteDesktop()) {
+			plans.put(ServerProtocol.REMOTE_DESKTOP, remoteDesktopTunnel(server, owner));
+		}
+		if (server.hasPortForwarding()) {
+			plans.put(ServerProtocol.PORT_FORWARDING, portForwardingTunnel(server, owner));
+		}
+		return plans;
 	}
 
 	/**
-	 * The doc's "Result" field: the URL for a Web Application, or "domain:port" for a Network
-	 * Service. Only meaningful for a RAW_TCP-mode Network Service -- an SSH/RDP/VNC-mode one is
-	 * never internet-reachable and dashboard.html never calls this for those rows, rendering its
-	 * own Connect button in the "Connect" column instead (see DashboardController).
+	 * Always "server" tls-termination (MANAGED -- Selfie Proxy automatically creates and renews a
+	 * signed certificate) for HTTPS; plain HTTP is also always "server"-terminated, with
+	 * proxyRequest defaulting to upstreamScheme "http" whenever clientAddr has no "https://"
+	 * prefix. This is what lets a Web Application be protected with single sign on either way.
 	 */
-	public String result(ExposedApp app) {
-		if (app.isNetworkService()) {
-			return app.domain() + ":" + app.exposedPort();
-		}
-		return HTTPS_PREFIX + fqdn(app);
+	private ProtocolTunnel webTunnel(Server server, String owner) {
+		WebConfig web = server.web();
+		String clientAddr = web.protocol() == Protocol.HTTPS ? HTTPS_PREFIX + server.host() : server.host();
+		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
+				server.fqdn(), owner, server.homelabName(), web.port(), clientAddr, null, null, null, null, null,
+				"server", web.ssoProtected(), null, null);
+		return new ProtocolTunnel(server.fqdn(), request);
 	}
 
-	/** Only Web Application results are rendered as a clickable link. */
-	public boolean resultIsLink(ExposedApp app) {
-		return app.isWebApplication();
+	/** allowExternalTcp false binds the tunnel's listener to 127.0.0.1 on the server host -- never internet-reachable, only selfieproxy-remote-console (network_mode: host) can dial it. */
+	private ProtocolTunnel terminalTunnel(Server server, String owner) {
+		TerminalConfig terminal = server.terminal();
+		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
+				terminal.fqdn(), owner, server.homelabName(), terminal.port(), server.host(), null, false, null, null, null,
+				"passthrough", null, null, null);
+		return new ProtocolTunnel(terminal.fqdn(), request);
 	}
 
-	public CreateTunnelRequestDto toCreateTunnelRequest(ExposedApp app, String owner) {
-		String tlsTermination;
-		String clientAddr = app.host();
-		Integer tunnelPort = null;
-		Boolean allowExternalTcp = null;
-
-		if (app.isNetworkService()) {
-			tlsTermination = "passthrough";
-			boolean rawTcp = app.effectiveMode() == NetworkServiceMode.RAW_TCP;
-			// SSH/RDP/VNC mode: tunnelPort left null so boringproxy auto-assigns one, and
-			// allowExternalTcp false binds its listener to 127.0.0.1 on the server host --
-			// never internet-reachable, only selfieproxy-remote-console (network_mode: host)
-			// can dial it. See root CLAUDE.md's "Running" section.
-			tunnelPort = rawTcp ? app.exposedPort() : null;
-			allowExternalTcp = rawTcp;
-		} else if (app.protocol() == Protocol.HTTP) {
-			// Selfie Proxy still terminates the public TLS connection itself (managed cert, same as
-			// MANAGED/"Server HTTPS") and forwards plain HTTP onward -- proxyRequest defaults to
-			// upstreamScheme "http" whenever clientAddr has no "https://" prefix. This is what lets
-			// an HTTP-only homelab app still be protected with single sign on (see ExposedApp.canProtectWithSso()).
-			tlsTermination = "server";
-		} else {
-			clientAddr = HTTPS_PREFIX + app.host();
-			tlsTermination = switch (app.effectiveTlsMode()) {
-				case MANAGED -> "server";
-				case BYO_CERT -> "client-tls";
-				case HOP_BY_HOP -> "server-tls";
-			};
-		}
-
-		return new CreateTunnelRequestDto(
-				fqdn(app),
-				owner,
-				app.homelabName(), // Agent name, matches the Homelab name 1:1
-				app.port(),
-				clientAddr,
-				tunnelPort,
-				allowExternalTcp,
-				null,
-				null,
-				null,
-				tlsTermination,
-				app.canProtectWithSso() ? app.ssoProtected() : null,
-				null,
-				null);
+	private ProtocolTunnel remoteDesktopTunnel(Server server, String owner) {
+		RemoteDesktopConfig remoteDesktop = server.remoteDesktop();
+		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
+				remoteDesktop.fqdn(), owner, server.homelabName(), remoteDesktop.port(), server.host(), null, false, null,
+				null, null, "passthrough", null, null, null);
+		return new ProtocolTunnel(remoteDesktop.fqdn(), request);
 	}
 
-	/**
-	 * Splits a live BoringProxy tunnel's flat FQDN into subdomain + domain. Checks
-	 * ExposedAppStore for an already-reconciled record by the tunnel's own FQDN first -- that
-	 * record's stored subdomain/domain fields are authoritative and require no guessing, and
-	 * critically remain correct even after the app's domain is later removed from the Domains
-	 * page (an orphaned domain is still a perfectly valid, still-functioning app -- see
-	 * DomainsController's delete(), which has no cascade). Only a tunnel Selfie Proxy has never
-	 * reconciled before (eg. one created through the legacy BoringProxy UI) falls through to
-	 * guessing the split from the longest currently-registered domain (primary or any secondary,
-	 * see DomainService) that's a suffix of the FQDN -- and even then, an unmatched FQDN never
-	 * throws (which would take down the entire Applications list for every other app over one bad
-	 * tunnel); it degrades to treating the whole FQDN as the domain with an empty subdomain.
-	 */
-	public ExposedApp toExposedApp(TunnelDto tunnel) {
-		ExposedApp stored = exposedAppStore.find(tunnel.domain());
-		String domain;
-		String subdomain;
-		if (stored != null) {
-			domain = stored.domain();
-			subdomain = stored.subdomain();
-		} else {
-			domain = domainService.allDomains().stream()
-					.filter(d -> tunnel.domain().equalsIgnoreCase(d.name())
-							|| tunnel.domain().toLowerCase().endsWith("." + d.name().toLowerCase()))
-					.max(Comparator.comparingInt(d -> d.name().length()))
-					.map(DomainService.Domain::name)
-					.orElse(tunnel.domain());
-			subdomain = tunnel.domain().equalsIgnoreCase(domain) ? ""
-					: tunnel.domain().substring(0, tunnel.domain().length() - domain.length() - 1);
-		}
-
-		// Any passthrough tunnel is a Network Service, whether or not it's internet-reachable --
-		// allowExternalTcp alone used to gate this, which is exactly why an SSH/RDP/VNC-mode
-		// tunnel's own passthrough-but-not-allowExternalTcp shape fell through to the
-		// WEB_APPLICATION branch below and showed up mis-typed on the Applications list. The
-		// true mode (RAW_TCP vs SSH/RDP/VNC) is never recoverable from tunnel data alone --
-		// defaulted to RAW_TCP here and overlaid from the stored record by ExposedAppStore.reconcile.
-		if ("passthrough".equals(tunnel.tlsTermination())) {
-			return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.NETWORK_SERVICE,
-					null, tunnel.clientAddress(), tunnel.clientPort(), tunnel.tunnelPort(), null, false, domain,
-					NetworkServiceMode.RAW_TCP, null, null, false);
-		}
-
-		boolean https = tunnel.clientAddress() != null && tunnel.clientAddress().startsWith(HTTPS_PREFIX);
-		String host = https ? tunnel.clientAddress().substring(HTTPS_PREFIX.length()) : tunnel.clientAddress();
-
-		TlsMode tlsMode = switch (tunnel.tlsTermination()) {
-			case "server" -> TlsMode.MANAGED;
-			case "client-tls" -> TlsMode.BYO_CERT;
-			case "server-tls" -> TlsMode.HOP_BY_HOP;
-			default -> null;
-		};
-
-		return new ExposedApp(subdomain, null, tunnel.agentName(), ExposedAppType.WEB_APPLICATION,
-				https ? Protocol.HTTPS : Protocol.HTTP, host, tunnel.clientPort(), null, tlsMode,
-				tunnel.ssoProtected(), domain, null, null, null, false);
+	/** allowExternalTcp true -- the one hidden protocol that's genuinely internet-reachable, at publicPort. */
+	private ProtocolTunnel portForwardingTunnel(Server server, String owner) {
+		PortForwardingConfig portForwarding = server.portForwarding();
+		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
+				portForwarding.fqdn(), owner, server.homelabName(), portForwarding.targetPort(), server.host(),
+				portForwarding.publicPort(), true, null, null, null, "passthrough", null, null, null);
+		return new ProtocolTunnel(portForwarding.fqdn(), request);
 	}
 }

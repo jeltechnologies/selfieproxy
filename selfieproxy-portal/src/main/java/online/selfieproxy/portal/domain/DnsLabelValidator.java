@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
  * punctuation. Used for both an Exposed App/Local Website subdomain (which becomes a real DNS
  * label under DOMAIN) and a Homelab name (never itself a DNS label, but validated the same way for
  * consistency, per selfieproxy-portal/CLAUDE.md) -- shared by the ordinary add/edit forms
- * (AgentController/ExposedAppController/LocalWebsiteController) and the import wizard's apply step
+ * (AgentController/ServerController/LocalWebsiteController) and the import wizard's apply step
  * (BackupService), so a crafted or pre-validation configuration export can't smuggle in a name an
  * ordinary form would have rejected.
  */

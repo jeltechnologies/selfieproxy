@@ -5,5 +5,5 @@ package online.selfieproxy.portal.web;
  * DashboardController's onlineByAgent/hasDnsMismatch checks), the reason if not, and whether its
  * certificate is still a temporary self-signed one.
  */
-public record AppStatusItem(String fqdn, boolean offline, String statusMessage, boolean certPending) {
+public record ServerStatusItem(String fqdn, boolean offline, String statusMessage, boolean certPending) {
 }

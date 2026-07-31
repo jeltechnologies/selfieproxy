@@ -8,19 +8,19 @@
 		<section class="page-header">
 			<div>
 				<h1>Domains</h1>
-				<p class="page-subtitle">Domains you can expose applications and local websites on.</p>
+				<p class="page-subtitle">Domains you can expose servers and local websites on.</p>
 			</div>
 			<a class="button" th:href="@{/domains/new}">Add</a>
 		</section>
 
 		<div class="warning" th:if="${renameResult != null and renameResult.hasFailures()}">
-			<p><strong>Some applications or local websites could not be moved to the new domain:</strong></p>
+			<p><strong>Some servers or local websites could not be moved to the new domain:</strong></p>
 			<ul>
 				<li th:each="f : ${renameResult.failures()}" th:text="${f}"></li>
 			</ul>
 		</div>
 
-		<table class="apps-table">
+		<table class="list-table">
 			<thead>
 				<tr>
 					<th>Domain</th>

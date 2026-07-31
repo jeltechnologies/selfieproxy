@@ -16,11 +16,11 @@ runtime config/volumes they use:
   before working on anything under that directory.
 - `selfieproxy-portal/` — the Selfie Proxy admin portal (Java/Spring), the product-facing UI
   that manages `boringproxy` tunnels/clients through its REST API. Has its own `CLAUDE.md` with
-  the full product spec (login flow, homelabs, exposed apps, tunnel mapping). No login of its
+  the full product spec (login flow, homelabs, exposed servers, tunnel mapping). No login of its
   own anymore — see `selfieproxy-identity-provider/` below.
 - `selfieproxy-identity-provider/` — Selfie Proxy's own bundled, OIDC Identity Provider with simplified admin/User management
   (Java/Spring, same Maven/Dockerfile template as `selfieproxy-portal/`). Used by default to
-  authenticate the admin portal and any exposed app with single sign on protection enabled; a BYO
+  authenticate the admin portal and any exposed server with single sign on protection enabled; a BYO
   external IdP (Keycloak, Authentik, etc.) can be swapped in instead via
   `OIDC_ISSUER_URL`/`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET`, since `boringproxy`'s embedded OIDC
   client only ever speaks generic OIDC. Self-provisions its RSA signing keypair into
@@ -35,7 +35,7 @@ runtime config/volumes they use:
   `check-prerequisites.sh` baked in via its own Dockerfile) that fails fast before anything else starts if
   `PRIMARY_DOMAIN` and a `*.PRIMARY_DOMAIN` wildcard record don't already resolve to the host's public IP
   (checked as the literal DNS owner names `PRIMARY_DOMAIN` and `*.PRIMARY_DOMAIN`, covering every current and
-  future subdomain — the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-app/tunnel
+  future subdomain — the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains and any exposed-server/tunnel
   subdomain created later — rather than enumerating each fixed subdomain by name). Run as the `check-prerequisites`
   service (`network_mode: host`). This check only ever covers the primary domain — any secondary domain (see `selfieproxy-portal/CLAUDE.md`'s
   "Domains" section) is registered and DNS-checked entirely at runtime through the portal's own Domains
@@ -52,9 +52,9 @@ runtime config/volumes they use:
   host's own public IP is unreliable, see above).
 - `selfieproxy-remote-console/` — browser SSH/RDP/VNC console (Java/Spring, same Maven/Dockerfile
   template as `selfieproxy-portal`/`selfieproxy-identity-provider`), the CRUD for which lives in the
-  admin portal as three of the four Network Service Modes an Application can have ("Terminal
+  admin portal as three of the four protocols a Server can have ("Terminal
   Access: SSH", "Desktop Access: RDP", "Desktop Access: VNC" -- see `selfieproxy-portal/CLAUDE.md`'s
-  "Exposed applications" section) while this service itself only serves the live browser session.
+  "Servers" section) while this service itself only serves the live browser session.
   Pairs with the `selfieproxy-guacd` service (the official,
   unmodified `guacamole/guacd` Docker image — see `THIRD-PARTY-NOTICES.md`) to bridge a WebSocket
   connection to a Homelab's SSH/RDP/VNC endpoint, reached over an `AllowExternalTcp: false` tunnel (never
@@ -69,10 +69,10 @@ runtime config/volumes they use:
 ├── .env                          # server config, copied from .env.example
 ├── data/                         # runtime volumes — not committed
 │   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
-│   └── selfieproxy/                # Selfie Proxy's own state: exposed-apps.json (ExposedAppStore --
+│   └── selfieproxy/                # Selfie Proxy's own state: servers.json (ServerStore --
 │       │                            # also covers every SSH/RDP/VNC-mode Network Service, read by
 │       │                            # selfieproxy-remote-console over the shared volume) + network-service-secret-key
-│       │                            # (self-provisioned, see selfieproxy-portal/CLAUDE.md's "Exposed applications"),
+│       │                            # (self-provisioned, see selfieproxy-portal/CLAUDE.md's "Servers"),
 │       │                            # local-websites.json (LocalWebsiteStore), domains.json (DomainStore --
 │       │                            # registered secondary domains only, the primary domain is never stored here),
 │       │                            # selfieproxy-localsites-agent-secret,
@@ -114,7 +114,7 @@ for consistency — none of the four Dockerfiles run tini/dumb-init, so each con
 process (the Go binary or the JVM) is PID 1. Neither `exec.Command` nor any Java equivalent
 exists in these codebases, but Docker's own healthcheck runner still execs a short-lived shell
 into the container's PID namespace on every tick and abandons it once the check completes; that
-process gets reparented to PID 1 per Linux PID-namespace semantics, and since the app itself
+process gets reparented to PID 1 per Linux PID-namespace semantics, and since the service itself
 never calls `wait()` on children it didn't spawn, it becomes a permanent zombie. `init: true`
 makes compose inject `tini` as the real PID 1 so it reaps them instead. Don't remove this
 thinking it's unnecessary — without it, zombies silently accumulate at roughly one per
@@ -154,7 +154,7 @@ Local Websites feature (see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-local-
 image, a shared NGINX serving every Local Website by `server_name`) and `selfieproxy-localsites-agent`
 (an ordinary boringproxy agent, `network_mode: host` like `boringproxy` itself, colocated with
 the server instead of a remote network — the "This Server" homelab, deliberately hidden from
-the Homelabs page and the Exposed Applications homelab dropdown, since it's not something a
+the Homelabs page and the Servers homelab dropdown, since it's not something a
 user picks or manages directly). Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
 copy-pasted into `.env` — its entrypoint blocks on `data/selfieproxy/selfieproxy-localsites-agent-secret`
 existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on every startup, so
@@ -179,7 +179,7 @@ carrying both `image:` and `build:`, since there is nothing of ours to build) an
 `selfieproxy-remote-console` (the WebSocket bridge between a browser and `guacd`, own
 Java/Spring module, same build template as `selfieproxy-portal`). Both run `network_mode: host`,
 like `selfieproxy-reverseproxy`/`selfieproxy-localsites-agent` — this is load-bearing, not just
-consistency: one of these apps' underlying tunnel is created with `AllowExternalTcp: false`
+consistency: one of these services' underlying tunnel is created with `AllowExternalTcp: false`
 (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section), which binds its listener to
 `127.0.0.1` on the server host rather than `0.0.0.0` — deliberately never reachable from the
 internet, only from a process sharing the host's own network namespace. `guacd` itself is
@@ -187,8 +187,8 @@ further restricted to bind only `127.0.0.1:4822` (`GUACD_BIND_HOST`), since it h
 authentication of its own and must never be reachable by anything but
 `selfieproxy-remote-console` on this same host. The two communicate over that same loopback
 interface; `selfieproxy-remote-console` reaches boringproxy's REST API only indirectly (it never
-creates/deletes tunnels itself -- the portal does, same as any other Application) and reads/
-decrypts credentials from `data/selfieproxy/exposed-apps.json`/`network-service-secret-key`, both
+creates/deletes tunnels itself -- the portal does, same as any other Server) and reads/
+decrypts credentials from `data/selfieproxy/servers.json`/`network-service-secret-key`, both
 owned and self-provisioned by `selfieproxy-portal` (this service only ever reads them). The browser reaches
 `selfieproxy-remote-console` through its own always-SSO-gated, admin-only domain carve-out
 (`-console-domain`/`-console-port`, default subdomain `console`) — see
@@ -211,7 +211,7 @@ boot, when no record exists yet, and the first login is forced through a change-
 before the admin's OIDC session is issued — after that, the `.env` value is permanently ignored
 and the real password only lives in that hashed record. Sibling to that record is
 `data/selfieproxy/users.json` (`UserStore`), the list of non-admin Users — login-only identities
-that can authenticate against any exposed app protected with single sign on but never the portal (see the "Users"
+that can authenticate against any exposed server protected with single sign on but never the portal (see the "Users"
 entry under the admin portal's Settings menu, `selfieproxy-portal/CLAUDE.md`'s Login section). No
 bootstrap: the file simply doesn't exist until the admin adds the first user. Like the admin
 record, `data/selfieproxy/users.json` is never included in a configuration export/import, and is
@@ -296,10 +296,10 @@ Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is already e
 certs unattended, and leaving `LETSENCRYPT_EMAIL` unset in `.env` is fine.
 `data/reverseproxy/storage` and `data/reverseproxy/certmagic`/`this-server-certmagic` persist the
 boringproxy database and TLS certs (server's and selfieproxy-localsites-agent's, kept separate) across restarts;
-`data/selfieproxy` persists selfieproxy-portal's own exposed-app records (see ExposedAppStore in
+`data/selfieproxy` persists selfieproxy-portal's own exposed-server records (see ServerStore in
 `selfieproxy-portal/CLAUDE.md`-adjacent code — boringproxy's own Tunnel schema can't represent
 everything Selfie Proxy needs, eg. homelab protocol), the completely separate Local Website
-records (LocalWebsiteStore — Local Websites don't share ExposedAppStore/the Exposed Applications
+records (LocalWebsiteStore — Local Websites don't share ServerStore/the Servers
 page at all, by design), the selfieproxy-localsites-agent secret file, and the `sites`/`sites-conf`
 directories `selfieproxy-local-websites` also mounts.
 
@@ -308,7 +308,7 @@ directories `selfieproxy-local-websites` also mounts.
 - Changes to the reverse-tunnel engine itself (tunnel lifecycle, TLS termination, the
   JSON API, the web UI templates) belong in `selfieproxy-reverseproxy/` — see
   `selfieproxy-reverseproxy/CLAUDE.md`.
-- Changes to the admin-facing product (login, exposed-app management, homelab
+- Changes to the admin-facing product (login, exposed-server management, homelab
   selection) belong in `selfieproxy-portal/` — see `selfieproxy-portal/CLAUDE.md` for the intended behavior.
 - Changes to how the pieces are deployed together (compose files, `.env` shape, volume
   layout) belong at this root level.

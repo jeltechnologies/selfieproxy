@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,16 +22,21 @@ import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.SitesWebserverProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.ServerProtocol;
 import online.selfieproxy.portal.domain.DomainRenameResult;
 import online.selfieproxy.portal.domain.DomainService;
 import online.selfieproxy.portal.domain.DomainStore;
 import online.selfieproxy.portal.domain.DomainValidator;
-import online.selfieproxy.portal.domain.ExposedApp;
-import online.selfieproxy.portal.domain.ExposedAppStore;
+import online.selfieproxy.portal.domain.Server;
+import online.selfieproxy.portal.domain.ServerStore;
+import online.selfieproxy.portal.domain.HiddenTunnelFqdnAssigner;
 import online.selfieproxy.portal.domain.LocalWebsite;
 import online.selfieproxy.portal.domain.LocalWebsiteStore;
+import online.selfieproxy.portal.domain.PortForwardingConfig;
+import online.selfieproxy.portal.domain.RemoteDesktopConfig;
 import online.selfieproxy.portal.domain.SecondaryDomain;
 import online.selfieproxy.portal.domain.StaticSiteProvisioner;
+import online.selfieproxy.portal.domain.TerminalConfig;
 import online.selfieproxy.portal.domain.TunnelMapper;
 
 /**
@@ -51,25 +57,28 @@ public class DomainsController {
 	private final DomainService domainService;
 	private final BoringProxyClient boringProxyClient;
 	private final TunnelMapper tunnelMapper;
-	private final ExposedAppStore exposedAppStore;
+	private final ServerStore serverStore;
 	private final LocalWebsiteStore localWebsiteStore;
 	private final StaticSiteProvisioner staticSiteProvisioner;
 	private final SitesWebserverProperties sitesWebserverProperties;
 	private final ThisServerAgentProperties thisServerAgentProperties;
+	private final HiddenTunnelFqdnAssigner fqdnAssigner;
 
 	public DomainsController(DomainStore domainStore, DomainService domainService,
-			BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper, ExposedAppStore exposedAppStore,
+			BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper, ServerStore serverStore,
 			LocalWebsiteStore localWebsiteStore, StaticSiteProvisioner staticSiteProvisioner,
-			SitesWebserverProperties sitesWebserverProperties, ThisServerAgentProperties thisServerAgentProperties) {
+			SitesWebserverProperties sitesWebserverProperties, ThisServerAgentProperties thisServerAgentProperties,
+			HiddenTunnelFqdnAssigner fqdnAssigner) {
 		this.domainStore = domainStore;
 		this.domainService = domainService;
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
-		this.exposedAppStore = exposedAppStore;
+		this.serverStore = serverStore;
 		this.localWebsiteStore = localWebsiteStore;
 		this.staticSiteProvisioner = staticSiteProvisioner;
 		this.sitesWebserverProperties = sitesWebserverProperties;
 		this.thisServerAgentProperties = thisServerAgentProperties;
+		this.fqdnAssigner = fqdnAssigner;
 	}
 
 	@GetMapping("/domains")
@@ -174,39 +183,46 @@ public class DomainsController {
 	}
 
 	/**
-	 * Every Exposed App/Local Website on oldName gets its tunnel recreated under newName (the same
-	 * delete-tunnel-then-recreate-with-a-2s-wait pattern an ordinary edit already uses, just applied
-	 * in bulk) -- brief downtime for the affected apps/sites, acceptable since this is a deliberate
-	 * admin action. A failure on one item is recorded and never blocks the rest of the rename;
-	 * deleting a domain has no such cascade at all (see delete() above), only renaming does.
+	 * Every Exposed App/Local Website on oldName gets its tunnel(s) recreated under newName (the
+	 * same delete-tunnel-then-recreate-with-a-2s-wait pattern an ordinary edit already uses, just
+	 * applied in bulk) -- brief downtime for the affected servers/sites, acceptable since this is a
+	 * deliberate admin action. A failure on one item is recorded and never blocks the rest of the
+	 * rename; deleting a domain has no such cascade at all (see delete() above), only renaming does.
+	 * An Application's hidden Terminal/RemoteDesktop/PortForwarding tunnels are derived from its own
+	 * full FQDN (see HiddenTunnelFqdnAssigner), so renaming its domain regenerates every one of them,
+	 * not just its Web tunnel -- every enabled protocol gets delete-then-recreated together.
 	 */
 	private DomainRenameResult renameDomain(String oldName, String newName) {
 		List<String> failures = new ArrayList<>();
 		int appsUpdated = 0;
 		int sitesUpdated = 0;
 
-		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
-		List<ExposedApp> affectedApps = tunnels.values().stream()
-				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
-				.map(tunnelMapper::toExposedApp)
-				.map(exposedAppStore::reconcile)
-				.filter(app -> oldName.equals(app.domain()))
+		List<Server> affectedServers = serverStore.values().stream()
+				.filter(server -> oldName.equals(server.domain()))
 				.toList();
-		for (ExposedApp app : affectedApps) {
-			String oldFqdn = app.fqdn();
+		for (Server server : affectedServers) {
+			String oldFqdn = server.fqdn();
 			try {
-				ExposedApp renamed = new ExposedApp(app.subdomain(), app.name(), app.homelabName(), app.type(),
-						app.protocol(), app.host(), app.port(), app.exposedPort(), app.tlsMode(), app.ssoProtected(),
-						newName, app.mode(), app.username(), app.encryptedSecret(),
-						app.ignoreCertificate());
-				deleteTunnelIgnoringMissing(oldFqdn);
-				sleep();
-				boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(renamed, OWNER));
-				exposedAppStore.delete(oldFqdn);
-				exposedAppStore.save(renamed);
+				Server renamed = rebuildForDomain(server, newName);
+				Map<ServerProtocol, TunnelMapper.ProtocolTunnel> oldPlans = tunnelMapper.tunnelPlans(server, OWNER);
+				Map<ServerProtocol, TunnelMapper.ProtocolTunnel> newPlans = tunnelMapper.tunnelPlans(renamed, OWNER);
+				oldPlans.values().forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
+				if (!oldPlans.isEmpty()) {
+					sleep();
+				}
+				for (Map.Entry<ServerProtocol, TunnelMapper.ProtocolTunnel> entry : newPlans.entrySet()) {
+					TunnelDto tunnel = boringProxyClient.createTunnel(entry.getValue().request());
+					if (entry.getKey() == ServerProtocol.TERMINAL) {
+						renamed = renamed.withTerminalExposedPort(tunnel.tunnelPort());
+					} else if (entry.getKey() == ServerProtocol.REMOTE_DESKTOP) {
+						renamed = renamed.withRemoteDesktopExposedPort(tunnel.tunnelPort());
+					}
+				}
+				serverStore.delete(oldFqdn);
+				serverStore.save(renamed);
 				appsUpdated++;
 			} catch (Exception e) {
-				failures.add("Application " + oldFqdn + ": " + e.getMessage());
+				failures.add("Server " + oldFqdn + ": " + e.getMessage());
 			}
 		}
 
@@ -233,6 +249,29 @@ public class DomainsController {
 		return new DomainRenameResult(appsUpdated, sitesUpdated, failures);
 	}
 
+	/**
+	 * Regenerates every hidden tunnel FQDN (Terminal/RemoteDesktop always under the primary domain,
+	 * PortForwarding under the server's own -- now new -- domain) since each is derived from the
+	 * Application's own full FQDN, which just changed. exposedPort is reset to null on each --
+	 * it's recaptured from the recreated tunnel's response right after (see renameDomain).
+	 */
+	private Server rebuildForDomain(Server server, String newDomain) {
+		String newServerFqdn = server.subdomain() == null || server.subdomain().isBlank()
+				? newDomain : server.subdomain() + "." + newDomain;
+		TerminalConfig terminal = server.terminal() == null ? null : new TerminalConfig(
+				fqdnAssigner.assign(newServerFqdn, server.terminal().port(), domainService.primaryDomain(), Set.of()),
+				server.terminal().port(), null, server.terminal().username(), server.terminal().encryptedSecret());
+		RemoteDesktopConfig remoteDesktop = server.remoteDesktop() == null ? null : new RemoteDesktopConfig(
+				fqdnAssigner.assign(newServerFqdn, server.remoteDesktop().port(), domainService.primaryDomain(), Set.of()),
+				server.remoteDesktop().protocol(), server.remoteDesktop().port(), null, server.remoteDesktop().username(),
+				server.remoteDesktop().encryptedSecret(), server.remoteDesktop().ignoreCertificate());
+		PortForwardingConfig portForwarding = server.portForwarding() == null ? null : new PortForwardingConfig(
+				fqdnAssigner.assign(newServerFqdn, server.portForwarding().publicPort(), newDomain, Set.of()),
+				server.portForwarding().protocol(), server.portForwarding().publicPort(), server.portForwarding().targetPort());
+		return new Server(server.subdomain(), newDomain, server.homelabName(), server.host(), server.web(),
+				terminal, remoteDesktop, portForwarding);
+	}
+
 	/** Same shape as LocalWebsiteController/BackupService's own private toCreateTunnelRequest -- Local Websites always point at the shared selfieproxy-local-websites container through the hidden "This Server" homelab. */
 	private CreateTunnelRequestDto toLocalWebsiteTunnelRequest(String fqdn) {
 		return new CreateTunnelRequestDto(
@@ -252,7 +291,7 @@ public class DomainsController {
 				null);
 	}
 
-	/** The Tunnel record can go stale (eg. already removed from boringproxy some other way); don't let that block the rest of the rename, mirrors ExposedAppController/LocalWebsiteController/BackupService's own identical helper. */
+	/** The Tunnel record can go stale (eg. already removed from boringproxy some other way); don't let that block the rest of the rename, mirrors ServerController/LocalWebsiteController/BackupService's own identical helper. */
 	private void deleteTunnelIgnoringMissing(String fqdn) {
 		try {
 			boringProxyClient.deleteTunnel(fqdn);

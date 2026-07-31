@@ -19,7 +19,7 @@
 		<div class="warning" th:if="${result != null}">
 			<p>
 				Imported <strong th:text="${result.homelabsRestored()}"></strong> homelab(s),
-				<strong th:text="${result.exposedAppsRestored()}"></strong> application(s), and
+				<strong th:text="${result.serversRestored()}"></strong> server(s), and
 				<strong th:text="${result.localWebsitesRestored()}"></strong> local website(s).
 			</p>
 			<ul th:if="${result.hasFailures()}">

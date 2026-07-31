@@ -8,7 +8,7 @@
 		<section class="page-header">
 			<div>
 				<h1>Import configuration</h1>
-				<p class="page-subtitle" th:text="'Step ' + ${stepNumber} + ' of ' + ${totalSteps} + ': Select which applications to import'"></p>
+				<p class="page-subtitle" th:text="'Step ' + ${stepNumber} + ' of ' + ${totalSteps} + ': Select which servers to import'"></p>
 			</div>
 		</section>
 
@@ -17,23 +17,27 @@
 		<form id="wizard-form" method="get" th:action="${nextUrl}">
 			<input type="hidden" name="homelabs" th:each="h : ${selectedHomelabs}" th:value="${h}">
 
-			<p class="muted" th:if="${#lists.isEmpty(manifest.exposedApps())}">No applications in this configuration export.</p>
+			<p class="muted" th:if="${#lists.isEmpty(manifest.servers())}">No servers in this configuration export.</p>
 
-			<div th:unless="${#lists.isEmpty(manifest.exposedApps())}">
+			<div th:unless="${#lists.isEmpty(manifest.servers())}">
 				<div class="button-panel select-controls">
 					<button type="button" id="select-all-btn" class="button-small">Select All</button>
 					<button type="button" id="select-none-btn" class="button-small">Select None</button>
 				</div>
-				<div th:each="app : ${manifest.exposedApps()}">
+				<div th:each="server : ${manifest.servers()}">
 					<label class="restore-item">
-						<input type="checkbox" name="exposedApps" th:value="${app.fqdn()}">
-						<span th:text="${(app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())) + ' (' + app.homelabName() + ')'}"></span>
-						<span th:if="${existingExposedApps.contains(app.fqdn())}" class="status-badge status-badge-existing">Existing</span>
-						<span th:unless="${existingExposedApps.contains(app.fqdn())}" class="status-badge status-badge-new">New</span>
-						<select th:name="'domain__' + ${app.fqdn()}">
+						<input type="checkbox" name="servers" th:value="${server.fqdn()}">
+						<span th:text="${(#strings.isEmpty(server.subdomain()) ? server.domain() : server.subdomain()) + ' (' + server.homelabName() + ')'}"></span>
+						<span th:if="${server.hasWeb()}" class="status-badge status-badge-primary">Web</span>
+						<span th:if="${server.hasTerminal()}" class="status-badge status-badge-primary">Terminal</span>
+						<span th:if="${server.hasRemoteDesktop()}" class="status-badge status-badge-primary">Remote desktop</span>
+						<span th:if="${server.hasPortForwarding()}" class="status-badge status-badge-primary">Port forwarding</span>
+						<span th:if="${existingServers.contains(server.fqdn())}" class="status-badge status-badge-existing">Existing</span>
+						<span th:unless="${existingServers.contains(server.fqdn())}" class="status-badge status-badge-new">New</span>
+						<select th:name="'domain__' + ${server.fqdn()}">
 							<option th:each="d : ${domains}" th:value="${d.name()}"
 									th:text="${d.primary()} ? ${d.name()} + ' (primary)' : ${d.name()}"
-									th:selected="${d.name() == targetDomainByFqdn.get(app.fqdn())}"></option>
+									th:selected="${d.name() == targetDomainByFqdn.get(server.fqdn())}"></option>
 						</select>
 					</label>
 				</div>

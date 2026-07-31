@@ -4,11 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-class ExposedAppTest {
+class ServerTest {
 
-	private ExposedApp appWithSubdomain(String subdomain) {
-		return new ExposedApp(subdomain, null, "lab1", ExposedAppType.WEB_APPLICATION, Protocol.HTTP,
-				"127.0.0.1", 8080, null, null, false, "example.com", null, null, null, false);
+	private Server appWithSubdomain(String subdomain) {
+		return new Server(subdomain, "example.com", "lab1", "127.0.0.1",
+				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
 	}
 
 	@Test

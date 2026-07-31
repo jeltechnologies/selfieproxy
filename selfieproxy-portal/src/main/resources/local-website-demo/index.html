@@ -4,10 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Selfie Proxy — Self-host your homelab on the internet.</title>
-<meta name="description" content="Selfie Proxy gives every app running in your homelab a friendly, secure internet address — from one small server you control. No port forwarding, automatic HTTPS, built-in login, one Docker command." />
+<meta name="description" content="Selfie Proxy gives every server running in your homelab a friendly, secure internet address — from one small server you control. No port forwarding, automatic HTTPS, built-in login, one Docker command." />
 <meta property="og:title" content="Selfie Proxy — self-hosted reverse proxy for homelabs" />
 <meta property="og:description" content="Self-host your homelab on the internet. Open source, MIT licensed, one Docker command." />
-<meta property="og:image" content="screenshots/edit-application.jpg" />
+<meta property="og:image" content="screenshots/edit-server.jpg" />
 <meta property="og:type" content="website" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -79,13 +79,13 @@
         <div class="browser-frame">
           <div class="browser-chrome"><span></span><span></span><span></span></div>
           <button type="button" class="shot-frame shot-trigger" id="hero-carousel-trigger"
-                  data-lightbox-src="screenshots/edit-application.jpg"
-                  data-lightbox-alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
-            <img id="hero-carousel-img" src="screenshots/edit-application.jpg" alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." width="1920" height="879" />
+                  data-lightbox-src="screenshots/edit-server.jpg"
+                  data-lightbox-alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
+            <img id="hero-carousel-img" src="screenshots/edit-server.jpg" alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." width="1920" height="879" />
           </button>
         </div>
         <div class="hero-carousel-dots" id="hero-carousel-dots" role="group" aria-label="Product screenshots">
-          <button type="button" class="carousel-dot is-active" aria-label="Show Applications screenshot"></button>
+          <button type="button" class="carousel-dot is-active" aria-label="Show Servers screenshot"></button>
           <button type="button" class="carousel-dot" aria-label="Show Homelabs screenshot"></button>
           <button type="button" class="carousel-dot" aria-label="Show Connect a homelab screenshot"></button>
           <button type="button" class="carousel-dot" aria-label="Show Remote desktop (Windows) screenshot"></button>
@@ -138,7 +138,7 @@
             </svg>
           </div>
           <h3>One simple admin portal</h3>
-          <p>Every homelab and every exposed app, managed from a single page — in light or dark, your call. A web form to fill in, not a config file to get right.</p>
+          <p>Every homelab and every exposed server, managed from a single page — in light or dark, your call. A web form to fill in, not a config file to get right.</p>
         </div>
 
         <div class="feature-card">
@@ -148,7 +148,7 @@
             </svg>
           </div>
           <h3>Authentication built in</h3>
-          <p>The admin portal is protected out of the box, and a checkbox puts the same login in front of any app you expose. Separate user accounts add security too: everyone can reach the apps, only you can reach the portal.</p>
+          <p>The admin portal is protected out of the box, and a checkbox puts the same login in front of any server you expose. Separate user accounts add security too: everyone can reach the servers, only you can reach the portal.</p>
         </div>
 
         <div class="feature-card">
@@ -168,7 +168,7 @@
             </svg>
           </div>
           <h3>Automatic certificates</h3>
-          <p>Every app you add gets a real, auto-renewing HTTPS certificate the moment you save it. No certbot, no expired-cert surprises at 2am.</p>
+          <p>Every server you add gets a real, auto-renewing HTTPS certificate the moment you save it. No certbot, no expired-cert surprises at 2am.</p>
         </div>
 
         <div class="feature-card">
@@ -177,8 +177,8 @@
               <path d="M11 3H4v7l10 10 7-7L11 3Z"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
             </svg>
           </div>
-          <h3>Add an app in seconds, from any homelab</h3>
-          <p>Pick a subdomain, point it at your app's local address, save. Connect your house, a parents' house, a friend's rack — all from one portal.</p>
+          <h3>Add a server in seconds, from any homelab</h3>
+          <p>Pick a subdomain, point it at your server's local address, save. Connect your house, a parents' house, a friend's rack — all from one portal.</p>
         </div>
 
         <div class="feature-card">
@@ -188,7 +188,7 @@
             </svg>
           </div>
           <h3>Back up your setup, or move it to a new server</h3>
-          <p>Every homelab, application, and static site, down to the files, in one ZIP you can restore anywhere. Other solutions lock this behind a paid enterprise plan.</p>
+          <p>Every homelab, server, and static site, down to the files, in one ZIP you can restore anywhere. Other solutions lock this behind a paid enterprise plan.</p>
         </div>
       </div>
     </div>
@@ -231,7 +231,7 @@
       <div class="faq-list reveal">
         <details class="faq-item" open>
           <summary>Is this actually secure?</summary>
-          <p>Yes. Traffic between your homelab and the server always travels through an encrypted tunnel, to a server that's entirely under your own control rather than a third party's. Every exposed app gets HTTPS automatically, and the admin portal — optionally any app — is protected by a built-in login screen that automatically slows down repeated wrong-password attempts. It's open source, so the code is there for anyone to check.</p>
+          <p>Yes. Traffic between your homelab and the server always travels through an encrypted tunnel, to a server that's entirely under your own control rather than a third party's. Every exposed server gets HTTPS automatically, and the admin portal — optionally any server — is protected by a built-in login screen that automatically slows down repeated wrong-password attempts. It's open source, so the code is there for anyone to check.</p>
         </details>
         <details class="faq-item">
           <summary>Is this free?</summary>
@@ -243,7 +243,7 @@
         </details>
         <details class="faq-item">
           <summary>I already run NGINX at home with a valid certificate — can Selfie Proxy just use that?</summary>
-          <p>No. Point Selfie Proxy directly at the web application itself, over HTTP or HTTPS with a self-signed certificate — not at the NGINX reverse proxy in front of it. Connecting straight to the application is what lets Selfie Proxy manage certificates for you automatically and protect the app with its own login, neither of which is possible if it's only forwarding to another reverse proxy.</p>
+          <p>No. Point Selfie Proxy directly at the web server itself, over HTTP or HTTPS with a self-signed certificate — not at the NGINX reverse proxy in front of it. Connecting straight to the server is what lets Selfie Proxy manage certificates for you automatically and protect the server with its own login, neither of which is possible if it's only forwarding to another reverse proxy.</p>
         </details>
       </div>
     </div>
@@ -264,8 +264,8 @@
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
                     data-lightbox-src="screenshots/homelabs.jpg"
-                    data-lightbox-alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 applications, and iot-gadgets shown Disconnected in red with 1 application.">
-              <img src="screenshots/homelabs.jpg" alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 applications, and iot-gadgets shown Disconnected in red with 1 application." loading="lazy" width="1920" height="879" />
+                    data-lightbox-alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 servers, and iot-gadgets shown Disconnected in red with 1 server.">
+              <img src="screenshots/homelabs.jpg" alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 servers, and iot-gadgets shown Disconnected in red with 1 server." loading="lazy" width="1920" height="879" />
             </button>
           </div>
         </div>
@@ -308,7 +308,7 @@
         <div class="tour-text">
           <p class="eyebrow">Terminal access</p>
           <h3>Or skip the desktop — a real SSH session, in the browser</h3>
-          <p>Type actual commands, see actual output. No terminal app to open, no key to copy around.</p>
+          <p>Type actual commands, see actual output. No separate terminal program to open, no key to copy around.</p>
         </div>
       </div>
 
@@ -317,14 +317,14 @@
           <div class="browser-frame">
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
-                    data-lightbox-src="screenshots/edit-application.jpg"
-                    data-lightbox-alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
-              <img src="screenshots/edit-application.jpg" alt="Edit application form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." loading="lazy" width="1920" height="879" />
+                    data-lightbox-src="screenshots/edit-server.jpg"
+                    data-lightbox-alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
+              <img src="screenshots/edit-server.jpg" alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." loading="lazy" width="1920" height="879" />
             </button>
           </div>
         </div>
         <div class="tour-text">
-          <p class="eyebrow">Edit application</p>
+          <p class="eyebrow">Edit server</p>
           <h3>Point it at an IP, pick HTTP or HTTPS, decide if it needs a login</h3>
           <p>That's the whole form. No YAML, no restarting a reverse proxy by hand to pick up the change.</p>
         </div>
@@ -437,7 +437,7 @@
       <div class="diagram-wrap reveal">
         <div class="diagram-wrap-inner">
         <svg viewBox="0 0 1000 290" role="img" aria-labelledby="diagram-title">
-          <title id="diagram-title">Diagram: your home network connects through one encrypted tunnel to your server, which exposes each app under its own friendly HTTPS address.</title>
+          <title id="diagram-title">Diagram: your home network connects through one encrypted tunnel to your server, which exposes each server under its own friendly HTTPS address.</title>
 
           <!-- home node -->
           <rect x="40" y="100" width="130" height="100" rx="16" fill="none" stroke="var(--line-strong)" stroke-width="1.5"/>

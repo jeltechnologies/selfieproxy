@@ -7,36 +7,35 @@
 	}
 
 	var refreshStatus = function () {
-		fetch("/apps/status", {credentials: "same-origin"})
+		fetch("/servers/status", {credentials: "same-origin"})
 			.then(function (response) {
 				return response.ok ? response.json() : Promise.reject();
 			})
-			.then(function (apps) {
-				apps.forEach(function (app) {
-					var row = document.querySelector('tr[data-fqdn="' + CSS.escape(app.fqdn) + '"]');
+			.then(function (servers) {
+				servers.forEach(function (server) {
+					var row = document.querySelector('tr[data-fqdn="' + CSS.escape(server.fqdn) + '"]');
 					if (!row) {
 						return;
 					}
 					var statusSpan = row.querySelector(".status");
 					var dot = row.querySelector(".status-dot");
-					dot.classList.toggle("status-dot-offline", app.offline);
-					dot.classList.toggle("status-dot-online", !app.offline);
-					if (app.status_message) {
-						statusSpan.title = app.status_message;
+					dot.classList.toggle("status-dot-offline", server.offline);
+					dot.classList.toggle("status-dot-online", !server.offline);
+					if (server.status_message) {
+						statusSpan.title = server.status_message;
 					} else {
 						statusSpan.removeAttribute("title");
 					}
 
-					var connectButton = row.querySelector(".connect-button");
-					if (connectButton) {
-						if (app.offline) {
+					row.querySelectorAll(".connect-button").forEach(function (connectButton) {
+						if (server.offline) {
 							connectButton.setAttribute("aria-disabled", "true");
 							connectButton.setAttribute("tabindex", "-1");
 						} else {
 							connectButton.removeAttribute("aria-disabled");
 							connectButton.removeAttribute("tabindex");
 						}
-					}
+					});
 				});
 			})
 			.catch(function () {

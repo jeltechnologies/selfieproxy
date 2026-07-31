@@ -27,7 +27,7 @@ import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.domain.BackupManifest;
 import online.selfieproxy.portal.domain.BackupService;
 import online.selfieproxy.portal.domain.DomainService;
-import online.selfieproxy.portal.domain.ExposedApp;
+import online.selfieproxy.portal.domain.Server;
 import online.selfieproxy.portal.domain.LocalWebsite;
 import online.selfieproxy.portal.domain.RestoreDiff;
 import online.selfieproxy.portal.domain.RestoreResult;
@@ -38,11 +38,11 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * "Export configuration" (<code>/export-configuration</code>) and "Import configuration"
  * (<code>/import-configuration</code>) pages, reached from the Settings dropdown --
- * download a ZIP covering a chosen subset of Homelabs, Exposed Apps ("servers"), and
- * Local Websites (config + content), and import from one. The underlying domain types
- * keep the shorter "backup"/"restore" naming -- see BackupService for the actual logic
- * and selfieproxy-portal/CLAUDE.md's "Backup and restore" section for the full product
- * behavior.
+ * download a ZIP covering a chosen subset of Homelabs, Servers (the underlying Java type is
+ * still Server/"exposed servers" internally), and Local Websites (config + content), and import
+ * from one. The underlying domain types keep the shorter "backup"/"restore" naming -- see
+ * BackupService for the actual logic and selfieproxy-portal/CLAUDE.md's "Backup and restore"
+ * section for the full product behavior.
  */
 @Controller
 public class BackupController {
@@ -70,7 +70,7 @@ public class BackupController {
 	}
 
 	/**
-	 * Streams the configuration export ZIP, filtered down to the homelabs/exposedApps/localWebsites
+	 * Streams the configuration export ZIP, filtered down to the homelabs/servers/localWebsites
 	 * the export page's checkboxes selected. GET is fine here despite the "no GET for
 	 * state-changing actions" convention elsewhere in this codebase -- creating an export
 	 * reads live state, it doesn't change any. The filename's timestamp, and the manifest's
@@ -82,7 +82,7 @@ public class BackupController {
 	@GetMapping("/export-configuration/download")
 	public void download(@RequestParam(required = false) String tz,
 			@RequestParam(required = false) List<String> homelabs,
-			@RequestParam(required = false) List<String> exposedApps,
+			@RequestParam(required = false) List<String> servers,
 			@RequestParam(required = false) List<String> localWebsites,
 			HttpServletResponse response) throws IOException {
 		ZoneId zone = resolveZone(tz);
@@ -91,7 +91,7 @@ public class BackupController {
 		String filename = "selfieproxy-config-export-" + safeDomain + "-" + timestamp + ".zip";
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps),
+		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(servers),
 				nullToEmpty(localWebsites), Map.of());
 		backupService.writeBackup(response.getOutputStream(), zone, selection);
 	}
@@ -131,9 +131,9 @@ public class BackupController {
 		return "restore-homelabs";
 	}
 
-	/** Wizard step (exposed apps): carries the homelab selection forward as hidden fields; its own exposed apps are unchecked on every render. Skipped when the export has no exposed apps. */
-	@GetMapping("/import-configuration/{stagingId}/exposed-apps")
-	public String exposedAppsStep(@PathVariable String stagingId,
+	/** Wizard step (servers): carries the homelab selection forward as hidden fields; its own servers are unchecked on every render. Skipped when the export has no servers. */
+	@GetMapping("/import-configuration/{stagingId}/servers")
+	public String serversStep(@PathVariable String stagingId,
 			@RequestParam(required = false) List<String> homelabs, Model model) {
 		BackupManifest manifest = backupService.readStagedManifest(stagingId);
 		RestoreDiff diff = backupService.diffManifest(manifest);
@@ -141,32 +141,32 @@ public class BackupController {
 		model.addAttribute("manifest", manifest);
 		model.addAttribute("stagingId", stagingId);
 		model.addAttribute("selectedHomelabs", selectedHomelabs);
-		model.addAttribute("existingExposedApps", diff.existingExposedAppFqdns());
+		model.addAttribute("existingServers", diff.existingServerFqdns());
 		model.addAttribute("domains", domainService.allDomains());
-		model.addAttribute("targetDomainByFqdn", targetDomainsForApps(manifest));
-		addWizardNav(model, "exposed-apps", stagingId, manifest, selectedHomelabs, List.of());
-		return "restore-exposed-apps";
+		model.addAttribute("targetDomainByFqdn", targetDomainsForServers(manifest));
+		addWizardNav(model, "servers", stagingId, manifest, selectedHomelabs, List.of());
+		return "restore-servers";
 	}
 
-	/** Wizard step (local websites): carries homelabs + exposed apps (+ the exposed apps step's own domain choices) forward; its own local websites are unchecked on every render. Skipped when the export has no local websites. */
+	/** Wizard step (local websites): carries homelabs + exposed servers (+ the exposed servers step's own domain choices) forward; its own local websites are unchecked on every render. Skipped when the export has no local websites. */
 	@GetMapping("/import-configuration/{stagingId}/local-websites")
 	public String localWebsitesStep(@PathVariable String stagingId,
 			@RequestParam(required = false) List<String> homelabs,
-			@RequestParam(required = false) List<String> exposedApps,
+			@RequestParam(required = false) List<String> servers,
 			@RequestParam Map<String, String> allParams, Model model) {
 		BackupManifest manifest = backupService.readStagedManifest(stagingId);
 		RestoreDiff diff = backupService.diffManifest(manifest);
 		List<String> selectedHomelabs = nullToEmpty(homelabs);
-		List<String> selectedExposedApps = nullToEmpty(exposedApps);
+		List<String> selectedServers = nullToEmpty(servers);
 		model.addAttribute("manifest", manifest);
 		model.addAttribute("stagingId", stagingId);
 		model.addAttribute("selectedHomelabs", selectedHomelabs);
-		model.addAttribute("selectedExposedApps", selectedExposedApps);
+		model.addAttribute("selectedServers", selectedServers);
 		model.addAttribute("existingLocalWebsites", diff.existingLocalWebsiteFqdns());
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("targetDomainByFqdn", targetDomainsForSites(manifest));
 		model.addAttribute("carriedDomainOverrides", domainOverrides(allParams));
-		addWizardNav(model, "local-websites", stagingId, manifest, selectedHomelabs, selectedExposedApps);
+		addWizardNav(model, "local-websites", stagingId, manifest, selectedHomelabs, selectedServers);
 		return "restore-local-websites";
 	}
 
@@ -174,34 +174,34 @@ public class BackupController {
 	@GetMapping("/import-configuration/{stagingId}/overview")
 	public String overviewStep(@PathVariable String stagingId,
 			@RequestParam(required = false) List<String> homelabs,
-			@RequestParam(required = false) List<String> exposedApps,
+			@RequestParam(required = false) List<String> servers,
 			@RequestParam(required = false) List<String> localWebsites,
 			@RequestParam Map<String, String> allParams, Model model) {
 		BackupManifest manifest = backupService.readStagedManifest(stagingId);
 		RestoreDiff diff = backupService.diffManifest(manifest);
 		List<String> selectedHomelabs = nullToEmpty(homelabs);
-		List<String> selectedExposedApps = nullToEmpty(exposedApps);
+		List<String> selectedServers = nullToEmpty(servers);
 		model.addAttribute("manifest", manifest);
 		model.addAttribute("stagingId", stagingId);
 		model.addAttribute("selectedHomelabs", selectedHomelabs);
-		model.addAttribute("selectedExposedApps", selectedExposedApps);
+		model.addAttribute("selectedServers", selectedServers);
 		model.addAttribute("selectedLocalWebsites", nullToEmpty(localWebsites));
 		model.addAttribute("existingHomelabs", diff.existingHomelabs());
-		model.addAttribute("existingExposedApps", diff.existingExposedAppFqdns());
+		model.addAttribute("existingServers", diff.existingServerFqdns());
 		model.addAttribute("existingLocalWebsites", diff.existingLocalWebsiteFqdns());
 		model.addAttribute("carriedDomainOverrides", domainOverrides(allParams));
-		addWizardNav(model, "overview", stagingId, manifest, selectedHomelabs, selectedExposedApps);
+		addWizardNav(model, "overview", stagingId, manifest, selectedHomelabs, selectedServers);
 		return "restore-overview";
 	}
 
 	@PostMapping("/import-configuration/{stagingId}/apply")
 	public String apply(@PathVariable String stagingId,
 			@RequestParam(required = false) List<String> homelabs,
-			@RequestParam(required = false) List<String> exposedApps,
+			@RequestParam(required = false) List<String> servers,
 			@RequestParam(required = false) List<String> localWebsites,
 			@RequestParam Map<String, String> allParams,
 			RedirectAttributes redirectAttributes) {
-		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(exposedApps),
+		RestoreSelection selection = new RestoreSelection(nullToEmpty(homelabs), nullToEmpty(servers),
 				nullToEmpty(localWebsites), domainOverrides(allParams));
 		RestoreResult result = backupService.applyRestore(stagingId, selection);
 		redirectAttributes.addFlashAttribute("result", result);
@@ -209,9 +209,9 @@ public class BackupController {
 	}
 
 	/** Per-item default target domain: the ZIP's own domain if it's still registered on this server, else the primary domain -- same fallback rule for both categories below. */
-	private Map<String, String> targetDomainsForApps(BackupManifest manifest) {
-		return manifest.exposedApps().stream()
-				.collect(Collectors.toMap(ExposedApp::fqdn, app -> defaultTargetDomain(app.domain())));
+	private Map<String, String> targetDomainsForServers(BackupManifest manifest) {
+		return manifest.servers().stream()
+				.collect(Collectors.toMap(Server::fqdn, server -> defaultTargetDomain(server.domain())));
 	}
 
 	private Map<String, String> targetDomainsForSites(BackupManifest manifest) {
@@ -223,7 +223,7 @@ public class BackupController {
 		return domainService.exists(zipDomain) ? zipDomain : domainService.primaryDomain();
 	}
 
-	/** Every request param named domain__&lt;fqdn&gt; (the per-item domain <select>s on the exposed-apps/local-websites steps), keyed back to the bare fqdn -- carried forward as hidden fields step to step (see restore-local-websites.html/restore-overview.html) since the wizard otherwise stays stateless. */
+	/** Every request param named domain__&lt;fqdn&gt; (the per-item domain <select>s on the exposed-servers/local-websites steps), keyed back to the bare fqdn -- carried forward as hidden fields step to step (see restore-local-websites.html/restore-overview.html) since the wizard otherwise stays stateless. */
 	private Map<String, String> domainOverrides(Map<String, String> allParams) {
 		return allParams.entrySet().stream()
 				.filter(e -> e.getKey().startsWith(DOMAIN_OVERRIDE_PREFIX))
@@ -259,12 +259,12 @@ public class BackupController {
 	}
 
 	/** The review wizard's category steps, in the fixed order they're always shown in when present at all -- see firstStep/nextStep/previousStep/stepNumber below. */
-	private static final List<String> CATEGORY_STEPS = List.of("homelabs", "exposed-apps", "local-websites");
+	private static final List<String> CATEGORY_STEPS = List.of("homelabs", "servers", "local-websites");
 
 	private boolean stepHasItems(String step, BackupManifest manifest) {
 		return switch (step) {
 			case "homelabs" -> !manifest.homelabs().isEmpty();
-			case "exposed-apps" -> !manifest.exposedApps().isEmpty();
+			case "servers" -> !manifest.servers().isEmpty();
 			case "local-websites" -> !manifest.localWebsites().isEmpty();
 			default -> throw new IllegalArgumentException(step);
 		};
@@ -324,18 +324,18 @@ public class BackupController {
 		return (int) (2 + presentCategories);
 	}
 
-	/** Builds a step's URL, including only the query params that step actually needs to carry forward (homelabs for exposed-apps/local-websites, exposedApps for local-websites only) -- used for Previous links, which unlike the Next/Finish forms have no hidden fields of their own to carry state. */
-	private String stepUrl(String stagingId, String step, List<String> homelabs, List<String> exposedApps) {
+	/** Builds a step's URL, including only the query params that step actually needs to carry forward (homelabs for exposed-servers/local-websites, servers for local-websites only) -- used for Previous links, which unlike the Next/Finish forms have no hidden fields of their own to carry state. */
+	private String stepUrl(String stagingId, String step, List<String> homelabs, List<String> servers) {
 		StringBuilder url = new StringBuilder("/import-configuration/").append(stagingId).append('/').append(step);
 		List<String> params = new ArrayList<>();
-		if ("exposed-apps".equals(step) || "local-websites".equals(step)) {
+		if ("servers".equals(step) || "local-websites".equals(step)) {
 			for (String homelab : homelabs) {
 				params.add("homelabs=" + URLEncoder.encode(homelab, StandardCharsets.UTF_8));
 			}
 		}
 		if ("local-websites".equals(step)) {
-			for (String exposedApp : exposedApps) {
-				params.add("exposedApps=" + URLEncoder.encode(exposedApp, StandardCharsets.UTF_8));
+			for (String server : servers) {
+				params.add("servers=" + URLEncoder.encode(server, StandardCharsets.UTF_8));
 			}
 		}
 		if (!params.isEmpty()) {
@@ -348,18 +348,18 @@ public class BackupController {
 	 * Adds stepNumber/totalSteps (for the "Step N of ..." subtitle), nextUrl (absent on the
 	 * overview step, which has Finish instead of Next), and previousUrl (null when nothing earlier
 	 * applies, in which case the template hides the Previous button) to model for currentStep.
-	 * selectedHomelabs/selectedExposedApps are exactly what currentStep itself received as incoming
+	 * selectedHomelabs/selectedServers are exactly what currentStep itself received as incoming
 	 * query params -- enough to rebuild any earlier step's URL, since a step never needs its own
 	 * category's selection to link backward to an earlier step.
 	 */
 	private void addWizardNav(Model model, String currentStep, String stagingId, BackupManifest manifest,
-			List<String> selectedHomelabs, List<String> selectedExposedApps) {
+			List<String> selectedHomelabs, List<String> selectedServers) {
 		model.addAttribute("stepNumber", stepNumber(currentStep, manifest));
 		model.addAttribute("totalSteps", totalSteps(manifest));
 		if (!"overview".equals(currentStep)) {
 			model.addAttribute("nextUrl", "/import-configuration/" + stagingId + "/" + nextStep(currentStep, manifest));
 		}
 		String previous = previousStep(currentStep, manifest);
-		model.addAttribute("previousUrl", previous == null ? null : stepUrl(stagingId, previous, selectedHomelabs, selectedExposedApps));
+		model.addAttribute("previousUrl", previous == null ? null : stepUrl(stagingId, previous, selectedHomelabs, selectedServers));
 	}
 }

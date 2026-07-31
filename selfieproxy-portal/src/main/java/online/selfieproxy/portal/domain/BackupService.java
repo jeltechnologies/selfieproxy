@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -39,18 +40,18 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Builds and applies whole-server backups covering Homelabs, Exposed Apps
- * ("servers"), and Local Websites (config + actual content files) -- see
- * selfieproxy-portal/CLAUDE.md's "Backup and restore" section for the full
- * product behavior and the deliberate exclusions (agent secrets,
- * identity-provider admin account). An SSH/RDP/VNC-mode Network Service's
- * stored credential is excluded too, for the same host-specific-secret
- * reason: it's encrypted with a key that never leaves this server (see
- * NetworkServiceCredentialCipher), so an exported ciphertext would be
- * undecryptable on a different one -- buildManifest strips encryptedSecret
- * (ExposedApp.withoutSecret) while keeping the rest of the app, including its
- * username, so the admin only has to re-enter the password once after an
- * import (see ConsoleConnectController) rather than losing the whole config.
+ * Builds and applies whole-server backups covering Homelabs, Servers, and
+ * Local Websites (config + actual content files) -- see selfieproxy-portal/CLAUDE.md's "Backup and
+ * restore" section for the full product behavior and the deliberate exclusions (agent secrets,
+ * identity-provider admin account). A Server's Terminal/RemoteDesktop credentials are
+ * excluded too, for the same host-specific-secret reason: they're encrypted with a key that never
+ * leaves this server (see NetworkServiceCredentialCipher), so an exported ciphertext would be
+ * undecryptable on a different one -- buildManifest strips both credential slots
+ * (Server.withoutSecrets) while keeping the rest of the server, including each slot's username, so
+ * the admin only has to re-enter the password once per protocol after an import (see
+ * ConsoleConnectController) rather than losing the whole config. Reads serverStore.values()
+ * directly rather than deriving from live boringproxy tunnels -- see ServerStore's own javadoc
+ * on why that store is the sole source of truth for the Application list now.
  */
 @Component
 public class BackupService {
@@ -62,10 +63,10 @@ public class BackupService {
 	private static final String LOCAL_WEBSITES_PREFIX = "local-websites/";
 	/** boringproxy's own error text for deleting a tunnel that's already gone -- see BoringProxyException, mirrors LocalWebsiteController.deleteTunnelIgnoringMissing. */
 	private static final String TUNNEL_MISSING_MESSAGE = "Tunnel doesn't exist";
-	/** Same wait ExposedAppController/LocalWebsiteController already use between deleting and recreating a tunnel. */
+	/** Same wait ServerController/LocalWebsiteController already use between deleting and recreating a tunnel. */
 	private static final long TUNNEL_RECREATE_WAIT_MS = 2000;
 
-	// Same bespoke camelCase mapper convention as ExposedAppStore/LocalWebsiteStore --
+	// Same bespoke camelCase mapper convention as ServerStore/LocalWebsiteStore --
 	// this is an internal persistence format, not a REST DTO, so it doesn't need the
 	// globally-configured snake_case naming strategy.
 	private final ObjectMapper objectMapper = JsonMapper.builder()
@@ -76,7 +77,8 @@ public class BackupService {
 	private final BoringProxyClient boringProxyClient;
 	private final TunnelMapper tunnelMapper;
 	private final BoringProxyProperties boringProxyProperties;
-	private final ExposedAppStore exposedAppStore;
+	private final ServerStore serverStore;
+	private final HiddenTunnelFqdnAssigner fqdnAssigner;
 	private final LocalWebsiteStore localWebsiteStore;
 	private final StaticSiteProvisioner staticSiteProvisioner;
 	private final SitesWebserverProperties sitesWebserverProperties;
@@ -86,14 +88,16 @@ public class BackupService {
 	private final Path stagingRoot;
 
 	public BackupService(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
-			BoringProxyProperties boringProxyProperties, ExposedAppStore exposedAppStore,
-			LocalWebsiteStore localWebsiteStore, StaticSiteProvisioner staticSiteProvisioner,
-			SitesWebserverProperties sitesWebserverProperties, ThisServerAgentProperties thisServerAgentProperties,
-			ThemeStore themeStore, TerminalSettingsStore terminalSettingsStore, BackupProperties backupProperties) {
+			BoringProxyProperties boringProxyProperties, ServerStore serverStore,
+			HiddenTunnelFqdnAssigner fqdnAssigner, LocalWebsiteStore localWebsiteStore,
+			StaticSiteProvisioner staticSiteProvisioner, SitesWebserverProperties sitesWebserverProperties,
+			ThisServerAgentProperties thisServerAgentProperties, ThemeStore themeStore,
+			TerminalSettingsStore terminalSettingsStore, BackupProperties backupProperties) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.boringProxyProperties = boringProxyProperties;
-		this.exposedAppStore = exposedAppStore;
+		this.serverStore = serverStore;
+		this.fqdnAssigner = fqdnAssigner;
 		this.localWebsiteStore = localWebsiteStore;
 		this.staticSiteProvisioner = staticSiteProvisioner;
 		this.sitesWebserverProperties = sitesWebserverProperties;
@@ -123,7 +127,7 @@ public class BackupService {
 		}
 	}
 
-	/** Every Homelab except "This Server" -- same filter ExposedAppController.homelabs()/DashboardController already apply. */
+	/** Every Homelab except "This Server" -- same filter ServerController.homelabs()/DashboardController already apply. */
 	private List<String> homelabNames() {
 		return boringProxyClient.listAgents().keySet().stream()
 				.filter(name -> !thisServerAgentProperties.agentName().equals(name))
@@ -133,18 +137,14 @@ public class BackupService {
 
 	/** The full manifest built from live server state -- also used by BackupController to list what's available on the backup selection page (see filterManifest). */
 	public BackupManifest buildManifest(ZoneId zone) {
-		Map<String, TunnelDto> tunnels = boringProxyClient.listTunnels();
-
-		List<ExposedApp> exposedApps = tunnels.values().stream()
-				.filter(tunnel -> !thisServerAgentProperties.agentName().equals(tunnel.agentName()))
-				.map(tunnelMapper::toExposedApp)
-				.map(exposedAppStore::reconcile)
-				.map(ExposedApp::withoutSecret)
+		List<Server> servers = serverStore.values().stream()
+				.map(Server::withoutSecrets)
+				.sorted(Comparator.comparing(server -> server.subdomain() == null ? "" : server.subdomain()))
 				.toList();
 
 		String createdAt = ZonedDateTime.now(zone).truncatedTo(ChronoUnit.MILLIS).toString();
 		return new BackupManifest(BackupManifest.CURRENT_VERSION, createdAt,
-				boringProxyProperties.primaryDomain(), homelabNames(), exposedApps, localWebsiteStore.list(),
+				boringProxyProperties.primaryDomain(), homelabNames(), servers, localWebsiteStore.list(),
 				themeStore.load().id(), terminalSettingsStore.load());
 	}
 
@@ -172,30 +172,30 @@ public class BackupService {
 	 * Which items in manifest already exist on this server, for the restore wizard's
 	 * per-item New/Existing status and contextual warnings -- computed against live
 	 * state, same lookups doApplyRestore itself relies on (ensureHomelab's existingAgents
-	 * set, exposedAppStore/localWebsiteStore as the source of truth for what an ordinary
+	 * set, serverStore/localWebsiteStore as the source of truth for what an ordinary
 	 * edit would overwrite).
 	 */
 	public RestoreDiff diffManifest(BackupManifest manifest) {
 		Set<String> existingHomelabs = new HashSet<>(boringProxyClient.listAgents().keySet());
-		Set<String> existingExposedApps = manifest.exposedApps().stream()
-				.map(ExposedApp::fqdn)
-				.filter(fqdn -> exposedAppStore.find(fqdn) != null)
+		Set<String> existingServers = manifest.servers().stream()
+				.map(Server::fqdn)
+				.filter(fqdn -> serverStore.find(fqdn) != null)
 				.collect(Collectors.toSet());
 		Set<String> existingLocalWebsites = manifest.localWebsites().stream()
 				.map(LocalWebsite::fqdn)
 				.filter(fqdn -> localWebsiteStore.find(fqdn) != null)
 				.collect(Collectors.toSet());
-		return new RestoreDiff(existingHomelabs, existingExposedApps, existingLocalWebsites);
+		return new RestoreDiff(existingHomelabs, existingServers, existingLocalWebsites);
 	}
 
-	/** Keeps only the homelabs/exposed apps/local websites selection picked -- what the backup page's checkbox tree narrows a backup ZIP down to. */
+	/** Keeps only the homelabs/exposed servers/local websites selection picked -- what the backup page's checkbox tree narrows a backup ZIP down to. */
 	public BackupManifest filterManifest(BackupManifest manifest, RestoreSelection selection) {
 		Set<String> homelabs = new HashSet<>(selection.homelabs());
-		Set<String> exposedAppFqdns = new HashSet<>(selection.exposedAppFqdns());
+		Set<String> serverFqdns = new HashSet<>(selection.serverFqdns());
 		Set<String> localWebsiteFqdns = new HashSet<>(selection.localWebsiteFqdns());
 		return new BackupManifest(manifest.version(), manifest.createdAt(), manifest.sourcePrimaryDomain(),
 				manifest.homelabs().stream().filter(homelabs::contains).toList(),
-				manifest.exposedApps().stream().filter(app -> exposedAppFqdns.contains(app.fqdn())).toList(),
+				manifest.servers().stream().filter(server -> serverFqdns.contains(server.fqdn())).toList(),
 				manifest.localWebsites().stream().filter(site -> localWebsiteFqdns.contains(site.fqdn())).toList(),
 				manifest.theme(), manifest.terminalSettings());
 	}
@@ -203,10 +203,13 @@ public class BackupService {
 	/**
 	 * Applies selection from a staged restore: creates missing Homelabs (always with a brand-new
 	 * secret -- see class docs), then for each selected Exposed App and Local Website deletes any
-	 * existing tunnel at that domain and recreates it from the backup's values -- the same
-	 * delete-then-recreate-with-wait pattern ExposedAppController/LocalWebsiteController already use
-	 * for an ordinary edit, just applied in bulk. A failure on one item is recorded and does not stop
-	 * the rest of the restore. The staging directory is always removed afterward.
+	 * existing tunnel(s) at that domain and recreates them from the backup's values -- the same
+	 * delete-then-recreate-with-wait pattern ServerController/LocalWebsiteController already use
+	 * for an ordinary edit, just applied in bulk. Restoring an Application restores all of its
+	 * enabled protocols together, atomically -- there's no partial-protocol selection in the wizard,
+	 * since an Application is presented everywhere else as one logical unit. A failure on one item
+	 * is recorded and does not stop the rest of the restore. The staging directory is always removed
+	 * afterward.
 	 */
 	public RestoreResult applyRestore(String stagingId, RestoreSelection selection) {
 		Path stagingDir = stagingRoot.resolve(stagingId);
@@ -258,50 +261,45 @@ public class BackupService {
 			}
 		}
 
-		Map<String, ExposedApp> appsByFqdn = manifest.exposedApps().stream()
-				.collect(Collectors.toMap(ExposedApp::fqdn, a -> a));
-		int exposedAppsRestored = 0;
-		for (String fqdnKey : selection.exposedAppFqdns()) {
-			ExposedApp original = appsByFqdn.get(fqdnKey);
+		Map<String, Server> appsByFqdn = manifest.servers().stream()
+				.collect(Collectors.toMap(Server::fqdn, a -> a));
+		int serversRestored = 0;
+		for (String fqdnKey : selection.serverFqdns()) {
+			Server original = appsByFqdn.get(fqdnKey);
 			if (original == null) {
-				failures.add("Exposed app " + fqdnKey + ": not found in configuration export");
+				failures.add("Server " + fqdnKey + ": not found in configuration export");
 				continue;
 			}
 			if (original.subdomain() != null && !original.subdomain().isBlank() && !DnsLabelValidator.isValid(original.subdomain())) {
-				failures.add("Exposed app " + fqdnKey + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
+				failures.add("Server " + fqdnKey + ": can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen");
 				continue;
 			}
 			try {
 				ensureHomelab(original.homelabName(), existingAgents);
 				// Substitute the target domain the restore wizard's per-item <select> chose (default:
 				// the ZIP's own domain if it's still registered here, else the primary domain -- see
-				// BackupController) -- the tunnel is created/deleted at this domain, not the ZIP's.
-				// An SSH/RDP/VNC-mode app always lives on the primary domain (see
-				// ExposedAppController.toExposedApp) regardless of what the wizard's picker offered.
-				String targetDomain = original.isRemoteAccessMode() ? boringProxyProperties.primaryDomain()
-						: selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain());
-				// original.encryptedSecret() is always null here -- buildManifest already stripped it
-				// (see class docs), so an imported SSH/RDP/VNC-mode app naturally lands in the same
-				// "no credential stored yet" state ConsoleConnectController's Connect page prompts for.
-				ExposedApp app = new ExposedApp(original.subdomain(), original.name(), original.homelabName(),
-						original.type(), original.protocol(), original.host(), original.port(),
-						original.exposedPort(), original.tlsMode(), original.ssoProtected(), targetDomain,
-						original.mode(), original.username(), original.encryptedSecret(),
-						original.ignoreCertificate());
-				String fqdn = tunnelMapper.fqdn(app);
-				deleteTunnelIgnoringMissing(fqdn);
-				sleep();
-				TunnelDto tunnel = boringProxyClient.createTunnel(tunnelMapper.toCreateTunnelRequest(app, OWNER));
-				// SSH/RDP/VNC mode submits exposedPort null (boringproxy auto-assigns it) -- capture
-				// the real assigned port from the response, same fix as ExposedAppController.create/
-				// update, or selfieproxy-remote-console ends up dialing port 0.
-				if (app.isRemoteAccessMode()) {
-					app = app.withExposedPort(tunnel.tunnelPort());
+				// BackupController). Every enabled protocol's hidden tunnel FQDN is derived from the
+				// Application's own (new) full FQDN, so all of them are regenerated here too, not just
+				// Web's -- see HiddenTunnelFqdnAssigner/rebuildForDomain.
+				String targetDomain = selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain());
+				Server server = rebuildForDomain(original, targetDomain);
+				Map<ServerProtocol, TunnelMapper.ProtocolTunnel> plans = tunnelMapper.tunnelPlans(server, OWNER);
+				plans.values().forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
+				if (!plans.isEmpty()) {
+					sleep();
 				}
-				exposedAppStore.save(app);
-				exposedAppsRestored++;
+				for (Map.Entry<ServerProtocol, TunnelMapper.ProtocolTunnel> entry : plans.entrySet()) {
+					TunnelDto tunnel = boringProxyClient.createTunnel(entry.getValue().request());
+					if (entry.getKey() == ServerProtocol.TERMINAL) {
+						server = server.withTerminalExposedPort(tunnel.tunnelPort());
+					} else if (entry.getKey() == ServerProtocol.REMOTE_DESKTOP) {
+						server = server.withRemoteDesktopExposedPort(tunnel.tunnelPort());
+					}
+				}
+				serverStore.save(server);
+				serversRestored++;
 			} catch (Exception e) {
-				failures.add("Exposed app " + fqdnKey + ": " + e.getMessage());
+				failures.add("Server " + fqdnKey + ": " + e.getMessage());
 			}
 		}
 
@@ -339,7 +337,34 @@ public class BackupService {
 			}
 		}
 
-		return new RestoreResult(homelabsRestored, exposedAppsRestored, localWebsitesRestored, failures);
+		return new RestoreResult(homelabsRestored, serversRestored, localWebsitesRestored, failures);
+	}
+
+	/**
+	 * Regenerates every hidden tunnel FQDN (Terminal/RemoteDesktop always under the primary domain,
+	 * PortForwarding under targetDomain -- the Application's own, possibly just-changed domain)
+	 * since each is derived from the Application's own full FQDN. exposedPort is reset to null on
+	 * each -- it's recaptured from the recreated tunnel's response right after (see doApplyRestore).
+	 * Credentials (already stripped by buildManifest/withoutSecrets) pass through unchanged, landing
+	 * the restored Application in the same "no credential yet" state a fresh add would be in.
+	 */
+	private Server rebuildForDomain(Server original, String targetDomain) {
+		String newServerFqdn = original.subdomain() == null || original.subdomain().isBlank()
+				? targetDomain : original.subdomain() + "." + targetDomain;
+		TerminalConfig terminal = original.terminal() == null ? null : new TerminalConfig(
+				fqdnAssigner.assign(newServerFqdn, original.terminal().port(), boringProxyProperties.primaryDomain(), Set.of()),
+				original.terminal().port(), null, original.terminal().username(), original.terminal().encryptedSecret());
+		RemoteDesktopConfig remoteDesktop = original.remoteDesktop() == null ? null : new RemoteDesktopConfig(
+				fqdnAssigner.assign(newServerFqdn, original.remoteDesktop().port(), boringProxyProperties.primaryDomain(), Set.of()),
+				original.remoteDesktop().protocol(), original.remoteDesktop().port(), null,
+				original.remoteDesktop().username(), original.remoteDesktop().encryptedSecret(),
+				original.remoteDesktop().ignoreCertificate());
+		PortForwardingConfig portForwarding = original.portForwarding() == null ? null : new PortForwardingConfig(
+				fqdnAssigner.assign(newServerFqdn, original.portForwarding().publicPort(), targetDomain, Set.of()),
+				original.portForwarding().protocol(), original.portForwarding().publicPort(),
+				original.portForwarding().targetPort());
+		return new Server(original.subdomain(), targetDomain, original.homelabName(), original.host(),
+				original.web(), terminal, remoteDesktop, portForwarding);
 	}
 
 	/** Creates the agent (with a brand-new secret) if it doesn't already exist on this server; returns whether it was created. */

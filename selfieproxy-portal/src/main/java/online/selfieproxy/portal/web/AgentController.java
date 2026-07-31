@@ -54,7 +54,7 @@ public class AgentController {
 		return "agents";
 	}
 
-	/** Polled every 2s by agents.js to refresh the connected/disconnected dot and app count without a full page reload. */
+	/** Polled every 2s by agents.js to refresh the connected/disconnected dot and server count without a full page reload. */
 	@GetMapping(value = "/agents/status", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public List<AgentListItem> status() {
@@ -116,7 +116,7 @@ public class AgentController {
 		// it under the new name and remove the old one. Its secret is just a token
 		// re-pointed at an agent name, though, so that part we retarget in place
 		// instead of minting a fresh one -- renaming must never invalidate a secret
-		// that's already configured on the homelab's .env. Every exposed app
+		// that's already configured on the homelab's .env. Every exposed server
 		// under the old name must follow the rename too, or it'd be silently
 		// orphaned (see the warning icon/banner on the Exposed applications page).
 		boringProxyClient.createAgent(OWNER, newName);
@@ -152,7 +152,7 @@ public class AgentController {
 	}
 
 	private List<AgentListItem> loadAgentListItems() {
-		Map<String, Long> appCountsByHomelab = boringProxyClient.listTunnels().values().stream()
+		Map<String, Long> serverCountsByHomelab = boringProxyClient.listTunnels().values().stream()
 				.collect(Collectors.groupingBy(TunnelDto::agentName, Collectors.counting()));
 
 		List<AgentListItem> items = new ArrayList<>();
@@ -161,8 +161,8 @@ public class AgentController {
 			if (isThisServer(name)) {
 				continue;
 			}
-			int appCount = appCountsByHomelab.getOrDefault(name, 0L).intValue();
-			items.add(new AgentListItem(name, agentStatusService.isOnline(entry.getValue()), appCount));
+			int serverCount = serverCountsByHomelab.getOrDefault(name, 0L).intValue();
+			items.add(new AgentListItem(name, agentStatusService.isOnline(entry.getValue()), serverCount));
 		}
 		items.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
 		return items;

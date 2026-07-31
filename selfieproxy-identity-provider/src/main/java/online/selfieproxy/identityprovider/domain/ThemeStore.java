@@ -15,7 +15,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Read-only mirror of theme.json (selfieproxy-portal owns writing it -- see that module's own
  * Theme/ThemeStore/AppearanceController), read over the shared /data volume via the same
  * selfieproxy.theme-path property/default path. Same read-only-mirror shape as
- * selfieproxy-remote-console's RemoteConsoleStore reading selfieproxy-portal's exposed-apps.json.
+ * selfieproxy-remote-console's RemoteConsoleStore reading selfieproxy-portal's servers.json.
  *
  * A missing or corrupt file is never fatal -- this setting backs the pre-auth login page, so it
  * must never be capable of blocking a login. load() falls back to Theme.LIGHT and logs a warning

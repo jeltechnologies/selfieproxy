@@ -27,4 +27,5 @@ replay_pid*
 data/
 selfieproxy-portal/target
 selfieproxy-identity-provider/target
+selfieproxy-remote-console/target
 

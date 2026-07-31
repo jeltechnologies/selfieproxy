@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
  * Selfie Proxy's single shared UI theme setting (Light/Dark/Dracula) -- the same mode is also used
  * by selfieproxy-identity-provider's login/change-password/logged-out pages, over the shared /data
  * volume (see that module's own read-only ThemeStore, the same mirror shape as
- * selfieproxy-remote-console's RemoteConsoleStore reading exposed-apps.json). Written only here,
+ * selfieproxy-remote-console's RemoteConsoleStore reading servers.json). Written only here,
  * from AppearanceController.
  *
  * Unlike DomainStore/AdminUserStore, a missing or corrupt theme.json is never fatal -- this is a

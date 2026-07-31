@@ -318,12 +318,12 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 }
 .page-header h1 { margin: 0; }
 
-.apps-table {
+.list-table {
 	width: 100%;
 	border-collapse: collapse;
 }
 
-.apps-table th, .apps-table td {
+.list-table th, .list-table td {
 	text-align: left;
 	padding: 0.6rem 0.5rem;
 	border-bottom: 1px solid var(--border);

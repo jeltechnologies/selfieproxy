@@ -62,7 +62,7 @@ public class GuacamoleWebSocketHandler implements WebSocketHandler, SubProtocolC
 		String fqdn = (String) session.getAttributes().get(ConsoleIdHandshakeInterceptor.CONSOLE_FQDN_ATTRIBUTE);
 		RemoteConsole console = fqdn == null ? null : remoteConsoleStore.find(fqdn);
 		if (console == null) {
-			log.warn("No SSH/RDP/VNC-mode application found for fqdn={}", fqdn);
+			log.warn("No SSH/RDP/VNC-mode server found for fqdn={}", fqdn);
 			session.close(CloseStatus.NOT_ACCEPTABLE.withReason("Unknown console"));
 			return;
 		}

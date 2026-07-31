@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * The full contents of a Selfie Proxy backup, serialized as manifest.json at
  * the root of the backup ZIP (see BackupService). Uses the same bespoke,
- * camelCase ObjectMapper convention as ExposedAppStore/LocalWebsiteStore
+ * camelCase ObjectMapper convention as ServerStore/LocalWebsiteStore
  * (not the globally-configured snake_case one used for REST DTOs) since this
  * is an internal persistence format, not an API response.
  *
@@ -13,9 +13,9 @@ import java.util.List;
  * @param createdAt      ISO-8601 date-time (millisecond precision, with offset/zone) the backup was created, in the
  *                       browser's local timezone at download time -- see BackupController's {@code ?tz=} param, informational only
  * @param sourcePrimaryDomain the primary domain of the server the backup was taken from, informational only -- restore
- *                       never depends on it, since each item already carries its own domain (see ExposedApp.domain()/LocalWebsite.domain())
+ *                       never depends on it, since each item already carries its own domain (see Server.domain()/LocalWebsite.domain())
  * @param homelabs       every Homelab (Agent) name except the hidden "This Server" one -- see ThisServerAgentProperties
- * @param exposedApps    every Exposed App ("server"), the same merged view ExposedAppController itself shows/edits
+ * @param servers    every Server, the same merged view ServerController itself shows/edits
  * @param localWebsites  every Local Website's config; its content files live in the ZIP under local-websites/&lt;fqdn&gt;/
  * @param theme          the shared Light/Dark UI theme setting (see ThemeStore) -- always included and always applied
  *                       on restore, unconditionally, the same treatment as sourcePrimaryDomain/createdAt: there's no
@@ -28,10 +28,13 @@ public record BackupManifest(
 		String createdAt,
 		String sourcePrimaryDomain,
 		List<String> homelabs,
-		List<ExposedApp> exposedApps,
+		List<Server> servers,
 		List<LocalWebsite> localWebsites,
 		String theme,
 		TerminalSettings terminalSettings) {
 
-	public static final int CURRENT_VERSION = 2;
+	// Bumped 3->4 when the "exposedApps" field/concept was renamed to "servers" throughout the
+	// Java codebase -- an old export is cleanly rejected by readManifest's version check instead
+	// of silently deserializing with an empty/missing servers list.
+	public static final int CURRENT_VERSION = 4;
 }

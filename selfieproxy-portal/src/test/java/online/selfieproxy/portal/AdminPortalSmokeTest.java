@@ -29,6 +29,11 @@ import online.selfieproxy.portal.boringproxy.dto.AgentStatusDto;
 import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
 import online.selfieproxy.portal.boringproxy.dto.TokenDataDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
+import online.selfieproxy.portal.domain.Server;
+import online.selfieproxy.portal.domain.ServerStore;
+import online.selfieproxy.portal.domain.Protocol;
+import online.selfieproxy.portal.domain.TerminalConfig;
+import online.selfieproxy.portal.domain.WebConfig;
 
 /**
  * Exercises dashboard -> add -> edit -> delete through real Spring MVC
@@ -38,9 +43,14 @@ import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
  * reaches here, see SessionInterceptor) -- each flow starts by simulating
  * that gate with the X-Selfieproxy-Sso-Verified header on a first request,
  * then reuses the resulting HttpSession like a real browser would.
+ *
+ * ServerStore is the sole source of truth for the Applications list now
+ * (see its own javadoc) -- fixture Applications are seeded directly into the
+ * real, temp-file-backed store rather than assembled from mocked
+ * BoringProxyClient tunnels the way the old single-protocol model allowed.
  */
 @SpringBootTest(properties = {
-		"selfieproxy.exposed-apps-path=${java.io.tmpdir}/selfieproxy-smoke-test-exposed-apps.json",
+		"selfieproxy.servers-path=${java.io.tmpdir}/selfieproxy-smoke-test-servers.json",
 		"selfieproxy.domains-path=${java.io.tmpdir}/selfieproxy-smoke-test-domains.json"})
 @AutoConfigureMockMvc
 class AdminPortalSmokeTest {
@@ -50,11 +60,14 @@ class AdminPortalSmokeTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	@Autowired
+	private ServerStore serverStore;
+
 	@MockitoBean
 	private BoringProxyClient boringProxyClient;
 
 	private MockHttpSession authenticatedSession() throws Exception {
-		MvcResult result = mockMvc.perform(get("/apps").header(SSO_VERIFIED_HEADER, "true"))
+		MvcResult result = mockMvc.perform(get("/servers").header(SSO_VERIFIED_HEADER, "true"))
 				.andExpect(status().isOk())
 				.andReturn();
 		return (MockHttpSession) result.getRequest().getSession();
@@ -66,46 +79,52 @@ class AdminPortalSmokeTest {
 
 		when(boringProxyClient.listAgents())
 				.thenReturn(Map.of("home", new AgentStatusDto(null), "office", new AgentStatusDto(null)));
+		when(boringProxyClient.listTunnels()).thenReturn(Map.of());
 
-		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "home", "", "");
-		TunnelDto netTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
-				51234, "", "127.0.0.1", 22, true, "passthrough", false, false, "admin", "home", "", "");
-		when(boringProxyClient.listTunnels())
-				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", netTunnel));
+		Server musicServer = new Server("music", "example.com", "home", "127.0.0.1",
+				new WebConfig(Protocol.HTTPS, 443, false), null, null, null);
+		Server sshServer = new Server("ssh", "example.com", "home", "127.0.0.1", null,
+				new TerminalConfig("ssh-example-com-22.example.com", 22, 51234, "user", null), null, null);
+		serverStore.save(musicServer);
+		serverStore.save(sshServer);
 
-		mockMvc.perform(get("/apps").session(session))
+		mockMvc.perform(get("/servers").session(session))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("music")))
 				.andExpect(content().string(containsString("ssh")))
 				.andExpect(content().string(containsString("home")));
 
-		mockMvc.perform(get("/apps/new").session(session))
+		mockMvc.perform(get("/servers/new").session(session))
 				.andExpect(status().isOk())
-				.andExpect(content().string(containsString("Add application")));
+				.andExpect(content().string(containsString("Add server")));
 
-		when(boringProxyClient.getTunnel(eq("music.example.com"))).thenReturn(webTunnel);
+		when(boringProxyClient.getTunnel(eq("music.example.com"))).thenReturn(
+				new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
+						12345, "", "127.0.0.1", 443, false, "server", false, false, "admin", "home", "", ""));
 
-		mockMvc.perform(get("/apps/music.example.com/edit").session(session))
+		mockMvc.perform(get("/servers/music.example.com/edit").session(session))
 				.andExpect(status().isOk())
 				.andExpect(content().string(containsString("music")));
 
-		when(boringProxyClient.createTunnel(any(CreateTunnelRequestDto.class))).thenReturn(webTunnel);
+		when(boringProxyClient.createTunnel(any(CreateTunnelRequestDto.class))).thenReturn(
+				new TunnelDto("newapp.example.com", "admin.example.com", 22, "", "user",
+						12345, "", "127.0.0.1", 8080, false, "server", false, false, "admin", "home", "", ""));
 
-		mockMvc.perform(post("/apps")
+		mockMvc.perform(post("/servers")
 						.session(session)
 						.param("subdomain", "newapp")
+						.param("domain", "example.com")
 						.param("homelabName", "home")
-						.param("type", "WEB_APPLICATION")
-						.param("protocol", "HTTP")
 						.param("host", "127.0.0.1")
-						.param("port", "8080"))
+						.param("webEnabled", "true")
+						.param("webProtocol", "HTTP")
+						.param("webPort", "8080"))
 				.andExpect(status().is3xxRedirection())
-				.andExpect(redirectedUrl("/apps"));
+				.andExpect(redirectedUrl("/servers"));
 
-		mockMvc.perform(post("/apps/ssh.example.com/delete").session(session))
+		mockMvc.perform(post("/servers/ssh.example.com/delete").session(session))
 				.andExpect(status().is3xxRedirection())
-				.andExpect(redirectedUrl("/apps"));
+				.andExpect(redirectedUrl("/servers"));
 	}
 
 	@Test
@@ -146,7 +165,7 @@ class AdminPortalSmokeTest {
 	}
 
 	@Test
-	void renamingAgentRetargetsSecretAndTunnelsInsteadOfMintingANewOneOrOrphaningApps() throws Exception {
+	void renamingAgentRetargetsSecretAndTunnelsInsteadOfMintingANewOneOrOrphaningServers() throws Exception {
 		MockHttpSession session = authenticatedSession();
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("default", new AgentStatusDto(null)));

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title=${isNew} ? 'Add server - Selfie Proxy' : 'Edit server - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='servers')}"></header>
+
+	<main class="page">
+		<h1 th:text="${isNew} ? 'Add server' : 'Edit ' + (${#strings.isEmpty(server.subdomain())} ? ${server.domain()} : ${server.subdomain()})"></h1>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<p class="warning" th:if="${certPending}">
+			This server is temporarily using a self-signed certificate -- browsers will show a security
+			warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt. This can happen after
+			creating many servers in a short time; Selfie Proxy retries automatically in the background.
+		</p>
+
+		<form id="server-form" method="post"
+			  th:action="${isNew} ? @{/servers} : @{/servers/{fqdn}(fqdn=${server.fqdn()})}">
+
+			<div class="field-row">
+				<div class="field" id="subdomain-field">
+					<label for="subdomain">Subdomain</label>
+					<input type="text" id="subdomain" name="subdomain" th:value="${server.subdomain()}"
+						   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen"
+						   placeholder="(leave blank to use the domain by itself)">
+				</div>
+
+				<div class="field" id="domain-field">
+					<label for="domain">Domain</label>
+					<select id="domain" name="domain">
+						<option th:each="d : ${domains}" th:value="${d.name()}"
+								th:text="${d.primary()} ? ${d.name()} + ' (primary)' : ${d.name()}"
+								th:selected="${d.name() == server.domain()}"></option>
+					</select>
+				</div>
+
+				<div class="field" id="result-field">
+					<label>Fully qualified domain name</label>
+					<p id="result" class="result-text"></p>
+				</div>
+			</div>
+
+			<div class="field">
+				<label for="homelabName">Homelab</label>
+				<select id="homelabName" name="homelabName" required>
+					<option th:if="${!#lists.contains(homelabs, server.homelabName())}" value=""
+							disabled="disabled" selected="selected">Select a homelab</option>
+					<option th:each="n : ${homelabs}" th:value="${n}"
+							th:text="${n} + (${homelabOnline.get(n)} ? ' (Connected)' : ' (Not connected)')"
+							th:selected="${n == server.homelabName()}"></option>
+				</select>
+			</div>
+
+			<div class="field">
+				<label for="host">IP or hostname to homelab server</label>
+				<input type="text" id="host" name="host" th:value="${server.host()}" placeholder="127.0.0.1">
+			</div>
+
+			<p class="muted">Select which protocols this server exposes.</p>
+
+			<fieldset class="protocol-row" id="web-row">
+				<label class="protocol-row-toggle">
+					<input type="checkbox" id="webEnabled" name="webEnabled" value="true" th:checked="${server.hasWeb()}">
+					<strong>Web</strong>
+				</label>
+				<div id="web-row-fields">
+					<p class="muted">Expose your homelab server as a website, or a REST/SOAP web service.</p>
+					<div class="field" id="web-sso-protected-field">
+						<label>
+							<input type="checkbox" id="webSsoProtected" name="webSsoProtected" value="true"
+								   th:checked="${server.hasWeb() and server.web().ssoProtected()}">
+							Protect by forcing authentication through Selfieproxy login
+						</label>
+					</div>
+					<div class="field-row">
+						<div class="field">
+							<label for="webProtocol">Protocol</label>
+							<select id="webProtocol" name="webProtocol">
+								<option value="HTTPS" th:selected="${!server.hasWeb() or server.web().protocol().name() == 'HTTPS'}">HTTPS</option>
+								<option value="HTTP" th:selected="${server.hasWeb() and server.web().protocol().name() == 'HTTP'}">HTTP</option>
+							</select>
+						</div>
+						<div class="field">
+							<label>Host</label>
+							<p class="result-text host-echo" th:text="${server.host()}"></p>
+						</div>
+						<div class="field">
+							<label for="webPort">Homelab server port</label>
+							<input type="number" id="webPort" name="webPort" th:value="${server.hasWeb() ? server.web().port() : 443}">
+						</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<fieldset class="protocol-row" id="terminal-row">
+				<label class="protocol-row-toggle">
+					<input type="checkbox" id="terminalEnabled" name="terminalEnabled" value="true" th:checked="${server.hasTerminal()}">
+					<strong>Terminal access</strong>
+				</label>
+				<div id="terminal-row-fields">
+					<p class="muted">Access your homelab server with a browser-based SSH terminal.</p>
+					<div class="field-row">
+						<div class="field">
+							<label>Protocol</label>
+							<p class="result-text">SSH</p>
+						</div>
+						<div class="field">
+							<label>Host</label>
+							<p class="result-text host-echo" th:text="${server.host()}"></p>
+						</div>
+						<div class="field">
+							<label for="terminalPort">Homelab server port</label>
+							<input type="number" id="terminalPort" name="terminalPort"
+								   th:value="${server.hasTerminal() ? server.terminal().port() : 22}">
+						</div>
+					</div>
+					<div class="field-row">
+						<div class="field">
+							<label for="terminalUsername">Username</label>
+							<input type="text" id="terminalUsername" name="terminalUsername"
+								   th:value="${server.hasTerminal() ? server.terminal().username() : null}">
+						</div>
+						<div class="field">
+							<label for="terminalSecret">Password</label>
+							<input type="password" id="terminalSecret" name="terminalSecret"
+								   th:placeholder="${server.hasTerminal() and server.terminal().encryptedSecret() != null} ? '••••••••'">
+						</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<fieldset class="protocol-row" id="remote-desktop-row">
+				<label class="protocol-row-toggle">
+					<input type="checkbox" id="remoteDesktopEnabled" name="remoteDesktopEnabled" value="true" th:checked="${server.hasRemoteDesktop()}">
+					<strong>Remote desktop</strong>
+				</label>
+				<div id="remote-desktop-row-fields">
+					<p class="muted">Access your homelab server with a browser-based RDP or VNC session.</p>
+					<div class="field-row">
+						<div class="field">
+							<label for="remoteDesktopProtocol">Protocol</label>
+							<select id="remoteDesktopProtocol" name="remoteDesktopProtocol">
+								<option th:each="m : ${T(online.selfieproxy.portal.domain.RemoteDesktopProtocol).values()}"
+										th:value="${m.name()}" th:text="${m.name()}"
+										th:selected="${server.hasRemoteDesktop() ? server.remoteDesktop().protocol().name() == m.name() : m.name() == 'RDP'}"></option>
+							</select>
+						</div>
+						<div class="field">
+							<label>Host</label>
+							<p class="result-text host-echo" th:text="${server.host()}"></p>
+						</div>
+						<div class="field">
+							<label for="remoteDesktopPort">Homelab server port</label>
+							<input type="number" id="remoteDesktopPort" name="remoteDesktopPort"
+								   th:value="${server.hasRemoteDesktop() ? server.remoteDesktop().port() : 3389}">
+						</div>
+					</div>
+					<div class="field-row">
+						<div class="field">
+							<label for="remoteDesktopUsername">Username</label>
+							<input type="text" id="remoteDesktopUsername" name="remoteDesktopUsername"
+								   th:value="${server.hasRemoteDesktop() ? server.remoteDesktop().username() : null}">
+						</div>
+						<div class="field">
+							<label for="remoteDesktopSecret">Password</label>
+							<input type="password" id="remoteDesktopSecret" name="remoteDesktopSecret"
+								   th:placeholder="${server.hasRemoteDesktop() and server.remoteDesktop().encryptedSecret() != null} ? '••••••••'">
+						</div>
+					</div>
+					<div class="field">
+						<label>
+							<input type="checkbox" id="remoteDesktopIgnoreCertificate" name="remoteDesktopIgnoreCertificate" value="true"
+								   th:checked="${server.hasRemoteDesktop() and server.remoteDesktop().ignoreCertificate()}">
+							Accept a self-signed certificate on the target
+						</label>
+					</div>
+				</div>
+			</fieldset>
+
+			<fieldset class="protocol-row" id="port-forwarding-row">
+				<label class="protocol-row-toggle">
+					<input type="checkbox" id="portForwardingEnabled" name="portForwardingEnabled" value="true" th:checked="${server.hasPortForwarding()}">
+					<strong>Port forwarding</strong>
+				</label>
+				<div id="port-forwarding-row-fields">
+					<p class="muted">Expose a raw TCP port on your homelab server directly to the internet.</p>
+					<p class="warning">
+						Use this at your own risk. Anyone on the internet who scans your domain can see that
+						port is open and attempt to connect to it.
+					</p>
+					<div class="field" id="port-forwarding-protocol-field">
+						<label for="portForwardingProtocol">Protocol</label>
+						<select id="portForwardingProtocol" name="portForwardingProtocol">
+							<option th:each="m : ${T(online.selfieproxy.portal.domain.PortForwardingProtocol).values()}"
+									th:value="${m.name()}" th:text="${m.name()}"></option>
+						</select>
+					</div>
+					<div class="field-row">
+						<div class="field">
+							<label>Host</label>
+							<p class="result-text host-echo" th:text="${server.host()}"></p>
+						</div>
+						<div class="field">
+							<label for="portForwardingTargetPort">Homelab server port</label>
+							<input type="number" id="portForwardingTargetPort" name="portForwardingTargetPort"
+								   th:value="${server.hasPortForwarding() ? server.portForwarding().targetPort() : null}">
+						</div>
+						<div class="field">
+							<label for="portForwardingPublicPort">Port exposed to the internet
+								<span class="warning-icon" title="Make sure to open the exposed port in your firewall.">&#9888;</span>
+							</label>
+							<input type="number" id="portForwardingPublicPort" name="portForwardingPublicPort"
+								   th:value="${server.hasPortForwarding() ? server.portForwarding().publicPort() : null}" min="1024" max="65535">
+						</div>
+					</div>
+				</div>
+			</fieldset>
+
+			<div class="button-panel">
+				<button type="submit" class="button">OK</button>
+				<button type="button" id="remove-button" class="button button-danger" th:unless="${isNew}">Remove</button>
+				<a class="button button-cancel" th:href="@{/servers}">Cancel</a>
+			</div>
+		</form>
+
+		<form id="delete-form" method="post"
+			  th:action="${isNew} ? '' : @{/servers/{fqdn}/delete(fqdn=${server.fqdn()})}">
+		</form>
+	</main>
+
+	<div id="confirm-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>Remove this server? This cannot be undone.</p>
+			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
+			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<div id="updating-overlay" class="overlay">
+		<div class="overlay-card overlay-card-status">
+			<div class="spinner"></div>
+			<p>Updating server....</p>
+		</div>
+	</div>
+
+	<script th:src="@{/js/edit-server.js}"></script>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title th:text="${console.name()} + ' - Selfie Proxy Console'">Selfie Proxy Console</title>
+	<title th:text="${fqdn} + ' - Selfie Proxy Console'">Selfie Proxy Console</title>
 	<link rel="stylesheet" th:href="@{/css/connect.css}">
 	<link rel="stylesheet" th:href="@{/css/vendor/xterm/xterm.css}">
 	<link rel="stylesheet" th:href="@{/css/fonts.css}">
@@ -20,7 +20,7 @@
 </head>
 <body>
 	<header class="toolbar">
-		<span class="console-name" th:text="${console.name()} + ' (' + ${console.mode()} + ')'"></span>
+		<span class="console-name" th:text="${fqdn} + ' (' + ${console.mode()} + ')'"></span>
 		<span id="status" class="status">Connecting...</span>
 		<details class="settings-menu">
 			<summary>Settings</summary>

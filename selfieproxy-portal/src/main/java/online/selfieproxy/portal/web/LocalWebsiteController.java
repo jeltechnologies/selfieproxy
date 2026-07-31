@@ -50,8 +50,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * protocol/TLS choice, just a domain. Every website's Tunnel points at the
  * shared selfieproxy-local-websites container through the hidden "This Server"
  * homelab (see ThisServerAgentProperties); this controller builds that
- * Tunnel request directly rather than going through ExposedApp/TunnelMapper,
- * which are exposed-app-specific abstractions this feature deliberately
+ * Tunnel request directly rather than going through Server/TunnelMapper,
+ * which are exposed-server-specific abstractions this feature deliberately
  * doesn't share.
  */
 @Controller

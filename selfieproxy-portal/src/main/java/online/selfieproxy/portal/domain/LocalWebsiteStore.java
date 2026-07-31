@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Selfie Proxy's own complete record of every LocalWebsite, keyed by its full
- * FQDN (see LocalWebsite.fqdn()). Unlike ExposedAppStore, this is the sole
+ * FQDN (see LocalWebsite.fqdn()). Unlike ServerStore, this is the sole
  * source of truth -- there's no boringproxy-side concept to reconcile
  * against, since a Local Website's Tunnel is entirely our own implementation
  * detail (see LocalWebsiteController), not something a user could have

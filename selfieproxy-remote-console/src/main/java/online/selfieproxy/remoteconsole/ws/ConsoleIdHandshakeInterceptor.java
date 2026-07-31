@@ -13,7 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * Spring's WebSocketHandlerRegistry has no built-in path-variable binding
- * (unlike @GetMapping's {fqdn}), so this interceptor pulls the app's FQDN out
+ * (unlike @GetMapping's {fqdn}), so this interceptor pulls the server's FQDN out
  * of the upgrade request's own path -- shared by both the guacd bridge
  * (/connect/{fqdn}/ws) and the direct-SSH terminal bridge
  * (/connect/{fqdn}/term, see SshWebSocketHandler) -- and stashes it into the

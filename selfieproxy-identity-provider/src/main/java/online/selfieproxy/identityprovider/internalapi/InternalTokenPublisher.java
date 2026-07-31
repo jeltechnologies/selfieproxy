@@ -13,9 +13,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Mints a fresh random token every startup and writes it to internal-api.token-path
- * (inside the /data volume this app already shares with selfieproxy-portal), mirroring
+ * (inside the /data volume this service already shares with selfieproxy-portal), mirroring
  * boringproxy's own ephemeral-REST-token pattern (see selfieproxy-portal's
- * InternalTokenProvider) but in the opposite role -- this app is the token
+ * InternalTokenProvider) but in the opposite role -- this service is the token
  * publisher/server, the portal is the reader/client. Never persisted anywhere
  * else, changes on every restart. Kept cached for InternalApiSecurityFilter's
  * constant-time comparison against every /internal/** request.
