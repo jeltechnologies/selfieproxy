@@ -48,7 +48,9 @@
 	var tlsModeRadios = document.querySelectorAll('input[name="tlsMode"]');
 
 	var defaultModePorts = { SSH: 22, RDP: 3389, VNC: 5900 };
+	var defaultProtocolPorts = { HTTP: 80, HTTPS: 443 };
 	var portTouched = false;
+	var lastProtocol = protocolSelect.value;
 
 	// Collapsed until the user clicks "Advanced settings" -- updateVisibility()
 	// only ever hides this (when switching away from HTTPS), never shows it.
@@ -140,7 +142,13 @@
 		portTouched = true;
 	});
 	protocolSelect.addEventListener("change", function () {
-		portInput.value = protocolSelect.value === "HTTPS" ? 443 : 80;
+		// Only follow the protocol's default port when the port was still at the *previous*
+		// protocol's default -- a port the user deliberately set (e.g. HTTPS on a custom 12345)
+		// must survive a protocol switch untouched.
+		if (String(portInput.value) === String(defaultProtocolPorts[lastProtocol])) {
+			portInput.value = defaultProtocolPorts[protocolSelect.value];
+		}
+		lastProtocol = protocolSelect.value;
 		refresh();
 	});
 	subdomainInput.addEventListener("input", refresh);

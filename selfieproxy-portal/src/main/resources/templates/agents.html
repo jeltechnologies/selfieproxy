@@ -20,6 +20,7 @@
 		<table class="apps-table" th:if="${not #lists.isEmpty(agents)}">
 			<thead>
 				<tr>
+					<th></th>
 					<th>Name</th>
 					<th>Status</th>
 					<th>Applications</th>
@@ -28,12 +29,12 @@
 			</thead>
 			<tbody>
 				<tr th:each="agent : ${agents}" th:attr="data-agent-name=${agent.name()}">
+					<td>
+						<span class="status-dot" th:classappend="${agent.online()} ? 'status-dot-online' : 'status-dot-offline'"></span>
+					</td>
 					<td th:text="${agent.name()}"></td>
 					<td>
-						<span class="status">
-							<span class="status-dot" th:classappend="${agent.online()} ? 'status-dot-online' : 'status-dot-offline'"></span>
-							<span class="status-text" th:text="${agent.online()} ? 'Connected' : 'Disconnected'"></span>
-						</span>
+						<span class="status-text" th:text="${agent.online()} ? 'Connected' : 'Disconnected'"></span>
 					</td>
 					<td class="app-count" th:text="${agent.appCount()}"></td>
 					<td>

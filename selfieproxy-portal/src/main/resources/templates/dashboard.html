@@ -41,8 +41,8 @@
 		<table class="apps-table" data-sortable th:if="${not #lists.isEmpty(exposedApps)}">
 			<thead>
 				<tr>
+					<th></th>
 					<th data-sort-key="name">Name</th>
-					<th>Status</th>
 					<th data-sort-key="domain">Domain</th>
 					<th data-sort-key="homelab">Homelab</th>
 					<th data-sort-key="localAddress">Local address</th>
@@ -53,15 +53,15 @@
 			<tbody>
 				<tr th:each="app : ${exposedApps}" th:attr="data-domain=${app.domain()}, data-fqdn=${app.fqdn()}"
 					th:with="offline=${appStatusMessage.containsKey(app.fqdn())}">
-					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())}">
-						<span th:text="${app.isNetworkService()} ? ${app.name()} : (${#strings.isEmpty(app.subdomain())} ? ${app.domain()} : ${app.subdomain()})"></span>
-						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
-							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
-					</td>
 					<td>
 						<span class="status" th:title="${appStatusMessage.get(app.fqdn())}">
 							<span class="status-dot" th:classappend="${offline} ? 'status-dot-offline' : 'status-dot-online'"></span>
 						</span>
+					</td>
+					<td th:attr="data-sort-value=${app.isNetworkService() ? app.name() : (#strings.isEmpty(app.subdomain()) ? app.domain() : app.subdomain())}">
+						<span th:text="${app.isNetworkService()} ? ${app.name()} : (${#strings.isEmpty(app.subdomain())} ? ${app.domain()} : ${app.subdomain()})"></span>
+						<span th:if="${!#lists.contains(homelabs, app.homelabName())}"
+							  class="warning-icon" title="This application's homelab no longer exists">&#9888;</span>
 					</td>
 					<td th:attr="data-sort-value=${app.domain()}">
 						<span th:text="${app.domain()}"></span>
@@ -69,7 +69,8 @@
 							  class="warning-icon" title="This application's domain no longer exists">&#9888;</span>
 					</td>
 					<td th:text="${app.homelabName()}"></td>
-					<td th:attr="data-sort-value=${app.host()} + ':' + ${app.port()}" th:text="${app.host()} + ':' + ${app.port()}"></td>
+					<td th:with="localAddress=${app.isWebApplication()} ? (${app.protocol().name().toLowerCase()} + '://' + ${app.host()} + ':' + ${app.port()}) : (${app.host()} + ':' + ${app.port()})"
+						th:attr="data-sort-value=${localAddress}" th:text="${localAddress}"></td>
 					<td>
 						<a th:if="${app.isRemoteAccessMode()}" class="button-small connect-button"
 						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"

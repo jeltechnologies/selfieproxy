@@ -56,7 +56,7 @@
 		var dockerCompose = document.getElementById("connect-docker-compose");
 
 		var renderConnectInfo = function () {
-			var name = (nameInput.value || "").trim() || "your-homelab-name";
+			var name = (nameInput.value || "").trim();
 
 			dockerRun.textContent =
 				"docker run -d --name selfieproxy-reverseproxy --restart unless-stopped \\\n" +
