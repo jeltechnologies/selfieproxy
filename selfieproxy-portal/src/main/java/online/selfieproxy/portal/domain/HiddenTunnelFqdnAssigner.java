@@ -28,11 +28,11 @@ public class HiddenTunnelFqdnAssigner {
 	 * excludeFqdns is this Application's own currently-live hidden tunnel FQDNs, so re-saving
 	 * unchanged (or renaming a sibling protocol) never makes an Application collide with itself.
 	 */
-	public String assign(String appFqdn, int port, String targetDomain, Set<String> excludeFqdns) {
-		String base = HiddenTunnelLabel.derive(appFqdn, port);
+	public String assign(String appFqdn, String suffix, String targetDomain, Set<String> excludeFqdns) {
+		String base = HiddenTunnelLabel.derive(appFqdn, suffix);
 		Map<String, TunnelDto> existing = boringProxyClient.listTunnels();
 		String candidate = base;
-		int suffix = 2;
+		int collisionSuffix = 2;
 		while (true) {
 			String fqdn = candidate + "." + targetDomain;
 			boolean taken = existing.keySet().stream()
@@ -40,7 +40,7 @@ public class HiddenTunnelFqdnAssigner {
 			if (!taken) {
 				return fqdn;
 			}
-			candidate = base + "-" + suffix++;
+			candidate = base + "-" + collisionSuffix++;
 		}
 	}
 }

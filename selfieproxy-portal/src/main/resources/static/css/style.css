@@ -405,6 +405,41 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	margin: 0;
 }
 
+.port-forwarding-table {
+	width: 100%;
+	max-width: 30rem;
+	border-collapse: collapse;
+	margin-bottom: 0.75rem;
+}
+
+.port-forwarding-table th, .port-forwarding-table td {
+	text-align: left;
+	padding: 0.4rem 0.5rem 0.4rem 0;
+}
+
+.port-forwarding-table th:last-child, .port-forwarding-table td:last-child {
+	width: 1%;
+	white-space: nowrap;
+	padding-right: 0;
+}
+
+/* Fixed width so the column doesn't shift when a row's button switches between "Add" and the
+   wider "Remove" text. */
+.port-forwarding-table .button-small {
+	min-width: 4.5rem;
+	text-align: center;
+}
+
+.port-forwarding-table input[type="number"] {
+	margin-bottom: 0;
+}
+
+.port-forwarding-table input[type="number"]:read-only {
+	background: var(--border);
+	color: var(--muted);
+	cursor: default;
+}
+
 .cert-pending-badge {
 	display: inline-block;
 	margin-left: 0.5rem;
@@ -514,5 +549,7 @@ table[data-sortable] th[data-sort-key]::after {
 }
 table[data-sortable] th.sorted-asc::after { content: "\25B2"; color: var(--accent); }
 table[data-sortable] th.sorted-desc::after { content: "\25BC"; color: var(--accent); }
-.list-filter { margin-bottom: 0.75rem; }
-.list-filter label { margin-right: 0.4rem; }
+.list-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.6rem; margin-bottom: 0.75rem; }
+.list-filter label { display: inline; margin: 0; }
+.list-filter select { width: auto; margin-bottom: 0; }
+.list-filter select + label { margin-left: 1rem; }

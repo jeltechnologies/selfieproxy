@@ -82,6 +82,7 @@ public class DashboardController {
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("consoleDomain", properties.consoleDomain());
 		model.addAttribute("selectedDomainFilter", domainFilterPreferenceStore.load().serversDomain());
+		model.addAttribute("selectedHomelabFilter", domainFilterPreferenceStore.load().serversHomelab());
 		return "dashboard";
 	}
 
@@ -96,6 +97,13 @@ public class DashboardController {
 	@PostMapping("/servers/domain-filter")
 	public ResponseEntity<Void> saveDomainFilter(@RequestParam(value = "domain", required = false) String domain) {
 		domainFilterPreferenceStore.saveServersDomain(domain == null || domain.isBlank() ? null : domain);
+		return ResponseEntity.noContent().build();
+	}
+
+	/** Fired by sortable-table.js on every homelab-filter change so the choice survives navigation and a server reboot -- see DomainFilterPreferenceStore. */
+	@PostMapping("/servers/homelab-filter")
+	public ResponseEntity<Void> saveHomelabFilter(@RequestParam(value = "homelab", required = false) String homelab) {
+		domainFilterPreferenceStore.saveServersHomelab(homelab == null || homelab.isBlank() ? null : homelab);
 		return ResponseEntity.noContent().build();
 	}
 

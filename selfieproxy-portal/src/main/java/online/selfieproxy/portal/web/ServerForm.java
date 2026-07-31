@@ -1,6 +1,7 @@
 package online.selfieproxy.portal.web;
 
-import online.selfieproxy.portal.domain.PortForwardingProtocol;
+import java.util.List;
+
 import online.selfieproxy.portal.domain.Protocol;
 import online.selfieproxy.portal.domain.RemoteDesktopProtocol;
 
@@ -9,7 +10,11 @@ import online.selfieproxy.portal.domain.RemoteDesktopProtocol;
  * variable instead. homelabName/host are shared across every protocol. Each row below submits its
  * own enabled/protocol/port/credential fields; terminalSecret/remoteDesktopSecret are the
  * plaintext passwords -- left blank on an edit to keep the previously stored credential unchanged
- * (see ServerController.toServer).
+ * (see ServerController.toServer). Port Forwarding has no protocol field here -- it's always TCP
+ * (see ServerController.toServer), so there's nothing for the admin to choose -- just up to 8
+ * repeatable target/public port pairs, rendered as table rows (see edit-server.html); Spring binds
+ * these from same-named, repeated &lt;input&gt;s in document order, so
+ * portForwardingTargetPort.get(i)/portForwardingPublicPort.get(i) are always the i-th pair.
  */
 public record ServerForm(
 		String subdomain,
@@ -32,10 +37,8 @@ public record ServerForm(
 		Integer remoteDesktopPort,
 		String remoteDesktopUsername,
 		String remoteDesktopSecret,
-		Boolean remoteDesktopIgnoreCertificate,
 		// Port Forwarding row
 		Boolean portForwardingEnabled,
-		PortForwardingProtocol portForwardingProtocol,
-		Integer portForwardingPublicPort,
-		Integer portForwardingTargetPort) {
+		List<Integer> portForwardingPublicPort,
+		List<Integer> portForwardingTargetPort) {
 }

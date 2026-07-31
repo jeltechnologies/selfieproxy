@@ -1,6 +1,7 @@
 package online.selfieproxy.portal.web;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -206,8 +207,11 @@ public class DomainsController {
 				Server renamed = rebuildForDomain(server, newName);
 				Map<ServerProtocol, TunnelMapper.ProtocolTunnel> oldPlans = tunnelMapper.tunnelPlans(server, OWNER);
 				Map<ServerProtocol, TunnelMapper.ProtocolTunnel> newPlans = tunnelMapper.tunnelPlans(renamed, OWNER);
+				List<TunnelMapper.ProtocolTunnel> oldPortForwards = tunnelMapper.portForwardingTunnelPlans(server, OWNER);
+				List<TunnelMapper.ProtocolTunnel> newPortForwards = tunnelMapper.portForwardingTunnelPlans(renamed, OWNER);
 				oldPlans.values().forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
-				if (!oldPlans.isEmpty()) {
+				oldPortForwards.forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
+				if (!oldPlans.isEmpty() || !oldPortForwards.isEmpty()) {
 					sleep();
 				}
 				for (Map.Entry<ServerProtocol, TunnelMapper.ProtocolTunnel> entry : newPlans.entrySet()) {
@@ -217,6 +221,9 @@ public class DomainsController {
 					} else if (entry.getKey() == ServerProtocol.REMOTE_DESKTOP) {
 						renamed = renamed.withRemoteDesktopExposedPort(tunnel.tunnelPort());
 					}
+				}
+				for (TunnelMapper.ProtocolTunnel plan : newPortForwards) {
+					boringProxyClient.createTunnel(plan.request());
 				}
 				serverStore.delete(oldFqdn);
 				serverStore.save(renamed);
@@ -259,17 +266,28 @@ public class DomainsController {
 		String newServerFqdn = server.subdomain() == null || server.subdomain().isBlank()
 				? newDomain : server.subdomain() + "." + newDomain;
 		TerminalConfig terminal = server.terminal() == null ? null : new TerminalConfig(
-				fqdnAssigner.assign(newServerFqdn, server.terminal().port(), domainService.primaryDomain(), Set.of()),
+				fqdnAssigner.assign(newServerFqdn, "terminal", domainService.primaryDomain(), Set.of()),
 				server.terminal().port(), null, server.terminal().username(), server.terminal().encryptedSecret());
 		RemoteDesktopConfig remoteDesktop = server.remoteDesktop() == null ? null : new RemoteDesktopConfig(
-				fqdnAssigner.assign(newServerFqdn, server.remoteDesktop().port(), domainService.primaryDomain(), Set.of()),
+				fqdnAssigner.assign(newServerFqdn, "remotedesktop", domainService.primaryDomain(), Set.of()),
 				server.remoteDesktop().protocol(), server.remoteDesktop().port(), null, server.remoteDesktop().username(),
 				server.remoteDesktop().encryptedSecret(), server.remoteDesktop().ignoreCertificate());
-		PortForwardingConfig portForwarding = server.portForwarding() == null ? null : new PortForwardingConfig(
-				fqdnAssigner.assign(newServerFqdn, server.portForwarding().publicPort(), newDomain, Set.of()),
-				server.portForwarding().protocol(), server.portForwarding().publicPort(), server.portForwarding().targetPort());
+		List<PortForwardingConfig> portForwarding = server.portForwarding() == null ? null
+				: rebuildPortForwarding(server.portForwarding(), newServerFqdn, newDomain);
 		return new Server(server.subdomain(), newDomain, server.homelabName(), server.host(), server.web(),
 				terminal, remoteDesktop, portForwarding);
+	}
+
+	/** Each entry gets its own freshly-assigned fqdn under newDomain; excludeFqdns grows as the loop proceeds so entries in the same rebuilt list can never collide with each other. */
+	private List<PortForwardingConfig> rebuildPortForwarding(List<PortForwardingConfig> original, String newServerFqdn, String newDomain) {
+		Set<String> excludeFqdns = new HashSet<>();
+		List<PortForwardingConfig> rebuilt = new ArrayList<>();
+		for (PortForwardingConfig entry : original) {
+			String fqdn = fqdnAssigner.assign(newServerFqdn, String.valueOf(entry.publicPort()), newDomain, excludeFqdns);
+			excludeFqdns.add(fqdn);
+			rebuilt.add(new PortForwardingConfig(fqdn, entry.protocol(), entry.publicPort(), entry.targetPort()));
+		}
+		return rebuilt;
 	}
 
 	/** Same shape as LocalWebsiteController/BackupService's own private toCreateTunnelRequest -- Local Websites always point at the shared selfieproxy-local-websites container through the hidden "This Server" homelab. */

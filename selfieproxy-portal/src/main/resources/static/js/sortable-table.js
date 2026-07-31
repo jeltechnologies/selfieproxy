@@ -32,30 +32,37 @@
 		});
 	});
 
-	var domainFilter = document.getElementById("domainFilter");
-	if (domainFilter) {
-		var applyFilter = function () {
+	// A page can have more than one filter dropdown at once (eg. the Servers list's domain and
+	// homelab filters) -- a row is shown only when it matches every active one (AND, not OR).
+	var filterSelects = Array.prototype.slice.call(document.querySelectorAll(".list-filter select[data-filter-attr]"));
+	if (filterSelects.length > 0) {
+		var applyFilters = function () {
 			document.querySelectorAll("table[data-sortable] tbody tr").forEach(function (row) {
-				var domain = row.getAttribute("data-domain");
-				row.style.display = (!domainFilter.value || domain === domainFilter.value) ? "" : "none";
+				var visible = filterSelects.every(function (select) {
+					var value = row.getAttribute(select.getAttribute("data-filter-attr"));
+					return !select.value || value === select.value;
+				});
+				row.style.display = visible ? "" : "none";
 			});
 		};
 
-		// The server pre-selects the remembered option (DomainFilterPreferenceStore), but that alone
-		// doesn't hide rows -- apply it once on load, same as every later change.
-		applyFilter();
+		// The server pre-selects each remembered option (DomainFilterPreferenceStore), but that
+		// alone doesn't hide rows -- apply once on load, same as every later change.
+		applyFilters();
 
-		domainFilter.addEventListener("change", function () {
-			applyFilter();
-			var saveUrl = domainFilter.getAttribute("data-save-url");
-			if (saveUrl) {
-				fetch(saveUrl, {
-					method: "POST",
-					headers: { "Content-Type": "application/x-www-form-urlencoded" },
-					body: "domain=" + encodeURIComponent(domainFilter.value),
-					credentials: "same-origin"
-				});
-			}
+		filterSelects.forEach(function (select) {
+			select.addEventListener("change", function () {
+				applyFilters();
+				var saveUrl = select.getAttribute("data-save-url");
+				if (saveUrl) {
+					fetch(saveUrl, {
+						method: "POST",
+						headers: { "Content-Type": "application/x-www-form-urlencoded" },
+						body: select.getAttribute("data-param") + "=" + encodeURIComponent(select.value),
+						credentials: "same-origin"
+					});
+				}
+			});
 		});
 	}
 })();

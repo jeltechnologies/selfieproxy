@@ -36,5 +36,9 @@ public record BackupManifest(
 	// Bumped 3->4 when the "exposedApps" field/concept was renamed to "servers" throughout the
 	// Java codebase -- an old export is cleanly rejected by readManifest's version check instead
 	// of silently deserializing with an empty/missing servers list.
-	public static final int CURRENT_VERSION = 4;
+	// Bumped 4->5 when Server.portForwarding changed from a single nullable PortForwardingConfig
+	// to a List<PortForwardingConfig> (up to 8 forwarded ports per Server) -- an old export's
+	// single-object shape wouldn't deserialize correctly against the new list-shaped field, so it
+	// must be cleanly rejected here rather than silently misbehaving.
+	public static final int CURRENT_VERSION = 5;
 }

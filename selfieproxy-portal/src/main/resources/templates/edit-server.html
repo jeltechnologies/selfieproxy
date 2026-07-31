@@ -90,7 +90,8 @@
 						</div>
 						<div class="field">
 							<label for="webPort">Homelab server port</label>
-							<input type="number" id="webPort" name="webPort" th:value="${server.hasWeb() ? server.web().port() : 443}">
+							<input type="number" id="webPort" name="webPort" th:value="${server.hasWeb() ? server.web().port() : 443}"
+								   min="1" max="65535" step="1">
 						</div>
 					</div>
 				</div>
@@ -99,7 +100,7 @@
 			<fieldset class="protocol-row" id="terminal-row">
 				<label class="protocol-row-toggle">
 					<input type="checkbox" id="terminalEnabled" name="terminalEnabled" value="true" th:checked="${server.hasTerminal()}">
-					<strong>Terminal access</strong>
+					<strong>Terminal</strong>
 				</label>
 				<div id="terminal-row-fields">
 					<p class="muted">Access your homelab server with a browser-based SSH terminal.</p>
@@ -115,7 +116,8 @@
 						<div class="field">
 							<label for="terminalPort">Homelab server port</label>
 							<input type="number" id="terminalPort" name="terminalPort"
-								   th:value="${server.hasTerminal() ? server.terminal().port() : 22}">
+								   th:value="${server.hasTerminal() ? server.terminal().port() : 22}"
+								   min="1" max="65535" step="1">
 						</div>
 					</div>
 					<div class="field-row">
@@ -156,7 +158,8 @@
 						<div class="field">
 							<label for="remoteDesktopPort">Homelab server port</label>
 							<input type="number" id="remoteDesktopPort" name="remoteDesktopPort"
-								   th:value="${server.hasRemoteDesktop() ? server.remoteDesktop().port() : 3389}">
+								   th:value="${server.hasRemoteDesktop() ? server.remoteDesktop().port() : 3389}"
+								   min="1" max="65535" step="1">
 						</div>
 					</div>
 					<div class="field-row">
@@ -170,13 +173,6 @@
 							<input type="password" id="remoteDesktopSecret" name="remoteDesktopSecret"
 								   th:placeholder="${server.hasRemoteDesktop() and server.remoteDesktop().encryptedSecret() != null} ? '••••••••'">
 						</div>
-					</div>
-					<div class="field">
-						<label>
-							<input type="checkbox" id="remoteDesktopIgnoreCertificate" name="remoteDesktopIgnoreCertificate" value="true"
-								   th:checked="${server.hasRemoteDesktop() and server.remoteDesktop().ignoreCertificate()}">
-							Accept a self-signed certificate on the target
-						</label>
 					</div>
 				</div>
 			</fieldset>
@@ -192,31 +188,31 @@
 						Use this at your own risk. Anyone on the internet who scans your domain can see that
 						port is open and attempt to connect to it.
 					</p>
-					<div class="field" id="port-forwarding-protocol-field">
-						<label for="portForwardingProtocol">Protocol</label>
-						<select id="portForwardingProtocol" name="portForwardingProtocol">
-							<option th:each="m : ${T(online.selfieproxy.portal.domain.PortForwardingProtocol).values()}"
-									th:value="${m.name()}" th:text="${m.name()}"></option>
-						</select>
-					</div>
-					<div class="field-row">
-						<div class="field">
-							<label>Host</label>
-							<p class="result-text host-echo" th:text="${server.host()}"></p>
-						</div>
-						<div class="field">
-							<label for="portForwardingTargetPort">Homelab server port</label>
-							<input type="number" id="portForwardingTargetPort" name="portForwardingTargetPort"
-								   th:value="${server.hasPortForwarding() ? server.portForwarding().targetPort() : null}">
-						</div>
-						<div class="field">
-							<label for="portForwardingPublicPort">Port exposed to the internet
-								<span class="warning-icon" title="Make sure to open the exposed port in your firewall.">&#9888;</span>
-							</label>
-							<input type="number" id="portForwardingPublicPort" name="portForwardingPublicPort"
-								   th:value="${server.hasPortForwarding() ? server.portForwarding().publicPort() : null}" min="1024" max="65535">
-						</div>
-					</div>
+					<p class="warning">Make sure to open the exposed port(s) in your firewall.</p>
+					<table class="port-forwarding-table">
+						<thead>
+							<tr>
+								<th>Homelab server port</th>
+								<th>Port exposed to the internet</th>
+								<th></th>
+							</tr>
+						</thead>
+						<tbody id="port-forwarding-rows">
+							<tr class="port-forwarding-entry" th:each="entry : ${server.portForwarding()}">
+								<td><input type="number" name="portForwardingTargetPort" th:value="${entry.targetPort()}"
+										   min="1" max="65535" step="1" readonly></td>
+								<td><input type="number" name="portForwardingPublicPort" th:value="${entry.publicPort()}"
+										   min="1024" max="65535" step="1" readonly></td>
+								<td><button type="button" class="button-small remove-port-forwarding-row">Remove</button></td>
+							</tr>
+							<tr class="port-forwarding-entry port-forwarding-entry-blank"
+								th:if="${server.portForwarding() == null or server.portForwarding().size() < 8}">
+								<td><input type="number" name="portForwardingTargetPort" min="1" max="65535" step="1"></td>
+								<td><input type="number" name="portForwardingPublicPort" min="1024" max="65535" step="1"></td>
+								<td><button type="button" class="button-small add-port-forwarding-row">Add</button></td>
+							</tr>
+						</tbody>
+					</table>
 				</div>
 			</fieldset>
 

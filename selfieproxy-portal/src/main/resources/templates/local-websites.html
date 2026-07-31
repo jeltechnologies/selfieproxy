@@ -36,7 +36,8 @@
 
 		<div class="list-filter" th:if="${not #lists.isEmpty(websites)}">
 			<label for="domainFilter">Filter by domain</label>
-			<select id="domainFilter" th:attr="data-save-url=@{/local-websites/domain-filter}">
+			<select id="domainFilter" data-filter-attr="data-domain" data-param="domain"
+					th:attr="data-save-url=@{/local-websites/domain-filter}">
 				<option value="" th:selected="${#strings.isEmpty(selectedDomainFilter)}">All domains</option>
 				<option th:each="d : ${domains}" th:value="${d.name()}" th:text="${d.name()}"
 						th:selected="${d.name() == selectedDomainFilter}"></option>

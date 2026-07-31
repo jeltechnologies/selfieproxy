@@ -1,5 +1,7 @@
 package online.selfieproxy.portal.domain;
 
+import java.util.List;
+
 /**
  * Selfie Proxy's own model of a published Application. One Application can simultaneously expose
  * up to 4 protocols -- Web, Terminal, Remote Desktop, and Port Forwarding -- each present here as
@@ -18,7 +20,9 @@ package online.selfieproxy.portal.domain;
  * @param web            Web (HTTP/HTTPS) settings, or null if Web isn't enabled
  * @param terminal       Terminal (SSH) settings, or null if Terminal isn't enabled
  * @param remoteDesktop  Remote Desktop (RDP/VNC) settings, or null if Remote Desktop isn't enabled
- * @param portForwarding Port Forwarding (TCP) settings, or null if Port Forwarding isn't enabled
+ * @param portForwarding up to 8 Port Forwarding (TCP) entries, one per forwarded port -- never a
+ *                       port range, each is its own independent boringproxy tunnel; null or empty
+ *                       means Port Forwarding isn't enabled
  */
 public record Server(
 		String subdomain,
@@ -28,7 +32,7 @@ public record Server(
 		WebConfig web,
 		TerminalConfig terminal,
 		RemoteDesktopConfig remoteDesktop,
-		PortForwardingConfig portForwarding) {
+		List<PortForwardingConfig> portForwarding) {
 
 	public String fqdn() {
 		return subdomain == null || subdomain.isBlank() ? domain : subdomain + "." + domain;
@@ -47,7 +51,7 @@ public record Server(
 	}
 
 	public boolean hasPortForwarding() {
-		return portForwarding != null;
+		return portForwarding != null && !portForwarding.isEmpty();
 	}
 
 	/** Same record with terminal's exposedPort replaced -- see ServerController.syncTunnels. */

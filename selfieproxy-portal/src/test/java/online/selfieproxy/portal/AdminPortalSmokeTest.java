@@ -3,8 +3,11 @@ package online.selfieproxy.portal;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,7 +16,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -189,5 +194,71 @@ class AdminPortalSmokeTest {
 
 		verify(boringProxyClient).renameTunnelAgent("music.example.com", "renamed");
 		verify(boringProxyClient, never()).renameTunnelAgent(eq("ssh.example.com"), anyString());
+	}
+
+	/**
+	 * A Server can forward several ports at once (up to 8) -- adding 3 must create exactly 3
+	 * tunnels, and editing to drop one and change another's homelab-side port must only
+	 * delete/recreate the ones that actually changed, leaving the untouched entry's live tunnel
+	 * completely alone. boringProxyClient is stubbed with a small in-memory tunnel map so
+	 * listTunnels() reflects what createTunnel/deleteTunnel actually did across both requests.
+	 */
+	@Test
+	void multiplePortForwardingEntriesCreateOneTunnelEachAndUnchangedEntriesSurviveAnEdit() throws Exception {
+		MockHttpSession session = authenticatedSession();
+
+		when(boringProxyClient.listAgents()).thenReturn(Map.of("home", new AgentStatusDto(null)));
+
+		Map<String, TunnelDto> liveTunnels = new LinkedHashMap<>();
+		when(boringProxyClient.listTunnels()).thenAnswer(invocation -> Map.copyOf(liveTunnels));
+		when(boringProxyClient.createTunnel(any(CreateTunnelRequestDto.class))).thenAnswer(invocation -> {
+			CreateTunnelRequestDto request = invocation.getArgument(0);
+			TunnelDto created = new TunnelDto(request.domain(), "admin.example.com", 22, "", "user",
+					request.tunnelPort() != null ? request.tunnelPort() : 0, "", "127.0.0.1",
+					request.clientPort() != null ? request.clientPort() : 0,
+					Boolean.TRUE.equals(request.allowExternalTcp()), request.tlsTermination(), false, false,
+					"admin", "home", "", "");
+			liveTunnels.put(request.domain(), created);
+			return created;
+		});
+
+		mockMvc.perform(post("/servers")
+						.session(session)
+						.param("subdomain", "raw")
+						.param("domain", "example.com")
+						.param("homelabName", "home")
+						.param("host", "127.0.0.1")
+						.param("portForwardingEnabled", "true")
+						.param("portForwardingTargetPort", "8001", "8002", "8003")
+						.param("portForwardingPublicPort", "20001", "20002", "20003"))
+				.andExpect(status().is3xxRedirection())
+				.andExpect(redirectedUrl("/servers"));
+
+		verify(boringProxyClient, times(3)).createTunnel(any(CreateTunnelRequestDto.class));
+
+		// Drop the 20002 entry entirely, keep 20001 unchanged, and change 20003's homelab-side
+		// port (8003 -> 9999, same public port so the same fqdn).
+		mockMvc.perform(post("/servers/raw.example.com")
+						.session(session)
+						.param("subdomain", "raw")
+						.param("domain", "example.com")
+						.param("homelabName", "home")
+						.param("host", "127.0.0.1")
+						.param("portForwardingEnabled", "true")
+						.param("portForwardingTargetPort", "8001", "9999")
+						.param("portForwardingPublicPort", "20001", "20003"))
+				.andExpect(status().is3xxRedirection())
+				.andExpect(redirectedUrl("/servers"));
+
+		// 20001's tunnel was only ever created once -- the edit left it completely alone.
+		verify(boringProxyClient, times(1)).createTunnel(
+				argThat(r -> Objects.equals(r.tunnelPort(), 20001)));
+		// 20002 was created once during the initial add, then removed on edit -- deleted, never
+		// recreated a second time.
+		verify(boringProxyClient).deleteTunnel(contains("-20002."));
+		verify(boringProxyClient, times(1)).createTunnel(argThat(r -> Objects.equals(r.tunnelPort(), 20002)));
+		// 20003 changed its homelab-side port -- same fqdn, so it's deleted once and recreated once
+		// (the second createTunnel call for that public port, on top of the initial add).
+		verify(boringProxyClient, times(2)).createTunnel(argThat(r -> Objects.equals(r.tunnelPort(), 20003)));
 	}
 }

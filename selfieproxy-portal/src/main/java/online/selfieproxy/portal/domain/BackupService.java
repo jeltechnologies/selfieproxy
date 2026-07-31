@@ -284,8 +284,10 @@ public class BackupService {
 				String targetDomain = selection.domainOverridesByFqdn().getOrDefault(fqdnKey, original.domain());
 				Server server = rebuildForDomain(original, targetDomain);
 				Map<ServerProtocol, TunnelMapper.ProtocolTunnel> plans = tunnelMapper.tunnelPlans(server, OWNER);
+				List<TunnelMapper.ProtocolTunnel> portForwardPlans = tunnelMapper.portForwardingTunnelPlans(server, OWNER);
 				plans.values().forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
-				if (!plans.isEmpty()) {
+				portForwardPlans.forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
+				if (!plans.isEmpty() || !portForwardPlans.isEmpty()) {
 					sleep();
 				}
 				for (Map.Entry<ServerProtocol, TunnelMapper.ProtocolTunnel> entry : plans.entrySet()) {
@@ -295,6 +297,9 @@ public class BackupService {
 					} else if (entry.getKey() == ServerProtocol.REMOTE_DESKTOP) {
 						server = server.withRemoteDesktopExposedPort(tunnel.tunnelPort());
 					}
+				}
+				for (TunnelMapper.ProtocolTunnel plan : portForwardPlans) {
+					boringProxyClient.createTunnel(plan.request());
 				}
 				serverStore.save(server);
 				serversRestored++;
@@ -352,19 +357,29 @@ public class BackupService {
 		String newServerFqdn = original.subdomain() == null || original.subdomain().isBlank()
 				? targetDomain : original.subdomain() + "." + targetDomain;
 		TerminalConfig terminal = original.terminal() == null ? null : new TerminalConfig(
-				fqdnAssigner.assign(newServerFqdn, original.terminal().port(), boringProxyProperties.primaryDomain(), Set.of()),
+				fqdnAssigner.assign(newServerFqdn, "terminal", boringProxyProperties.primaryDomain(), Set.of()),
 				original.terminal().port(), null, original.terminal().username(), original.terminal().encryptedSecret());
 		RemoteDesktopConfig remoteDesktop = original.remoteDesktop() == null ? null : new RemoteDesktopConfig(
-				fqdnAssigner.assign(newServerFqdn, original.remoteDesktop().port(), boringProxyProperties.primaryDomain(), Set.of()),
+				fqdnAssigner.assign(newServerFqdn, "remotedesktop", boringProxyProperties.primaryDomain(), Set.of()),
 				original.remoteDesktop().protocol(), original.remoteDesktop().port(), null,
 				original.remoteDesktop().username(), original.remoteDesktop().encryptedSecret(),
 				original.remoteDesktop().ignoreCertificate());
-		PortForwardingConfig portForwarding = original.portForwarding() == null ? null : new PortForwardingConfig(
-				fqdnAssigner.assign(newServerFqdn, original.portForwarding().publicPort(), targetDomain, Set.of()),
-				original.portForwarding().protocol(), original.portForwarding().publicPort(),
-				original.portForwarding().targetPort());
+		List<PortForwardingConfig> portForwarding = original.portForwarding() == null ? null
+				: rebuildPortForwarding(original.portForwarding(), newServerFqdn, targetDomain);
 		return new Server(original.subdomain(), targetDomain, original.homelabName(), original.host(),
 				original.web(), terminal, remoteDesktop, portForwarding);
+	}
+
+	/** Each entry gets its own freshly-assigned fqdn under targetDomain; excludeFqdns grows as the loop proceeds so entries in the same rebuilt list can never collide with each other. */
+	private List<PortForwardingConfig> rebuildPortForwarding(List<PortForwardingConfig> original, String newServerFqdn, String targetDomain) {
+		Set<String> excludeFqdns = new HashSet<>();
+		List<PortForwardingConfig> rebuilt = new ArrayList<>();
+		for (PortForwardingConfig entry : original) {
+			String fqdn = fqdnAssigner.assign(newServerFqdn, String.valueOf(entry.publicPort()), targetDomain, excludeFqdns);
+			excludeFqdns.add(fqdn);
+			rebuilt.add(new PortForwardingConfig(fqdn, entry.protocol(), entry.publicPort(), entry.targetPort()));
+		}
+		return rebuilt;
 	}
 
 	/** Creates the agent (with a brand-new secret) if it doesn't already exist on this server; returns whether it was created. */

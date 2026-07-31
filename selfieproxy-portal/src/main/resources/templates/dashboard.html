@@ -8,7 +8,7 @@
 		<section class="page-header">
 			<div>
 				<h1>Servers</h1>
-				<p class="page-subtitle">Expose servers running in your homelab to the internet.</p>
+				<p class="page-subtitle">Access your servers on the internet by the web, terminal or remote desktop.</p>
 			</div>
 			<a class="button" th:if="${not #lists.isEmpty(homelabs)}" th:href="@{/servers/new}">Add</a>
 		</section>
@@ -31,10 +31,18 @@
 
 		<div class="list-filter" th:if="${not #lists.isEmpty(servers)}">
 			<label for="domainFilter">Filter by domain</label>
-			<select id="domainFilter" th:attr="data-save-url=@{/servers/domain-filter}">
+			<select id="domainFilter" data-filter-attr="data-domain" data-param="domain"
+					th:attr="data-save-url=@{/servers/domain-filter}">
 				<option value="" th:selected="${#strings.isEmpty(selectedDomainFilter)}">All domains</option>
 				<option th:each="d : ${domains}" th:value="${d.name()}" th:text="${d.name()}"
 						th:selected="${d.name() == selectedDomainFilter}"></option>
+			</select>
+			<label for="homelabFilter">Filter by homelab</label>
+			<select id="homelabFilter" data-filter-attr="data-homelab" data-param="homelab"
+					th:attr="data-save-url=@{/servers/homelab-filter}">
+				<option value="" th:selected="${#strings.isEmpty(selectedHomelabFilter)}">All homelabs</option>
+				<option th:each="h : ${homelabs}" th:value="${h}" th:text="${h}"
+						th:selected="${h == selectedHomelabFilter}"></option>
 			</select>
 		</div>
 
@@ -46,14 +54,15 @@
 					<th data-sort-key="domain">Domain</th>
 					<th data-sort-key="homelab">Homelab</th>
 					<th data-sort-key="localAddress">Local address</th>
-					<th>Connect</th>
+					<th>Web</th>
 					<th>Terminal</th>
 					<th>Remote desktop</th>
 					<th></th>
 				</tr>
 			</thead>
 			<tbody>
-				<tr th:each="server : ${servers}" th:attr="data-domain=${server.domain()}, data-fqdn=${server.fqdn()}"
+				<tr th:each="server : ${servers}"
+					th:attr="data-domain=${server.domain()}, data-fqdn=${server.fqdn()}, data-homelab=${server.homelabName()}"
 					th:with="offline=${serverStatusMessage.containsKey(server.fqdn())}">
 					<td>
 						<span class="status" th:title="${serverStatusMessage.get(server.fqdn())}">

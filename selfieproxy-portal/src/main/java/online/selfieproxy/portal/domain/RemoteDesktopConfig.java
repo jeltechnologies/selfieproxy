@@ -12,7 +12,10 @@ package online.selfieproxy.portal.domain;
  *                          null until the tunnel has actually been created once
  * @param username          nullable -- VNC often has none
  * @param encryptedSecret   AES-GCM ciphertext (NetworkServiceCredentialCipher), null until entered
- * @param ignoreCertificate accept a self-signed certificate on the target
+ * @param ignoreCertificate always true -- RDP/VNC targets are essentially always self-signed
+ *                          (eg. Windows' own default RDP certificate), so there's no user-facing
+ *                          choice about it; the field is kept only because selfieproxy-remote-console's
+ *                          GuacamoleWebSocketHandler still reads it when building the Guacamole config
  */
 public record RemoteDesktopConfig(String fqdn, RemoteDesktopProtocol protocol, int port, Integer exposedPort,
 		String username, String encryptedSecret, boolean ignoreCertificate) {

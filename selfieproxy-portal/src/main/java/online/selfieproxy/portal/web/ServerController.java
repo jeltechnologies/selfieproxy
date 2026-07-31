@@ -2,12 +2,12 @@ package online.selfieproxy.portal.web;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -48,6 +48,10 @@ public class ServerController {
 
 	/** Well-known/system port range (SSH, HTTPS, ...) that must never be exposed as Port Forwarding's public port. */
 	private static final int RESERVED_PORT_MAX = 1023;
+	/** The highest possible TCP/UDP port number -- applies to every port field on the edit page. */
+	private static final int MAX_PORT = 65535;
+	/** Deliberately capped, not a port range -- each entry is its own boringproxy tunnel. */
+	private static final int MAX_PORT_FORWARDING_ENTRIES = 8;
 	private static final long TUNNEL_RECREATE_WAIT_MS = 2000;
 	private static final String OWNER = "admin";
 
@@ -172,6 +176,8 @@ public class ServerController {
 		if (server != null) {
 			tunnelMapper.tunnelPlans(server, OWNER).values()
 					.forEach(plan -> boringProxyClient.deleteTunnel(plan.fqdn()));
+			tunnelMapper.portForwardingTunnelPlans(server, OWNER)
+					.forEach(plan -> boringProxyClient.deleteTunnel(plan.fqdn()));
 		}
 		serverStore.delete(fqdn);
 		return "redirect:/servers";
@@ -195,11 +201,14 @@ public class ServerController {
 
 	/**
 	 * Diffs existing's tunnel plans against desired's per protocol (ServerProtocol.WEB/TERMINAL/
-	 * REMOTE_DESKTOP/PORT_FORWARDING): a protocol whose plan is unchanged is left completely alone
-	 * (no delete/recreate -- eg. toggling the Remote Desktop checkbox must never bounce an unrelated
-	 * live SSH session), a removed protocol is deleted, an added or changed one is (re)created. Only
-	 * one 2s wait total is paid, not one per changed protocol. existing is null on create, so every
-	 * enabled protocol is simply created with nothing to delete first.
+	 * REMOTE_DESKTOP), plus a separate fqdn-keyed diff for Port Forwarding (which can have several
+	 * tunnels at once, so it can't be diffed by a single ServerProtocol key the way the other three
+	 * are): a protocol/entry whose plan is unchanged is left completely alone (no delete/recreate --
+	 * eg. toggling the Remote Desktop checkbox must never bounce an unrelated live SSH session, and
+	 * editing one Port Forwarding entry must never bounce its siblings), a removed one is deleted, an
+	 * added or changed one is (re)created. Only one 2s wait total is paid, not one per changed
+	 * protocol/entry. existing is null on create, so every enabled protocol/entry is simply created
+	 * with nothing to delete first.
 	 */
 	private Server syncTunnels(Server existing, Server desired, String owner) {
 		Map<ServerProtocol, TunnelMapper.ProtocolTunnel> oldPlans = existing == null
@@ -222,8 +231,30 @@ public class ServerController {
 			}
 		}
 
+		Map<String, TunnelMapper.ProtocolTunnel> oldPortForwards = existing == null ? Map.of()
+				: tunnelMapper.portForwardingTunnelPlans(existing, owner).stream()
+						.collect(Collectors.toMap(TunnelMapper.ProtocolTunnel::fqdn, p -> p));
+		Map<String, TunnelMapper.ProtocolTunnel> newPortForwards = tunnelMapper.portForwardingTunnelPlans(desired, owner).stream()
+				.collect(Collectors.toMap(TunnelMapper.ProtocolTunnel::fqdn, p -> p));
+		List<TunnelMapper.ProtocolTunnel> portForwardsToCreate = new ArrayList<>();
+		Set<String> allPortForwardFqdns = new HashSet<>(oldPortForwards.keySet());
+		allPortForwardFqdns.addAll(newPortForwards.keySet());
+		for (String fqdn : allPortForwardFqdns) {
+			TunnelMapper.ProtocolTunnel oldPlan = oldPortForwards.get(fqdn);
+			TunnelMapper.ProtocolTunnel newPlan = newPortForwards.get(fqdn);
+			if (Objects.equals(oldPlan, newPlan)) {
+				continue;
+			}
+			if (oldPlan != null) {
+				toDelete.add(oldPlan.fqdn());
+			}
+			if (newPlan != null) {
+				portForwardsToCreate.add(newPlan);
+			}
+		}
+
 		toDelete.forEach(boringProxyClient::deleteTunnel);
-		if (!toDelete.isEmpty() && !toCreate.isEmpty()) {
+		if (!toDelete.isEmpty() && (!toCreate.isEmpty() || !portForwardsToCreate.isEmpty())) {
 			sleep();
 		}
 
@@ -236,6 +267,7 @@ public class ServerController {
 				result = result.withRemoteDesktopExposedPort(created.tunnelPort());
 			}
 		}
+		portForwardsToCreate.forEach(plan -> boringProxyClient.createTunnel(plan.request()));
 		return result;
 	}
 
@@ -260,12 +292,20 @@ public class ServerController {
 		String subdomain = trimmedSubdomain == null || trimmedSubdomain.isBlank() ? null : trimmedSubdomain;
 		String appFqdn = subdomain == null ? domain : subdomain + "." + domain;
 
-		Set<String> ownHiddenFqdns = existing == null ? Set.of() : Stream.of(
-				existing.terminal() != null ? existing.terminal().fqdn() : null,
-				existing.remoteDesktop() != null ? existing.remoteDesktop().fqdn() : null,
-				existing.portForwarding() != null ? existing.portForwarding().fqdn() : null)
-				.filter(Objects::nonNull)
-				.collect(Collectors.toSet());
+		// Mutable and grown as each Port Forwarding entry below is assigned its own hidden fqdn, so
+		// two entries in the same submission can never collide with each other.
+		Set<String> ownHiddenFqdns = new HashSet<>();
+		if (existing != null) {
+			if (existing.terminal() != null) {
+				ownHiddenFqdns.add(existing.terminal().fqdn());
+			}
+			if (existing.remoteDesktop() != null) {
+				ownHiddenFqdns.add(existing.remoteDesktop().fqdn());
+			}
+			if (existing.portForwarding() != null) {
+				existing.portForwarding().forEach(entry -> ownHiddenFqdns.add(entry.fqdn()));
+			}
+		}
 
 		WebConfig web = enabled(form.webEnabled())
 				? new WebConfig(form.webProtocol() != null ? form.webProtocol() : Protocol.HTTPS,
@@ -275,7 +315,7 @@ public class ServerController {
 		TerminalConfig terminal;
 		if (enabled(form.terminalEnabled())) {
 			int port = form.terminalPort() != null ? form.terminalPort() : 22;
-			String hiddenFqdn = fqdnAssigner.assign(appFqdn, port, properties.primaryDomain(), ownHiddenFqdns);
+			String hiddenFqdn = fqdnAssigner.assign(appFqdn, "terminal", properties.primaryDomain(), ownHiddenFqdns);
 			Integer previousExposedPort = existing != null && existing.terminal() != null
 					? existing.terminal().exposedPort() : null;
 			String previousSecret = existing != null && existing.terminal() != null
@@ -291,7 +331,7 @@ public class ServerController {
 			RemoteDesktopProtocol protocol = form.remoteDesktopProtocol() != null
 					? form.remoteDesktopProtocol() : RemoteDesktopProtocol.RDP;
 			int port = form.remoteDesktopPort() != null ? form.remoteDesktopPort() : protocol.defaultPort();
-			String hiddenFqdn = fqdnAssigner.assign(appFqdn, port, properties.primaryDomain(), ownHiddenFqdns);
+			String hiddenFqdn = fqdnAssigner.assign(appFqdn, "remotedesktop", properties.primaryDomain(), ownHiddenFqdns);
 			Integer previousExposedPort = existing != null && existing.remoteDesktop() != null
 					? existing.remoteDesktop().exposedPort() : null;
 			String previousSecret = existing != null && existing.remoteDesktop() != null
@@ -299,19 +339,26 @@ public class ServerController {
 			remoteDesktop = new RemoteDesktopConfig(hiddenFqdn, protocol, port, previousExposedPort,
 					blankToNull(form.remoteDesktopUsername()),
 					resolveSecret(form.remoteDesktopSecret(), previousSecret),
-					Boolean.TRUE.equals(form.remoteDesktopIgnoreCertificate()));
+					true);
 		} else {
 			remoteDesktop = null;
 		}
 
-		PortForwardingConfig portForwarding;
+		List<PortForwardingConfig> portForwarding;
 		if (enabled(form.portForwardingEnabled())) {
-			PortForwardingProtocol protocol = form.portForwardingProtocol() != null
-					? form.portForwardingProtocol() : PortForwardingProtocol.TCP;
-			int publicPort = form.portForwardingPublicPort() != null ? form.portForwardingPublicPort() : 0;
-			String hiddenFqdn = fqdnAssigner.assign(appFqdn, publicPort, domain, ownHiddenFqdns);
-			portForwarding = new PortForwardingConfig(hiddenFqdn, protocol, publicPort,
-					form.portForwardingTargetPort() != null ? form.portForwardingTargetPort() : 0);
+			// Only TCP exists today -- no per-entry (or shared) protocol choice to submit.
+			PortForwardingProtocol protocol = PortForwardingProtocol.TCP;
+			List<Integer> targetPorts = form.portForwardingTargetPort() != null ? form.portForwardingTargetPort() : List.of();
+			List<Integer> publicPorts = form.portForwardingPublicPort() != null ? form.portForwardingPublicPort() : List.of();
+			int entryCount = Math.min(targetPorts.size(), publicPorts.size());
+			portForwarding = new ArrayList<>();
+			for (int i = 0; i < entryCount; i++) {
+				int publicPort = publicPorts.get(i) != null ? publicPorts.get(i) : 0;
+				int targetPort = targetPorts.get(i) != null ? targetPorts.get(i) : 0;
+				String hiddenFqdn = fqdnAssigner.assign(appFqdn, String.valueOf(publicPort), domain, ownHiddenFqdns);
+				ownHiddenFqdns.add(hiddenFqdn);
+				portForwarding.add(new PortForwardingConfig(hiddenFqdn, protocol, publicPort, targetPort));
+			}
 		} else {
 			portForwarding = null;
 		}
@@ -330,9 +377,9 @@ public class ServerController {
 	/**
 	 * originalFqdn is null when adding, and the Application's own current FQDN when updating
 	 * (excluded from the Row 1 collision check). existing is the previously-stored record when
-	 * editing (null when adding) -- its own current Port Forwarding hidden FQDN, if any, must also
-	 * be excluded from the public-port uniqueness check below, since at validation time that old
-	 * tunnel is still live in boringproxy (syncTunnels only deletes/recreates after validation
+	 * editing (null when adding) -- every one of its current Port Forwarding hidden FQDNs must also
+	 * be excluded from the public-port uniqueness check below, since at validation time those old
+	 * tunnels are still live in boringproxy (syncTunnels only deletes/recreates after validation
 	 * passes) and would otherwise look like a different Application already using the same port.
 	 */
 	private List<String> validate(Server server, String originalFqdn, Server existing) {
@@ -379,26 +426,65 @@ public class ServerController {
 			errors.add("Select at least one protocol to expose.");
 		}
 
+		if (server.hasWeb()) {
+			validatePortRange(server.web().port(), "Homelab server port", errors);
+		}
+		if (server.hasTerminal()) {
+			validatePortRange(server.terminal().port(), "Homelab server port", errors);
+		}
+		if (server.hasRemoteDesktop()) {
+			validatePortRange(server.remoteDesktop().port(), "Homelab server port", errors);
+		}
+
 		if (server.hasPortForwarding()) {
-			PortForwardingConfig portForwarding = server.portForwarding();
-			if (portForwarding.publicPort() <= RESERVED_PORT_MAX) {
-				errors.add("Port " + portForwarding.publicPort() + " is reserved for system services and cannot be exposed.");
-			} else {
-				String previousFqdn = existing != null && existing.portForwarding() != null
-						? existing.portForwarding().fqdn() : null;
+			List<PortForwardingConfig> portForwarding = server.portForwarding();
+			if (portForwarding.size() > MAX_PORT_FORWARDING_ENTRIES) {
+				errors.add("Up to " + MAX_PORT_FORWARDING_ENTRIES + " ports can be forwarded.");
+			}
+			Set<String> previousFqdns = existing != null && existing.portForwarding() != null
+					? existing.portForwarding().stream().map(PortForwardingConfig::fqdn).collect(Collectors.toSet())
+					: Set.of();
+			Set<Integer> publicPortsSeen = new HashSet<>();
+			Set<Integer> targetPortsSeen = new HashSet<>();
+			for (PortForwardingConfig entry : portForwarding) {
+				validatePortRange(entry.targetPort(), "Homelab server port", errors);
+				if (!targetPortsSeen.add(entry.targetPort())) {
+					errors.add("Homelab server port " + entry.targetPort()
+							+ " is used by more than one of this server's own forwarded ports.");
+					continue;
+				}
+				if (entry.publicPort() > MAX_PORT) {
+					errors.add("Port " + entry.publicPort() + " is not a valid port number (must be 1-" + MAX_PORT + ").");
+					continue;
+				}
+				if (entry.publicPort() <= RESERVED_PORT_MAX) {
+					errors.add("Port " + entry.publicPort() + " is reserved for system services and cannot be exposed.");
+					continue;
+				}
+				if (!publicPortsSeen.add(entry.publicPort())) {
+					errors.add("Port " + entry.publicPort() + " is used by more than one of this server's own forwarded ports.");
+					continue;
+				}
 				boolean portTaken = existingTunnels.entrySet().stream()
 						.anyMatch(e -> e.getValue().allowExternalTcp()
 								&& "passthrough".equals(e.getValue().tlsTermination())
-								&& e.getValue().tunnelPort() == portForwarding.publicPort()
-								&& !e.getKey().equalsIgnoreCase(portForwarding.fqdn())
-								&& (previousFqdn == null || !e.getKey().equalsIgnoreCase(previousFqdn)));
+								&& e.getValue().tunnelPort() == entry.publicPort()
+								&& !e.getKey().equalsIgnoreCase(entry.fqdn())
+								&& previousFqdns.stream().noneMatch(e.getKey()::equalsIgnoreCase));
 				if (portTaken) {
-					errors.add("Port " + portForwarding.publicPort() + " is already exposed by another server.");
+					errors.add("Port " + entry.publicPort() + " is already exposed by another server.");
 				}
 			}
 		}
 
 		return errors;
+	}
+
+	/** Applies to every port field on the edit page (Web/Terminal/Remote Desktop's homelab-side port, and Port Forwarding's homelab-side port -- Port Forwarding's own public-port range is checked separately alongside its other business rules). */
+	private void validatePortRange(int port, String fieldLabel, List<String> errors) {
+		if (port < 1 || port > MAX_PORT) {
+			errors.add(fieldLabel + " " + port + " is not a valid port number (must be 1-" + MAX_PORT + ").");
+		}
 	}
 
 	private static String blankToNull(String value) {

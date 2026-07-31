@@ -1,6 +1,7 @@
 package online.selfieproxy.portal.domain;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
@@ -13,6 +14,10 @@ import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
  * single-protocol model this replaces, there's no reverse "reconstruct an Server from a live
  * Tunnel" direction anymore: ServerStore is now the sole source of truth for an Application's
  * shape (see its own javadoc), tunnels are just a derived side-effect kept in sync on save.
+ * Port Forwarding is deliberately kept out of {@link #tunnelPlans} -- it's the one protocol that
+ * can produce more than one tunnel per Server (up to 8), so it has its own
+ * {@link #portForwardingTunnelPlans} returning a list instead of forcing the other three
+ * always-single-tunnel protocols into a list-shaped map they'd never use.
  */
 @Component
 public class TunnelMapper {
@@ -26,7 +31,7 @@ public class TunnelMapper {
 		return server.fqdn();
 	}
 
-	/** Only entries for the server's currently-enabled protocols. */
+	/** Only entries for the server's currently-enabled single-tunnel protocols (WEB/TERMINAL/REMOTE_DESKTOP) -- see {@link #portForwardingTunnelPlans} for Port Forwarding. */
 	public Map<ServerProtocol, ProtocolTunnel> tunnelPlans(Server server, String owner) {
 		Map<ServerProtocol, ProtocolTunnel> plans = new EnumMap<>(ServerProtocol.class);
 		if (server.hasWeb()) {
@@ -38,10 +43,17 @@ public class TunnelMapper {
 		if (server.hasRemoteDesktop()) {
 			plans.put(ServerProtocol.REMOTE_DESKTOP, remoteDesktopTunnel(server, owner));
 		}
-		if (server.hasPortForwarding()) {
-			plans.put(ServerProtocol.PORT_FORWARDING, portForwardingTunnel(server, owner));
-		}
 		return plans;
+	}
+
+	/** One entry per enabled Port Forwarding port (up to 8), empty if disabled. */
+	public List<ProtocolTunnel> portForwardingTunnelPlans(Server server, String owner) {
+		if (!server.hasPortForwarding()) {
+			return List.of();
+		}
+		return server.portForwarding().stream()
+				.map(entry -> portForwardingTunnel(server, entry, owner))
+				.toList();
 	}
 
 	/**
@@ -77,11 +89,10 @@ public class TunnelMapper {
 	}
 
 	/** allowExternalTcp true -- the one hidden protocol that's genuinely internet-reachable, at publicPort. */
-	private ProtocolTunnel portForwardingTunnel(Server server, String owner) {
-		PortForwardingConfig portForwarding = server.portForwarding();
+	private ProtocolTunnel portForwardingTunnel(Server server, PortForwardingConfig entry, String owner) {
 		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
-				portForwarding.fqdn(), owner, server.homelabName(), portForwarding.targetPort(), server.host(),
-				portForwarding.publicPort(), true, null, null, null, "passthrough", null, null, null);
-		return new ProtocolTunnel(portForwarding.fqdn(), request);
+				entry.fqdn(), owner, server.homelabName(), entry.targetPort(), server.host(),
+				entry.publicPort(), true, null, null, null, "passthrough", null, null, null);
+		return new ProtocolTunnel(entry.fqdn(), request);
 	}
 }
