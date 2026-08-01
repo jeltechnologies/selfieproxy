@@ -24,7 +24,7 @@
 				<div class="field" id="subdomain-field">
 					<label for="subdomain">Subdomain</label>
 					<input type="text" id="subdomain" name="subdomain" th:value="${server.subdomain()}"
-						   pattern="[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+						   pattern="[A-Za-z0-9]([-A-Za-z0-9]{0,61}[A-Za-z0-9])?"
 						   title="Only letters, numbers, and hyphens -- cannot start or end with a hyphen"
 						   placeholder="(leave blank to use the domain by itself)">
 				</div>

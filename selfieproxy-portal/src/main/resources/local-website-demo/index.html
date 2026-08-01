@@ -7,7 +7,7 @@
 <meta name="description" content="Selfie Proxy gives every server running in your homelab a friendly, secure internet address — from one small server you control. No port forwarding, automatic HTTPS, built-in login, one Docker command." />
 <meta property="og:title" content="Selfie Proxy — self-hosted reverse proxy for homelabs" />
 <meta property="og:description" content="Self-host your homelab on the internet. Open source, MIT licensed, one Docker command." />
-<meta property="og:image" content="screenshots/edit-server.jpg" />
+<meta property="og:image" content="screenshots/servers.jpg" />
 <meta property="og:type" content="website" />
 <link rel="icon" href="favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -78,20 +78,11 @@
       <div class="hero-shot reveal">
         <div class="browser-frame">
           <div class="browser-chrome"><span></span><span></span><span></span></div>
-          <button type="button" class="shot-frame shot-trigger" id="hero-carousel-trigger"
-                  data-lightbox-src="screenshots/edit-server.jpg"
-                  data-lightbox-alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
-            <img id="hero-carousel-img" src="screenshots/edit-server.jpg" alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." width="1920" height="879" />
+          <button type="button" class="shot-frame shot-trigger"
+                  data-lightbox-src="screenshots/servers.jpg"
+                  data-lightbox-alt="Servers page listing seven servers across two homelabs, with Connect buttons for their Web, Terminal, and Remote desktop protocols.">
+            <img src="screenshots/servers.jpg" alt="Servers page listing seven servers across two homelabs, with Connect buttons for their Web, Terminal, and Remote desktop protocols." width="1920" height="1037" />
           </button>
-        </div>
-        <div class="hero-carousel-dots" id="hero-carousel-dots" role="group" aria-label="Product screenshots">
-          <button type="button" class="carousel-dot is-active" aria-label="Show Servers screenshot"></button>
-          <button type="button" class="carousel-dot" aria-label="Show Homelabs screenshot"></button>
-          <button type="button" class="carousel-dot" aria-label="Show Connect a homelab screenshot"></button>
-          <button type="button" class="carousel-dot" aria-label="Show Remote desktop (Windows) screenshot"></button>
-          <button type="button" class="carousel-dot" aria-label="Show Remote desktop (Linux) screenshot"></button>
-          <button type="button" class="carousel-dot" aria-label="Show Terminal access screenshot"></button>
-          <button type="button" class="carousel-dot" aria-label="Show Local websites screenshot"></button>
         </div>
       </div>
     </div>
@@ -276,8 +267,8 @@
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
                     data-lightbox-src="screenshots/homelabs.jpg"
-                    data-lightbox-alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 servers, and iot-gadgets shown Disconnected in red with 1 server.">
-              <img src="screenshots/homelabs.jpg" alt="Homelabs page listing two connected networks, my-homelab shown Connected in green with 5 servers, and iot-gadgets shown Disconnected in red with 1 server." loading="lazy" width="1920" height="879" />
+                    data-lightbox-alt="Homelabs page listing two networks, my-homelab shown Connected in green with 7 servers, and iot-gadgets shown Disconnected in red with 1 server.">
+              <img src="screenshots/homelabs.jpg" alt="Homelabs page listing two networks, my-homelab shown Connected in green with 7 servers, and iot-gadgets shown Disconnected in red with 1 server." loading="lazy" width="1920" height="1037" />
             </button>
           </div>
         </div>
@@ -330,15 +321,15 @@
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
                     data-lightbox-src="screenshots/edit-server.jpg"
-                    data-lightbox-alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields.">
-              <img src="screenshots/edit-server.jpg" alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, an authentication checkbox, and the homelab's protocol, host and port fields." loading="lazy" width="1920" height="879" />
+                    data-lightbox-alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, and Web and Terminal both enabled with their own protocol, host and port fields.">
+              <img src="screenshots/edit-server.jpg" alt="Edit server form for nas, showing the subdomain, the domain dropdown, the resulting HTTPS address, and Web and Terminal both enabled with their own protocol, host and port fields." loading="lazy" width="1920" height="1191" />
             </button>
           </div>
         </div>
         <div class="tour-text">
           <p class="eyebrow">Edit server</p>
-          <h3>Point it at an IP, pick HTTP or HTTPS, decide if it needs a login</h3>
-          <p>That's the whole form. No YAML, no restarting a reverse proxy by hand to pick up the change.</p>
+          <h3>One server, up to four ways in: web, terminal, remote desktop, port forwarding</h3>
+          <p>Turn on just the protocols this one needs — a website behind SSO, an SSH terminal, or both at once, like here. No YAML, no restarting a reverse proxy by hand to pick up the change.</p>
         </div>
       </div>
 
@@ -348,8 +339,8 @@
             <div class="browser-chrome"><span></span><span></span><span></span></div>
             <button type="button" class="shot-frame shot-trigger"
                     data-lightbox-src="screenshots/local-websites.jpg"
-                    data-lightbox-alt="Local websites page listing selfieproxy.online redirecting to https://www.selfieproxy.online, and www.selfieproxy.online itself, both temporarily flagged as using a self-signed certificate.">
-              <img src="screenshots/local-websites.jpg" alt="Local websites page listing selfieproxy.online redirecting to https://www.selfieproxy.online, and www.selfieproxy.online itself, both temporarily flagged as using a self-signed certificate." loading="lazy" width="1920" height="879" />
+                    data-lightbox-alt="Local websites page listing nordicsnerd.com redirecting to https://www.nordicsnerd.com, and www.nordicsnerd.com itself.">
+              <img src="screenshots/local-websites.jpg" alt="Local websites page listing nordicsnerd.com redirecting to https://www.nordicsnerd.com, and www.nordicsnerd.com itself." loading="lazy" width="1920" height="1037" />
             </button>
           </div>
         </div>
