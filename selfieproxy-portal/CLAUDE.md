@@ -149,8 +149,10 @@ container. After a successful login the user lands on the Servers page.
   optional** line rather than an applied default (`# user: "1000:1000"  # Optional, replace with
   your own UID:GID to avoid running as root.`), since any UID/GID works equally well here: the
   snippet has no volume for anything to need matching ownership against (see below), so `1000` was
-  never actually load-bearing for this role the way `boreagent`/uid `1000` baked into the image is
-  for the colocated `selfieproxy-localsites-agent` (root `CLAUDE.md`'s "Running" section) --
+  never actually load-bearing for this role -- it's simply a convenient default matching the
+  `boreagent` uid `1000` baked into the image (`Dockerfile`), which exists for this optional use
+  here; the colocated `selfieproxy-localsites-agent` (root `CLAUDE.md`'s "Running" section) runs as
+  root instead, since it's trusted server-side infrastructure, not a user-run homelab agent --
   operators are free to pick whichever UID:GID they already use on their own homelab host. The snippet has no volume at all: the agent
   role's old `-cert-dir` flag was removed entirely (`cmd/boringproxy/main.go`, no longer even
   parsed for the `agent` subcommand) rather than just hardcoded, once tracing `agent.go` confirmed

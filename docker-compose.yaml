@@ -50,9 +50,6 @@ services:
       selfieproxy-reverseproxy:
         condition: service_healthy
     env_file: .env
-    environment:
-      SITES_WEBSERVER_HOST: selfieproxy-local-websites
-      SITES_WEBSERVER_PORT: "80"
     volumes:
       - ./data/reverseproxy/runtime:/runtime:ro
       - ./data/selfieproxy:/data
@@ -124,12 +121,13 @@ services:
     depends_on:
       selfieproxy-portal:
         condition: service_healthy
+    network_mode: host
     env_file: .env
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
         until [ -s /selfieproxy-data/selfieproxy-localsites-agent-secret ]; do sleep 1; done;
-        exec su-exec boreagent /selfieproxy-reverseproxy agent
+        exec /selfieproxy-reverseproxy agent
         -server ${REVERSE_PROXY_LISTENER_SUBDOMAIN:-proxylistener}.${PRIMARY_DOMAIN}
         -secret "$$(cat /selfieproxy-data/selfieproxy-localsites-agent-secret)"
         -agent-name selfieproxy-internal-agent

@@ -156,36 +156,21 @@ image, a shared NGINX serving every Local Website by `server_name`) and `selfiep
 "This Server" homelab, deliberately hidden from the Homelabs page and the Servers homelab
 dropdown, since it's not something a user picks or manages directly). Unlike every other agent
 (and unlike `selfieproxy-reverseproxy`/`selfieproxy-remote-console`/`selfieproxy-guacd` below),
-`selfieproxy-localsites-agent` does **not** run `network_mode: host` — its only target is
-`selfieproxy-local-websites`, a container in this same compose file, so it reaches it by service
-name over the default bridge network instead (`SITES_WEBSERVER_HOST`/`SITES_WEBSERVER_PORT`,
-`selfieproxy-portal`'s own env overrides pointing `sites-webserver.host`/`.port` at
-`selfieproxy-local-websites:80` rather than the host-published `127.0.0.1:8090` — see
-`SitesWebserverProperties`). **Changing this value is not retroactive**: `SitesWebserverProperties`
-is only read when `LocalWebsiteController` actually calls `boringProxyClient.createTunnel` --
-`toCreateTunnelRequest` builds the `client-addr`/`client-port` fresh from it every time, but
-`update()` only ever calls that (via delete-then-recreate) when the FQDN itself changes; a plain
-same-FQDN save is a no-op early return, and there's no "resync all tunnels" trigger anywhere.
-So on the one occasion this default actually changed (moving off `network_mode: host` above), the
-two already-existing "This Server" tunnels (the bootstrapped `www`/apex demo Local Websites) kept
-their stale `127.0.0.1:8090` `client_address`/`client_port` from before, and 404'd ("Server Not
-Found" -- the agent's own dial to that stale address failing, not the SSH tunnel itself) until
-manually deleted and recreated through boringproxy's REST API directly
-(`DELETE`/`POST /rest/tunnels/{domain}`, same shape `BoringProxyClient.deleteTunnel`/`createTunnel`
-use, `access_token` header from `data/reverseproxy/runtime/internal_rest_token`). This also means it's the one boringproxy-agent process that can run
-fully non-root with no privilege-drop bookkeeping needed at all: `docker-compose.yaml`'s command
-chain goes straight to `exec su-exec boreagent ...` before starting the agent binary -- no `chown`
-step, since neither of its two mounts (`/selfieproxy-data`, `/etc/ssl/certs`) is writable. The
-agent role has no volume of its own at all (the old `-cert-dir`/`this-server-certmagic` mount was
-removed entirely -- see `selfieproxy-portal/CLAUDE.md`'s "Agents" section for why: the agent
-binary never actually writes a certificate in this product, only the *server* role does).
-`boreagent` (uid/gid `1000`) is baked into the
-`selfieproxy-reverseproxy` image itself (`Dockerfile`) alongside `su-exec`, since the same image
-also serves the root-requiring server role (`selfieproxy-reverseproxy` service, pinned
-`USER: root`/`HOME: /root`, unaffected by any of this) and the external/homelab agent role below,
-which stays root-optional-but-not-default the same way (see `selfieproxy-portal/CLAUDE.md`'s
-"Agents" section for why *that* one keeps `network_mode: host` — real local-hostname-resolution
-requirement, not just habit). Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
+`selfieproxy-localsites-agent` runs `network_mode: host` and as root, same as
+`selfieproxy-reverseproxy` (pinned `USER: root`/`HOME: /root`) -- unlike a real homelab agent, it's
+trusted, colocated server-side infrastructure rather than a process an operator runs on their own,
+separately-administered network, so there's no reason to sandbox it any tighter than the rest of
+the server. It reaches `selfieproxy-local-websites` over that shared host networking at the
+host-published `127.0.0.1:8090` -- `SitesWebserverProperties`' own default
+(`sites-webserver.host`/`.port` in `application.properties`), so `docker-compose.yaml` doesn't need
+to override it at all. The agent role has no volume of its own at all (the old
+`-cert-dir`/`this-server-certmagic` mount was removed entirely -- see `selfieproxy-portal/CLAUDE.md`'s
+"Agents" section for why: the agent binary never actually writes a certificate in this product,
+only the *server* role does). The `boreagent` user (uid/gid `1000`) and `su-exec` baked into the
+`selfieproxy-reverseproxy` image (`Dockerfile`) exist solely for the external/homelab agent role
+below, which stays root-optional-but-not-default (see `selfieproxy-portal/CLAUDE.md`'s "Agents"
+section for why *that* one keeps `network_mode: host` — real local-hostname-resolution requirement,
+not just habit) -- the colocated agent here doesn't use either. Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
 copy-pasted into `.env` — its entrypoint blocks on `data/selfieproxy/selfieproxy-localsites-agent-secret`
 existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on every startup, so
 it self-provisions. `selfieproxy-local-websites` is deliberately the last service to start in
