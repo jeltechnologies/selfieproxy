@@ -14,6 +14,9 @@
 			var label = revealed ? "Show secret" : "Hide secret";
 			secretToggle.title = label;
 			secretToggle.setAttribute("aria-label", label);
+			if (renderConnectInfo) {
+				renderConnectInfo();
+			}
 		});
 	}
 
@@ -27,6 +30,24 @@
 					secretCopy.title = original;
 				}, 1500);
 			});
+		});
+	}
+
+	var regenerateButton = document.getElementById("regenerate-button");
+	var regenerateOverlay = document.getElementById("regenerate-overlay");
+	var confirmRegenerate = document.getElementById("confirm-regenerate");
+	var cancelRegenerate = document.getElementById("cancel-regenerate");
+	var regenerateForm = document.getElementById("regenerate-form");
+
+	if (regenerateButton) {
+		regenerateButton.addEventListener("click", function () {
+			regenerateOverlay.style.display = "flex";
+		});
+		cancelRegenerate.addEventListener("click", function () {
+			regenerateOverlay.style.display = "none";
+		});
+		confirmRegenerate.addEventListener("click", function () {
+			regenerateForm.submit();
 		});
 	}
 
@@ -57,16 +78,17 @@
 
 		var renderConnectInfo = function () {
 			var name = (nameInput.value || "").trim();
+			var secretValue = (secretInput && secretInput.type === "text") ? secretInput.value : "your-secret";
 
 			dockerRun.textContent =
+				"# --network host  Remove this flag to run the agent on Windows or macOS.\n" +
+				"# --user 1000:1000  Optional, replace with your own UID:GID to avoid running as root.\n" +
 				"docker run -d --name selfieproxy-reverseproxy --restart unless-stopped \\\n" +
 				"  --network host \\\n" +
-				"  -v ./data/selfieproxy-certs:/certs \\\n" +
 				"  ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest agent \\\n" +
 				"  -server " + adminDomain + " \\\n" +
-				"  -secret \"your-secret\" \\\n" +
-				"  -agent-name " + name + " \\\n" +
-				"  -cert-dir /certs";
+				"  -secret \"" + secretValue + "\" \\\n" +
+				"  -agent-name " + name;
 
 			dockerCompose.textContent =
 				"services:\n" +
@@ -74,19 +96,16 @@
 				"    image: ghcr.io/jeltechnologies/selfieproxy-reverseproxy:latest\n" +
 				"    container_name: selfieproxy-reverseproxy\n" +
 				"    restart: unless-stopped\n" +
-				"    network_mode: host\n" +
-				"    volumes:\n" +
-				"      - ./data/selfieproxy-certs:/certs\n" +
+				"    network_mode: host  # Remove this line to run the agent on Windows or macOS\n" +
+				"    # user: \"1000:1000\"  # Optional, replace with your own UID:GID to avoid running as root.\n" +
 				"    command:\n" +
 				"      - agent\n" +
 				"      - -server\n" +
 				"      - " + adminDomain + "\n" +
 				"      - -secret\n" +
-				"      - \"your-secret\"\n" +
+				"      - \"" + secretValue + "\"\n" +
 				"      - -agent-name\n" +
-				"      - " + name + "\n" +
-				"      - -cert-dir\n" +
-				"      - /certs\n";
+				"      - " + name + "\n";
 		};
 
 		renderConnectInfo();

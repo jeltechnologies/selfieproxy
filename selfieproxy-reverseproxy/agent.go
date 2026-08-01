@@ -67,6 +67,7 @@ type Agent struct {
 	cancelFuncs      map[string]context.CancelFunc
 	cancelFuncsMutex *sync.Mutex
 	certConfig       *certmagic.Config
+	certConfigOnce   sync.Once
 	selfSignedCerts  *SelfSignedCertProvider
 	pollInterval     int
 	boreSem          chan struct{}
@@ -130,8 +131,6 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		certmagic.DefaultACME.CA = config.AcmeCa
 	}
 
-	certConfig := certmagic.NewDefault()
-
 	httpClient := &http.Client{
 		// Don't follow redirects
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -160,47 +159,49 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		user:             config.User,
 		cancelFuncs:      cancelFuncs,
 		cancelFuncsMutex: cancelFuncsMutex,
-		certConfig:       certConfig,
 		selfSignedCerts:  NewSelfSignedCertProvider(),
 		pollInterval:     config.PollInterval,
 		boreSem:          make(chan struct{}, maxConcurrentBores),
 	}, nil
 }
 
+// getCertConfig lazily starts certmagic -- including its background certificate maintenance
+// goroutine (the "started background certificate maintenance" log line) -- the first time a
+// tunnel actually needs it, rather than unconditionally on agent startup like the server role
+// does (boringproxy.go, a separate *certmagic.Config with its own maintenance loop, unaffected
+// by any of this). Every ordinary tunnel this product creates (server/passthrough termination)
+// never calls ManageSync at all, so for the agent's entire lifetime in the common case this
+// never runs and never logs -- only a "client"/"client-tls"-terminated tunnel (not producible
+// through the portal today, see selfieproxy-portal/CLAUDE.md's "Agents" section) needs a real
+// *certmagic.Config, and only then does it get created, once, via certConfigOnce.
+func (c *Agent) getCertConfig(tlsTermination string) *certmagic.Config {
+	if tlsTermination != "client" && tlsTermination != "client-tls" {
+		return nil
+	}
+	c.certConfigOnce.Do(func() {
+		c.certConfig = certmagic.NewDefault()
+	})
+	return c.certConfig
+}
+
+// Retry intervals for the initial agent registration (POST /api/agents/). Docker's
+// restart: unless-stopped policy used to be the only thing retrying this at all -- Run
+// returned an error on any registration failure, main.go exited, and the container immediately
+// restarted and tried again, hammering the server on every failure including an unrecoverable
+// one (wrong -secret/-agent-name, e.g. after the secret was regenerated in the portal) that
+// can't self-resolve until the operator fixes it. registerWithRetry below never returns an
+// error for a registration failure -- it logs and backs off instead, much more slowly for an
+// auth rejection specifically, since nothing about retrying faster helps that case.
+const (
+	registerRetryInterval     = 5 * time.Second
+	registerAuthRetryInterval = 60 * time.Second
+)
+
 func (c *Agent) Run(ctx context.Context) error {
 
-	url := fmt.Sprintf("https://%s/api/agents/?agent-name=%s", c.server, c.agentName)
-	if c.user != "" {
-		url = url + "&user=" + c.user
+	if err := c.registerWithRetry(ctx); err != nil {
+		return err
 	}
-
-	registerCtx, cancelRegister := context.WithTimeout(ctx, controlPlaneRequestTimeout)
-	defer cancelRegister()
-
-	agentReq, err := http.NewRequestWithContext(registerCtx, "POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("Failed to create request for URL %s", url)
-	}
-	if len(c.secret) > 0 {
-		agentReq.Header.Add("Authorization", "bearer "+c.secret)
-	}
-	resp, err := c.httpClient.Do(agentReq)
-	if err != nil {
-		return fmt.Errorf("Failed to register agent. Ensure the server is running. URL: %s", url)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("Failed to register agent. HTTP Status code: %d. Failed to read body", resp.StatusCode)
-		}
-
-		msg := string(body)
-		return fmt.Errorf("Failed to register agent. Are the agent name ('%s') and secret correct? HTTP Status code: %d. Message: %s", c.agentName, resp.StatusCode, msg)
-	}
-
-	log.Printf("Successfully connected to %s", c.server)
 
 	pollChan := make(chan struct{})
 
@@ -233,6 +234,71 @@ func (c *Agent) Run(ctx context.Context) error {
 			// continue
 		}
 	}
+}
+
+// registerWithRetry keeps retrying the initial registration until it succeeds or ctx is
+// cancelled -- see the constants above Run for why a bad secret/agent-name backs off far more
+// slowly than any other kind of failure. Returns nil either way (ctx cancellation is a clean
+// shutdown, not a failure) -- Run treats a non-nil return here as fatal, but that path is only
+// reachable if ctx itself is somehow already done before the first attempt.
+func (c *Agent) registerWithRetry(ctx context.Context) error {
+	url := fmt.Sprintf("https://%s/api/agents/?agent-name=%s", c.server, c.agentName)
+	if c.user != "" {
+		url = url + "&user=" + c.user
+	}
+
+	for {
+		statusCode, body, err := c.registerOnce(ctx, url)
+		if err == nil && statusCode == 200 {
+			log.Printf("Successfully connected to %s", c.server)
+			return nil
+		}
+
+		wait := registerRetryInterval
+		switch {
+		case err != nil:
+			log.Printf("Failed to register agent: %v. Retrying in %s.", err, wait)
+		case statusCode == 401 || statusCode == 403:
+			wait = registerAuthRetryInterval
+			log.Printf("Registration rejected (HTTP %d): %s -- check that -secret and -agent-name ('%s') match the portal's Homelabs page (a regenerated secret invalidates the old one immediately). Retrying in %s until it's fixed.", statusCode, body, c.agentName, wait)
+		default:
+			log.Printf("Failed to register agent. HTTP status %d: %s. Retrying in %s.", statusCode, body, wait)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(wait):
+		}
+	}
+}
+
+// registerOnce performs a single registration attempt. A network-level failure (server
+// unreachable, timeout, ...) comes back as err; anything else -- including a rejected auth --
+// comes back as a plain HTTP status/body for the caller to interpret.
+func (c *Agent) registerOnce(ctx context.Context, url string) (int, string, error) {
+	registerCtx, cancel := context.WithTimeout(ctx, controlPlaneRequestTimeout)
+	defer cancel()
+
+	agentReq, err := http.NewRequestWithContext(registerCtx, "POST", url, nil)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to create request for URL %s: %w", url, err)
+	}
+	if len(c.secret) > 0 {
+		agentReq.Header.Add("Authorization", "bearer "+c.secret)
+	}
+
+	resp, err := c.httpClient.Do(agentReq)
+	if err != nil {
+		return 0, "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, "", nil
+	}
+	return resp.StatusCode, string(body), nil
 }
 
 func (c *Agent) PollTunnels(ctx context.Context) error {
@@ -481,7 +547,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	// meantime instead of failing the TLS handshake outright -- same mechanism the server uses,
 	// just backed by a per-tunnel flag here since the agent has no shared tunnel DB to query.
 	certPending := &atomic.Bool{}
-	getCertificate := withSelfSignedFallback(c.certConfig,
+	getCertificate := withSelfSignedFallback(c.getCertConfig(tunnel.TlsTermination),
 		func(string) certFallback {
 			if certPending.Load() {
 				return certFallbackSelfSigned
@@ -545,7 +611,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	}
 
 	if tunnel.TlsTermination == "client" || tunnel.TlsTermination == "client-tls" {
-		err = c.certConfig.ManageSync(ctx, []string{tunnel.Domain})
+		err = c.getCertConfig(tunnel.TlsTermination).ManageSync(ctx, []string{tunnel.Domain})
 		certPending.Store(err != nil)
 		if err != nil {
 			log.Printf("CertMagic error for %s, will keep retrying in the background\n", tunnel.Domain)

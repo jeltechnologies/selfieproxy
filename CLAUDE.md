@@ -68,7 +68,7 @@ runtime config/volumes they use:
 .
 ├── .env                          # server config, copied from .env.example
 ├── data/                         # runtime volumes — not committed
-│   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token, this-server-certmagic)
+│   ├── reverseproxy/               # everything owned by the boringproxy engine (DB, certmagic certs, ephemeral REST token)
 │   └── selfieproxy/                # Selfie Proxy's own state: servers.json (ServerStore --
 │       │                            # also covers every Server's Terminal/Remote Desktop protocol, read by
 │       │                            # selfieproxy-remote-console over the shared volume) + network-service-secret-key
@@ -152,10 +152,40 @@ a fresh deployment reach the portal to create its first agent, before any agent 
 `docker-compose.yaml` also runs two more services, both existing solely to power the
 Local Websites feature (see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-local-websites` (the `selfieproxy-localsites-webserver/`
 image, a shared NGINX serving every Local Website by `server_name`) and `selfieproxy-localsites-agent`
-(an ordinary boringproxy agent, `network_mode: host` like `boringproxy` itself, colocated with
-the server instead of a remote network — the "This Server" homelab, deliberately hidden from
-the Homelabs page and the Servers homelab dropdown, since it's not something a
-user picks or manages directly). Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
+(an ordinary boringproxy agent, colocated with the server instead of a remote network — the
+"This Server" homelab, deliberately hidden from the Homelabs page and the Servers homelab
+dropdown, since it's not something a user picks or manages directly). Unlike every other agent
+(and unlike `selfieproxy-reverseproxy`/`selfieproxy-remote-console`/`selfieproxy-guacd` below),
+`selfieproxy-localsites-agent` does **not** run `network_mode: host` — its only target is
+`selfieproxy-local-websites`, a container in this same compose file, so it reaches it by service
+name over the default bridge network instead (`SITES_WEBSERVER_HOST`/`SITES_WEBSERVER_PORT`,
+`selfieproxy-portal`'s own env overrides pointing `sites-webserver.host`/`.port` at
+`selfieproxy-local-websites:80` rather than the host-published `127.0.0.1:8090` — see
+`SitesWebserverProperties`). **Changing this value is not retroactive**: `SitesWebserverProperties`
+is only read when `LocalWebsiteController` actually calls `boringProxyClient.createTunnel` --
+`toCreateTunnelRequest` builds the `client-addr`/`client-port` fresh from it every time, but
+`update()` only ever calls that (via delete-then-recreate) when the FQDN itself changes; a plain
+same-FQDN save is a no-op early return, and there's no "resync all tunnels" trigger anywhere.
+So on the one occasion this default actually changed (moving off `network_mode: host` above), the
+two already-existing "This Server" tunnels (the bootstrapped `www`/apex demo Local Websites) kept
+their stale `127.0.0.1:8090` `client_address`/`client_port` from before, and 404'd ("Server Not
+Found" -- the agent's own dial to that stale address failing, not the SSH tunnel itself) until
+manually deleted and recreated through boringproxy's REST API directly
+(`DELETE`/`POST /rest/tunnels/{domain}`, same shape `BoringProxyClient.deleteTunnel`/`createTunnel`
+use, `access_token` header from `data/reverseproxy/runtime/internal_rest_token`). This also means it's the one boringproxy-agent process that can run
+fully non-root with no privilege-drop bookkeeping needed at all: `docker-compose.yaml`'s command
+chain goes straight to `exec su-exec boreagent ...` before starting the agent binary -- no `chown`
+step, since neither of its two mounts (`/selfieproxy-data`, `/etc/ssl/certs`) is writable. The
+agent role has no volume of its own at all (the old `-cert-dir`/`this-server-certmagic` mount was
+removed entirely -- see `selfieproxy-portal/CLAUDE.md`'s "Agents" section for why: the agent
+binary never actually writes a certificate in this product, only the *server* role does).
+`boreagent` (uid/gid `1000`) is baked into the
+`selfieproxy-reverseproxy` image itself (`Dockerfile`) alongside `su-exec`, since the same image
+also serves the root-requiring server role (`selfieproxy-reverseproxy` service, pinned
+`USER: root`/`HOME: /root`, unaffected by any of this) and the external/homelab agent role below,
+which stays root-optional-but-not-default the same way (see `selfieproxy-portal/CLAUDE.md`'s
+"Agents" section for why *that* one keeps `network_mode: host` — real local-hostname-resolution
+requirement, not just habit). Unlike every other agent, `selfieproxy-localsites-agent` needs no secret
 copy-pasted into `.env` — its entrypoint blocks on `data/selfieproxy/selfieproxy-localsites-agent-secret`
 existing, a file `ThisServerBootstrap` (`selfieproxy-portal`) republishes on every startup, so
 it self-provisions. `selfieproxy-local-websites` is deliberately the last service to start in
@@ -169,7 +199,34 @@ same `selfieproxy-local-websites` infrastructure: a demo content site at `www.PR
 (bundled with the portal itself, see `selfieproxy-portal/CLAUDE.md`'s "Local websites" section)
 and a redirect from the bare `PRIMARY_DOMAIN` to it — see `LocalWebsiteDemoBootstrap`, the same
 one-time, marker-file-gated pattern `AgentBootstrap` already uses for the default homelab above,
-applied independently to each of the two.
+applied independently to each of the two. That demo content (`selfieproxy-portal/src/main/resources/local-website-demo/`)
+is also this project's own public marketing site content (screenshots, FAQ, feature tour) --
+`selfieproxy-portal/pom.xml`'s `zip-local-website-demo` antrun execution bundles it into the jar at
+`target/classes/local-website-demo.zip` on every Maven build so it ships inside the portal image
+with no separate download step (see `selfieproxy-portal/CLAUDE.md`'s "Local websites" section). A
+second, export-only Docker stage, `selfieproxy-portal/Dockerfile`'s `website-zip` (`FROM scratch`,
+never part of the runtime image), makes that same zip grabbable straight onto the host, reusing
+whatever's already cached from the ordinary image build with no extra Maven invocation --
+**always export to a throwaway directory first, then `cp` just the one file out**, never point
+`--output type=local,dest=` directly at this repo's root (or anywhere under it containing `data/`):
+confirmed live that buildx's local exporter recursively walks the *entire* destination tree, not
+just the path(s) it's writing, and chokes (`permission denied`) on anything unreadable it finds
+there -- e.g. `data/reverseproxy/this-server-certmagic`'s uid-1000-only cert directories. Safe
+two-step form, run from inside `selfieproxy-portal/`:
+```
+docker buildx build --target website-zip --output type=local,dest=/tmp/website-zip-export .
+cp /tmp/website-zip-export/local-website-demo.zip ../local-website-demo.zip
+```
+landing at this repo's root as `local-website-demo.zip` (gitignored, both by the blanket `*.zip`
+rule and an explicit entry). This is how content edits made here get carried over to a
+separately-hosted production Selfie Proxy: download the zip from this repo root and upload it
+through that server's own Local Websites edit page (see "Uploading a ZIP" in
+`selfieproxy-portal/CLAUDE.md`'s "Local websites" section) -- there's no other sync mechanism
+between two independent Selfie Proxy deployments. Note this only refreshes a *fresh* install's
+bootstrapped demo site or the downloadable zip itself -- an already-bootstrapped `www` Local
+Website on a running server (this dev server included) keeps its existing live content
+untouched by a portal image rebuild, by design (see `LocalWebsiteDemoBootstrap` above); seeing
+edited content live there always requires that same manual "Upload a ZIP" step, even here.
 
 Two further services power the browser SSH/RDP/VNC console feature (a Server's Terminal and Remote
 Desktop protocols in the portal, see `selfieproxy-portal/CLAUDE.md`): `selfieproxy-guacd` (the official, unmodified
@@ -177,7 +234,7 @@ Desktop protocols in the portal, see `selfieproxy-portal/CLAUDE.md`): `selfiepro
 carrying both `image:` and `build:`, since there is nothing of ours to build) and
 `selfieproxy-remote-console` (the WebSocket bridge between a browser and `guacd`, own
 Java/Spring module, same build template as `selfieproxy-portal`). Both run `network_mode: host`,
-like `selfieproxy-reverseproxy`/`selfieproxy-localsites-agent` — this is load-bearing, not just
+like `selfieproxy-reverseproxy` — this is load-bearing, not just
 consistency: one of these services' underlying tunnel is created with `AllowExternalTcp: false`
 (see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core types" section), which binds its listener to
 `127.0.0.1` on the server host rather than `0.0.0.0` — deliberately never reachable from the
@@ -289,12 +346,17 @@ domain for SSH. Toggling `STEALTH_MODE` is a global switch, not a per-homelab se
 connected agent picks up the new `ServerPort`/`SshTls` values on its next poll and re-bores all its
 tunnels (the same `SyncTunnels` diff-and-restart mechanism already used for any tunnel change).
 `docker-compose.yaml` passes `-acme-email "${LETSENCRYPT_EMAIL:-}"` to both boringproxy
-invocations (the main server and the colocated `selfieproxy-localsites-agent`, which does its
-own independent certmagic issuance into `this-server-certmagic`) — it's optional for ACME/Let's
-Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is already enough to issue
-certs unattended, and leaving `LETSENCRYPT_EMAIL` unset in `.env` is fine.
-`data/reverseproxy/storage` and `data/reverseproxy/certmagic`/`this-server-certmagic` persist the
-boringproxy database and TLS certs (server's and selfieproxy-localsites-agent's, kept separate) across restarts;
+invocations (the main server and the colocated `selfieproxy-localsites-agent`) — it's optional for
+ACME/Let's Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is already enough
+to issue certs unattended, and leaving `LETSENCRYPT_EMAIL` unset in `.env` is fine. On the agent
+side this value is currently inert -- `selfieproxy-localsites-agent` has no cert-dir volume at all
+(see above) and never actually calls into certmagic in practice, so `-acme-email` there has
+nothing to attach to; it's passed for parity with the server invocation, not because the agent
+does anything with it today.
+`data/reverseproxy/storage` and `data/reverseproxy/certmagic` persist the boringproxy database and
+TLS certs across restarts (`data/reverseproxy/this-server-certmagic` is a leftover, no-longer-mounted
+directory from before the agent role's cert-dir was removed -- safe to delete, kept only because
+`data/` isn't committed and nothing here auto-prunes it);
 `data/selfieproxy` persists selfieproxy-portal's own exposed-server records (see ServerStore in
 `selfieproxy-portal/CLAUDE.md`-adjacent code — boringproxy's own Tunnel schema can't represent
 everything Selfie Proxy needs, eg. homelab protocol), the completely separate Local Website

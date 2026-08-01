@@ -26,6 +26,12 @@ Use "%[1]s command -h" for a list of flags for the command.
 
 var Version string
 
+// agentCertDir is the fixed path the agent role stores its own certmagic state under -- not
+// configurable via flag, since every deployment (the colocated selfieproxy-localsites-agent and
+// every external homelab agent, see root/portal CLAUDE.md) just needs a volume mounted here, not
+// a choice of path.
+const agentCertDir = "/certs"
+
 func fail(msg string) {
 	fmt.Fprintln(os.Stderr, msg)
 	os.Exit(1)
@@ -90,7 +96,6 @@ func main() {
 		secret := flagSet.String("secret", "", "Agent secret")
 		name := flagSet.String("agent-name", "", "Agent name")
 		user := flagSet.String("user", "", "user")
-		certDir := flagSet.String("cert-dir", "", "TLS cert directory")
 		acmeEmail := flagSet.String("acme-email", "", "Email for ACME (ie Let's Encrypt)")
 		acmeUseStaging := flagSet.Bool("acme-use-staging", false, "Use ACME (ie Let's Encrypt) staging servers")
 		acmeCa := flagSet.String("acme-certificate-authority", "", "URI for ACME Certificate Authority")
@@ -120,7 +125,7 @@ func main() {
 			Secret:         *secret,
 			AgentName:      *name,
 			User:           *user,
-			CertDir:        *certDir,
+			CertDir:        agentCertDir,
 			AcmeEmail:      *acmeEmail,
 			AcmeUseStaging: *acmeUseStaging,
 			AcmeCa:         *acmeCa,

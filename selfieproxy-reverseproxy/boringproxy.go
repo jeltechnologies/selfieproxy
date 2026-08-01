@@ -432,7 +432,7 @@ func Listen() {
 				oidcAuth := oidcAuthHolder.Load()
 				if oidcAuth == nil {
 					w.WriteHeader(http.StatusServiceUnavailable)
-					io.WriteString(w, "Selfieproxy is starting... please retry shortly")
+					io.WriteString(w, "Selfie Proxy is starting... please retry shortly")
 					return
 				}
 				oidcAuth.HandleAuthorize(w, r)
@@ -440,7 +440,7 @@ func Listen() {
 				oidcAuth := oidcAuthHolder.Load()
 				if oidcAuth == nil {
 					w.WriteHeader(http.StatusServiceUnavailable)
-					io.WriteString(w, "Selfieproxy is starting... please retry shortly")
+					io.WriteString(w, "Selfie Proxy is starting... please retry shortly")
 					return
 				}
 				oidcAuth.HandleCallback(w, r)
@@ -497,7 +497,7 @@ func Listen() {
 				// (self_signed_cert.go) now serves a self-signed cert for domains with no tunnel,
 				// rather than aborting the TLS handshake outright -- see TunnelManager.CertFallbackDecision.
 				writeHtmlError(w, http.StatusNotFound, "404 - Not Found",
-					"<p>This domain is not configured in Selfie Proxy.</p><p>If you own this domain, add an application or local website for it in the Selfie Proxy portal.</p>")
+					"<p>This subdomain is not configured in Selfie Proxy.</p><p>If you own this domain, add a server or local website for it in the Selfie Proxy portal.</p>")
 				return
 			}
 

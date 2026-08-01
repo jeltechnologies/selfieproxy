@@ -17,6 +17,9 @@ RUN setcap cap_net_bind_service=+ep cmd/boringproxy/selfieproxy-reverseproxy
 # secret from a file before exec'ing the binary (boringproxy's own -secret
 # flag takes a literal value, not a file path).
 FROM alpine:3.24
+RUN apk add --no-cache su-exec \
+ && addgroup -g 1000 boreagent \
+ && adduser -D -u 1000 -G boreagent boreagent
 EXPOSE 80 443
 WORKDIR /storage
 COPY --from=builder /build/cmd/boringproxy/selfieproxy-reverseproxy /

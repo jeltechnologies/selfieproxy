@@ -142,9 +142,26 @@ container. After a successful login the user lands on the Servers page.
   64-bit arm), with outbound internet access — the generated connect snippet (`agents.js`'s
   `renderConnectInfo`) runs the agent container with `network_mode: host`/`--network host` so it
   inherits the homelab host's own `/etc/resolv.conf` and can resolve the homelab's local-DNS
-  hostnames (same pattern as `selfieproxy-localsites-agent` in root `CLAUDE.md`'s "Running"
-  section); this rules out Docker Desktop (macOS/Windows), same as the server's own host
-  requirement.
+  hostnames; this rules out Docker Desktop (macOS/Windows), same as the server's own host
+  requirement. Unlike the server role (which needs root for `/root/.ssh` and low-port binding, and
+  stays root), the agent doesn't need to run as root at all -- confirmed live against a real
+  homelab. The generated snippet shows `--user 1000:1000`/`user: "1000:1000"` as a **commented-out,
+  optional** line rather than an applied default (`# user: "1000:1000"  # Optional, replace with
+  your own UID:GID to avoid running as root.`), since any UID/GID works equally well here: the
+  snippet has no volume for anything to need matching ownership against (see below), so `1000` was
+  never actually load-bearing for this role the way `boreagent`/uid `1000` baked into the image is
+  for the colocated `selfieproxy-localsites-agent` (root `CLAUDE.md`'s "Running" section) --
+  operators are free to pick whichever UID:GID they already use on their own homelab host. The snippet has no volume at all: the agent
+  role's old `-cert-dir` flag was removed entirely (`cmd/boringproxy/main.go`, no longer even
+  parsed for the `agent` subcommand) rather than just hardcoded, once tracing `agent.go` confirmed
+  its only write (`certConfig.ManageSync`, gated on `Tunnel.TlsTermination` being
+  `"client"`/`"client-tls"`) can never actually fire in this product -- `TunnelMapper` (the single
+  place every tunnel the portal creates goes through) only ever emits `"server"`/`"passthrough"`,
+  and the old `TlsMode.BYO_CERT`/`HOP_BY_HOP` enum that would have produced those other two values
+  is gone from the Java codebase entirely, not merely hidden behind a removed UI picker. So the
+  agent binary never writes a certificate anywhere in this product -- only the *server* role does
+  (its own separate `-cert-dir`, `boringproxy.go`, unrelated flag/code path) -- and there's nothing
+  for a volume to back.
 
 ## Servers
 

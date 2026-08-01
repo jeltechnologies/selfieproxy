@@ -33,7 +33,7 @@
 					<button type="button" id="secret-toggle" class="icon-button icon-button-boxed" title="Show secret" aria-label="Show secret">
 						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
 					</button>
-					<button type="submit" form="regenerate-form" class="link-button">New</button>
+					<button type="button" id="regenerate-button" class="button">New</button>
 				</div>
 			</div>
 
@@ -53,20 +53,14 @@
 
 		<fieldset id="connect-info" th:if="${!isNew}" th:attr="data-admin-domain=${adminDomain}">
 			<legend>How to connect</legend>
-			<p>The connection to Selfie Proxy is made by an agent that runs inside your home network.</p>
-			<p>Agents run in Docker on Linux (including 64-bit Raspberry Pi OS) -- host networking is
-			required so the agent can resolve your homelab's local hostnames, which macOS and
-			Windows Docker Desktop don't support.</p>
+			<p>Agents run in your homelab, connecting to your servers locally and bridging them to the internet.</p>
+			<p>Agents run in Docker — on a Linux server, a Raspberry Pi, Windows, or macOS.</p>
 
 			<p>1. Run this with Docker Compose inside your homelab:</p>
 			<pre class="code-block" id="connect-docker-compose"></pre>
 
 			<p>2. Or with a single Docker command:</p>
 			<pre class="code-block" id="connect-docker-run"></pre>
-
-			<p>macOS and Windows users must remove the <code>network_mode: host</code> line (or the
-			<code>--network host</code> flag) from the example above -- Docker Desktop on those
-			platforms doesn't support host networking.</p>
 		</fieldset>
 	</main>
 
@@ -75,6 +69,15 @@
 			<p>Remove this homelab? Anything connecting with its secret will stop working. This cannot be undone.</p>
 			<button type="button" id="confirm-remove" class="button button-danger">Remove</button>
 			<button type="button" id="cancel-remove" class="button button-cancel">Cancel</button>
+		</div>
+	</div>
+
+	<div id="regenerate-overlay" class="overlay">
+		<div class="overlay-card">
+			<p>A new secret will be generated. Press OK to use the new secret — you'll need to
+			update it in your agent's configuration. Press Cancel to keep using the old secret.</p>
+			<button type="button" id="confirm-regenerate" class="button">OK</button>
+			<button type="button" id="cancel-regenerate" class="button button-cancel">Cancel</button>
 		</div>
 	</div>
 

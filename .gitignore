@@ -29,3 +29,8 @@ selfieproxy-portal/target
 selfieproxy-identity-provider/target
 selfieproxy-remote-console/target
 
+# Local website demo content, exported to the repo root on every build for downloading and
+# applying to a production server -- see selfieproxy-portal/Dockerfile's website-zip stage.
+# Already covered by *.zip above; called out explicitly since it's a deliberate build artifact.
+/local-website-demo.zip
+

@@ -183,7 +183,7 @@ func requireSsoIfNeeded(w http.ResponseWriter, r *http.Request, domain string, p
 	oidcAuth := oidcAuthHolder.Load()
 	if oidcAuth == nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprint(w, "Selfieproxy is starting... please retry shortly")
+		fmt.Fprint(w, "Selfie Proxy is starting... please retry shortly")
 		return false
 	}
 

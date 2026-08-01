@@ -158,16 +158,16 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 			var opErr *net.OpError
 			if errors.As(err, &opErr) && opErr.Op == "dial" {
 				// Dialing 127.0.0.1:<tunnel port> itself failed -- nothing is listening there at
-				// all, meaning the agent's own SSH reverse-tunnel bore for this app is gone
+				// all, meaning the agent's own SSH reverse-tunnel bore for this server is gone
 				// (agent process down, or its SSH connection to this server dropped).
 				writeHtmlError(w, http.StatusNotFound, "404 - Agent Not Found",
-					`<p>The Selfie Proxy agent your the homelab is disconnected.</p><p>Please edit the homelab in the Selfie Proxy portal, and verify that name and secrets are correctly configured in docker-compose.yaml of the agent.</p>`)
+					`<p>The Selfie Proxy agent for your homelab is disconnected.</p><p>Please edit the homelab in the Selfie Proxy portal, and verify that name and secrets are correctly configured in docker-compose.yaml of the agent.</p>`)
 			} else {
 				// The dial succeeded (the agent's tunnel listener accepted the connection) but no
 				// response ever came back -- the agent itself is connected, but its own dial to the
 				// real backend inside the homelab failed (see tls_proxy.go's handleConnection).
 				writeHtmlError(w, http.StatusNotFound, "404 - Server Not Found",
-					`<p>The Selfie Proxy agent could not connect to the server in your homelab.</p><p>Please edit your application and check that all settings in 'Address in the homelab' are correct.</p>`)
+					`<p>The Selfie Proxy agent could not connect to the server in your homelab.</p><p>Please edit your server and check that 'IP or hostname to homelab server' is set correctly.</p>`)
 			}
 		default:
 			errMessage := fmt.Sprintf("%s", err)

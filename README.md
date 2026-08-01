@@ -1,6 +1,6 @@
 # Selfie Proxy
 
-Selfie Proxy provides a simplified, selfhosting solution for accessing home labs behind NAT/CGNAT, creating HTTPS subdomains via a small internet-facing server rather than complex configurations. It avoids unnecessary enterprise features like load balancing and auditing, focusing instead on ease of use for self-hosters.
+Selfie Proxy provides a simplified, selfhosting solution for accessing home labs behind NAT/CGNAT, creating HTTPS subdomains via a small internet-facing server rather than complex configurations. It avoids unnecessary enterprise features like load balancing and auditing, focusing instead on ease of use for self-hosters. See it in action at [www.selfieproxy.net](https://www.selfieproxy.net).
 
 ## Features
 
@@ -146,10 +146,10 @@ delay, capped at 15 minutes, so password-guessing scripts get slower with every 
 without ever locking a legitimate user out for longer than that. It's open source.
 
 **macOS/Windows?** The homelab agent runs fine on macOS/Windows, in Docker's default bridge
-mode — except it can't use a local DNS server, so use an IP address rather than a hostname
-when adding the homelab. On macOS/Windows, remove `network_mode: host` from the agent
-`docker-compose.yaml` snippet the Agents page generates, or the container won't start. The
-server has no such flexibility: it requires `network_mode: host`, so it must run on Linux.
+mode. Use an IP address rather than a hostname when adding the homelab, because Docker's
+bridge networking on those platforms has no local DNS support. Also remove `network_mode: host`
+from the agent `docker-compose.yaml` snippet the Agents page generates, or the container won't
+start. The server has no such flexibility: it requires `network_mode: host`, so it must run on Linux.
 
 **Can I point Selfie Proxy at an NGINX reverse proxy already running in my homelab?** No —
 point it directly at the server (HTTP, or HTTPS with a self-signed cert). Connecting
@@ -159,6 +159,27 @@ forwarding through another reverse proxy breaks both.
 **What's in a configuration export?** Everything, with the exception of passwords. Importing
 walks you through what's new versus what already exists before anything changes. A restored
 homelab always gets a new secret, which you then update on that homelab.
+
+**Are HTTPS certificates, including subdomains, handled automatically?** Yes. Every exposed
+server, static website, and the domain itself gets a free, auto-renewing Let's Encrypt
+certificate the moment you add it — no manual requests, no renewal reminders, and a
+self-signed fallback keeps things working in the meantime if Let's Encrypt is ever rate-limited.
+
+**Does the homelab agent need root access?** No. The agent container runs as a non-root user
+(the Agents page's generated Docker command includes `--user 1000:1000`, or use your own
+UID/GID) — confirmed working against a real homelab. Only the server needs root, to bind
+low ports and manage the host's SSH.
+
+**Is there a simple way to map a domain/subdomain to a port on my homelab machine?** Yes —
+that's the Servers page. Pick a homelab, a domain/subdomain, and the local address/port; Selfie
+Proxy creates the tunnel and certificate for you and proxies every connection to that domain.
+
+**Does Selfie Proxy register my domain and point DNS at the server for me?** No. You buy and
+manage the domain with any registrar you like, then point it at the server yourself (see
+Installation, step 1). The admin portal's Domains page only tracks the domains you've added
+and shows whether their DNS already resolves correctly — it doesn't create or change DNS
+records on your behalf.
+Proxy creates the tunnel and certificate for you and proxies every connection to that domain.
 
 ## License
 
