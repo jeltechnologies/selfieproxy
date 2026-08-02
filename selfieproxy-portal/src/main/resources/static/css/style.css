@@ -407,7 +407,7 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 
 .port-forwarding-table {
 	width: 100%;
-	max-width: 30rem;
+	max-width: 42rem;
 	border-collapse: collapse;
 	margin-bottom: 0.75rem;
 }
@@ -430,11 +430,13 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	text-align: center;
 }
 
-.port-forwarding-table input[type="number"] {
+.port-forwarding-table input[type="number"],
+.port-forwarding-table input[type="text"] {
 	margin-bottom: 0;
 }
 
-.port-forwarding-table input[type="number"]:read-only {
+.port-forwarding-table input[type="number"]:read-only,
+.port-forwarding-table input[type="text"]:read-only {
 	background: var(--border);
 	color: var(--muted);
 	cursor: default;

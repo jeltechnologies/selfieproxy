@@ -285,7 +285,7 @@ public class DomainsController {
 		for (PortForwardingConfig entry : original) {
 			String fqdn = fqdnAssigner.assign(newServerFqdn, String.valueOf(entry.publicPort()), newDomain, excludeFqdns);
 			excludeFqdns.add(fqdn);
-			rebuilt.add(new PortForwardingConfig(fqdn, entry.protocol(), entry.publicPort(), entry.targetPort()));
+			rebuilt.add(new PortForwardingConfig(fqdn, entry.protocol(), entry.publicPort(), entry.targetPort(), entry.description()));
 		}
 		return rebuilt;
 	}

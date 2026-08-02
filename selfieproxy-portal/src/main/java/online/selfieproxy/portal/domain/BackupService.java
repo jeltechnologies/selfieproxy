@@ -377,7 +377,7 @@ public class BackupService {
 		for (PortForwardingConfig entry : original) {
 			String fqdn = fqdnAssigner.assign(newServerFqdn, String.valueOf(entry.publicPort()), targetDomain, excludeFqdns);
 			excludeFqdns.add(fqdn);
-			rebuilt.add(new PortForwardingConfig(fqdn, entry.protocol(), entry.publicPort(), entry.targetPort()));
+			rebuilt.add(new PortForwardingConfig(fqdn, entry.protocol(), entry.publicPort(), entry.targetPort(), entry.description()));
 		}
 		return rebuilt;
 	}
