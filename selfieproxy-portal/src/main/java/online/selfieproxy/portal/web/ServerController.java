@@ -91,9 +91,11 @@ public class ServerController {
 				? lastUsed.domain() : properties.primaryDomain();
 		String defaultHomelab = lastUsed != null && lastUsed.homelabName() != null && homelabs.contains(lastUsed.homelabName())
 				? lastUsed.homelabName() : homelabs.stream().findFirst().orElse(null);
-		// Every protocol checkbox starts unchecked for a brand-new Application -- the admin picks
-		// which ones to enable.
-		Server server = new Server("", defaultDomain, defaultHomelab, "127.0.0.1", null, null, null, null);
+		// Web starts enabled and SSO-protected by default -- the common case is a single-sign-on
+		// protected website, and the admin opts out rather than in. Every other protocol checkbox
+		// still starts unchecked -- the admin picks which of those to enable.
+		WebConfig defaultWeb = new WebConfig(Protocol.HTTPS, 443, true);
+		Server server = new Server("", defaultDomain, defaultHomelab, "127.0.0.1", defaultWeb, null, null, null);
 		model.addAttribute("server", server);
 		model.addAttribute("isNew", true);
 		model.addAttribute("domains", domainService.allDomains());

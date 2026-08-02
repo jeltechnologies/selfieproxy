@@ -50,7 +50,6 @@
 			<thead>
 				<tr>
 					<th></th>
-					<th data-sort-key="name">Name</th>
 					<th data-sort-key="domain">Domain</th>
 					<th data-sort-key="homelab">Homelab</th>
 					<th data-sort-key="localAddress">Local address</th>
@@ -69,13 +68,10 @@
 							<span class="status-dot" th:classappend="${offline} ? 'status-dot-offline' : 'status-dot-online'"></span>
 						</span>
 					</td>
-					<td th:attr="data-sort-value=${#strings.isEmpty(server.subdomain()) ? server.domain() : server.subdomain()}">
-						<span th:text="${#strings.isEmpty(server.subdomain())} ? ${server.domain()} : ${server.subdomain()}"></span>
+					<td th:attr="data-sort-value=${server.fqdn()}">
+						<span th:text="${server.fqdn()}"></span>
 						<span th:if="${!#lists.contains(homelabs, server.homelabName())}"
 							  class="warning-icon" title="This server's homelab no longer exists">&#9888;</span>
-					</td>
-					<td th:attr="data-sort-value=${server.domain()}">
-						<span th:text="${server.domain()}"></span>
 						<span th:if="${!domainService.exists(server.domain())}"
 							  class="warning-icon" title="This server's domain no longer exists">&#9888;</span>
 					</td>
