@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -37,6 +38,7 @@ public class TerminalSettingsStore {
 	private final ObjectMapper objectMapper = JsonMapper.builder()
 			.disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
 			.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+			.enable(SerializationFeature.INDENT_OUTPUT)
 			.build();
 	private final Object lock = new Object();
 

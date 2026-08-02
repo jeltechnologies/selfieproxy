@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import online.selfieproxy.identityprovider.config.AdminAuthProperties;
@@ -52,7 +53,7 @@ public class AdminUserStore {
 	private final AdminAuthProperties authProperties;
 	private final PasswordEncoder passwordEncoder;
 	private final OidcProperties oidcProperties;
-	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+	private final ObjectMapper objectMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 	private final Object lock = new Object();
 
 	public AdminUserStore(@Value("${admin-portal.user-store-path}") String path, AdminAuthProperties authProperties,

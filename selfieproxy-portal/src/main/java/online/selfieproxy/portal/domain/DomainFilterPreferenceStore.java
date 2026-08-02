@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -26,7 +27,7 @@ public class DomainFilterPreferenceStore {
 	private static final Logger log = LoggerFactory.getLogger(DomainFilterPreferenceStore.class);
 
 	private final Path filePath;
-	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+	private final ObjectMapper objectMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 	private final Object lock = new Object();
 
 	public DomainFilterPreferenceStore(@Value("${selfieproxy.domain-filter-preference-path}") String path) {

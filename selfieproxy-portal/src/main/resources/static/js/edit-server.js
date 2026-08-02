@@ -4,6 +4,7 @@
 	var subdomainInput = document.getElementById("subdomain");
 	var domainSelect = document.getElementById("domain");
 	var resultInput = document.getElementById("result");
+	var defaultSubdomainPlaceholder = subdomainInput.placeholder;
 
 	var hostInput = document.getElementById("host");
 
@@ -83,6 +84,20 @@
 		terminalRowFields.style.display = terminalEnabledCheckbox.checked ? "" : "none";
 		remoteDesktopRowFields.style.display = remoteDesktopEnabledCheckbox.checked ? "" : "none";
 		portForwardingRowFields.style.display = portForwardingEnabledCheckbox.checked ? "" : "none";
+		updateSubdomainRequirement();
+	}
+
+	/**
+	 * A blank subdomain (apex) only makes sense for Web -- a whole domain hosting one website.
+	 * Terminal/Remote Desktop/Port Forwarding each route over their own separately-generated hidden
+	 * tunnel address, never the visible subdomain, so it buys nothing there, and it's the only name
+	 * the admin has to find this server again afterward -- require it whenever Web isn't enabled
+	 * (mirrors the same rule enforced server-side in ServerController.validate).
+	 */
+	function updateSubdomainRequirement() {
+		var required = !webEnabledCheckbox.checked;
+		subdomainInput.toggleAttribute("required", required);
+		subdomainInput.placeholder = required ? "Required to identify and edit this server later" : defaultSubdomainPlaceholder;
 	}
 
 	function updateResult() {

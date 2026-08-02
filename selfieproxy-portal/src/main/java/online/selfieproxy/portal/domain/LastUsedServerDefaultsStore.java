@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -25,7 +26,7 @@ public class LastUsedServerDefaultsStore {
 	private static final Logger log = LoggerFactory.getLogger(LastUsedServerDefaultsStore.class);
 
 	private final Path filePath;
-	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+	private final ObjectMapper objectMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 	private final Object lock = new Object();
 
 	public LastUsedServerDefaultsStore(@Value("${selfieproxy.last-used-server-defaults-path}") String path) {

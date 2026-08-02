@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -41,7 +42,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class UserStore {
 
 	private final Path path;
-	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+	private final ObjectMapper objectMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 	private final Object lock = new Object();
 
 	public UserStore(@Value("${users.store-path}") String path) {

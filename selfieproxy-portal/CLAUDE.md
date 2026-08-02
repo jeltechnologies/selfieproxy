@@ -115,10 +115,15 @@ container. After a successful login the user lands on the Servers page.
 
 - Each exposed web service is bound to one subdomain of whichever domain it's assigned to (see
   "Domains" above), composing a FQDN automatically (subdomain `music` on domain `example.com` becomes
-  `music.example.com`). The subdomain is optional -- leaving it blank exposes the service at the bare
-  domain itself (`example.com`), including the primary domain, since nothing else listens on it bare
-  (the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains are all subdomains *of* the
-  primary domain, never the primary domain itself).
+  `music.example.com`). The subdomain is optional only when Web is enabled -- leaving it blank exposes
+  the website at the bare domain itself (`example.com`), including the primary domain, since nothing
+  else listens on it bare (the fixed `proxylistener`/`selfieproxy`/`auth`/`console` subdomains are all
+  subdomains *of* the primary domain, never the primary domain itself). A Server with no Web protocol
+  (Terminal/Remote Desktop/Port Forwarding only) requires a subdomain: none of those three route over
+  the visible subdomain at all (each gets its own separately-generated hidden tunnel address, see
+  `HiddenTunnelFqdnAssigner`), so a blank one would buy nothing while leaving the subdomain -- the
+  admin's only handle for finding and editing this Server again -- meaningless, and would silently
+  collide with any other same-domain, no-Web Server also left blank (see Validation below).
 - The Homelabs page and the Servers page are two views over related data, not two
   separate concepts: a Homelab corresponds to one Agent (see Agents page below) and is managed
   there, not on the Servers page.
@@ -284,7 +289,14 @@ Button panel: Cancel (returns to the list, no changes), OK (add/update), Remove 
 background/white text, asks for confirmation in an overlay first).
 
 Validation (`ServerController.validate`): before adding, check the subdomain isn't already taken on
-the chosen domain (case-insensitive). At least one protocol must be enabled. Every port field
+the chosen domain (case-insensitive) -- checked against both live boringproxy tunnels *and* every
+other stored Server, since a Server with no Web protocol never registers a live tunnel at its own
+fqdn (see "Homelabs" above), so the tunnel-list check alone can't catch two such Servers sharing the
+same subdomain+domain; without the second check, saving the newer one would silently overwrite the
+older one in ServerStore rather than being rejected. A blank subdomain is only valid when Web is
+enabled -- required otherwise, both server-side here and client-side (`edit-server.js`'s
+`updateSubdomainRequirement`, toggled on the Web checkbox's `change` event same as the field
+visibility it already reacts to). At least one protocol must be enabled. Every port field
 (Web/Terminal/Remote Desktop's homelab-side port, Port Forwarding's homelab-side and public ports)
 must be 1-65535. Port Forwarding additionally requires: no more than 8 entries; each entry's
 homelab-side port unique across this Server's own forwarded ports; each entry's public port not

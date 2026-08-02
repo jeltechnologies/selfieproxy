@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -27,7 +28,7 @@ public class ThemeStore {
 	private static final Logger log = LoggerFactory.getLogger(ThemeStore.class);
 
 	private final Path filePath;
-	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+	private final ObjectMapper objectMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
 	public ThemeStore(@Value("${selfieproxy.theme-path}") String path) {
 		this.filePath = Path.of(path);

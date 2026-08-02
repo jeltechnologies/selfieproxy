@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -25,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class DomainStore {
 
 	private final Path filePath;
-	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+	private final ObjectMapper objectMapper = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 	private final Object lock = new Object();
 
 	public DomainStore(@Value("${selfieproxy.domains-path}") String path) {

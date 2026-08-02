@@ -390,6 +390,18 @@ public class ServerController {
 		if (server.subdomain() != null && !server.subdomain().isBlank() && !DnsLabelValidator.isValid(server.subdomain())) {
 			errors.add("Subdomain can only contain letters, numbers, and hyphens, and cannot start or end with a hyphen.");
 		}
+		// A blank subdomain (apex) only makes sense for Web -- a whole domain hosting one website.
+		// Terminal/RemoteDesktop/PortForwarding each route over their own separately-generated hidden
+		// tunnel FQDN (see HiddenTunnelFqdnAssigner), never the server's own subdomain, so leaving it
+		// blank buys nothing there -- and since a server without Web never registers a live boringproxy
+		// tunnel at its own fqdn, two such servers left blank on the same domain wouldn't even be caught
+		// by the "already in use" check below (nothing to collide against), silently overwriting one
+		// another in ServerStore on save. The subdomain is also the only name the admin has to find this
+		// server again on the Servers list/edit page, so requiring it here is a UX necessity too, not
+		// just a collision guard.
+		if (!server.hasWeb() && (server.subdomain() == null || server.subdomain().isBlank())) {
+			errors.add("A subdomain is required unless this server exposes a website at the domain itself.");
+		}
 		if (!domainService.exists(server.domain())) {
 			errors.add("Unknown domain.");
 			return errors;
@@ -415,10 +427,17 @@ public class ServerController {
 
 		String fqdn = tunnelMapper.fqdn(server);
 		Map<String, TunnelDto> existingTunnels = boringProxyClient.listTunnels();
-		boolean taken = existingTunnels.keySet().stream()
+		boolean takenByTunnel = existingTunnels.keySet().stream()
 				.anyMatch(domain -> domain.equalsIgnoreCase(fqdn)
 						&& (originalFqdn == null || !domain.equalsIgnoreCase(originalFqdn)));
-		if (taken) {
+		// A server without Web never registers a live boringproxy tunnel at its own fqdn (see the
+		// subdomain-required check above), so the tunnel-list check above alone can't catch two such
+		// servers sharing the same subdomain+domain -- cross-check ServerStore's own records too, or
+		// the second save would silently overwrite the first instead of being rejected.
+		boolean takenByServer = serverStore.values().stream()
+				.anyMatch(other -> other.fqdn().equalsIgnoreCase(fqdn)
+						&& (originalFqdn == null || !other.fqdn().equalsIgnoreCase(originalFqdn)));
+		if (takenByTunnel || takenByServer) {
 			errors.add(server.subdomain() != null && !server.subdomain().isBlank()
 					? "Subdomain \"" + server.subdomain() + "\" is already in use."
 					: "\"" + server.domain() + "\" is already in use.");
