@@ -239,11 +239,12 @@ own enable checkbox -- toggling one on/off never touches the others' fields or t
 - **Port Forwarding**: up to 8 individual forwarded TCP ports -- never a range, each is its own
   boringproxy tunnel (`MAX_PORT_FORWARDING_ENTRIES` in `ServerController`). Shown as a small table
   (`Homelab server port` | `Port exposed to the internet` | `Description` | blank), modeled on a
-  typical router's port-forwarding page: each already-added row is read-only with a **Remove**
+  typical router's port-forwarding page: each already-added row stays editable and has a **Remove**
   button (no confirmation needed -- the page's own Cancel already covers "I didn't mean to change
   this"); a trailing blank row is always directly submittable as-is (typing into it and clicking
-  the form's OK works without ever clicking the row's own **Add**), and clicking **Add** just locks
-  that row read-only and appends a fresh blank row unless the 8-entry cap is reached. Every port
+  the form's OK works without ever clicking the row's own **Add**), and clicking **Add** just turns
+  that row into an ordinary already-added one and appends a fresh blank row unless the 8-entry cap
+  is reached. Every port
   field is constrained to 1-65535 (`min`/`max`/`step` plus server-side `validatePortRange`); Add
   and direct submit both block, client-side, a homelab-server-port or public-port value that
   duplicates another row already in the table, ahead of the authoritative server-side check.
@@ -254,8 +255,32 @@ own enable checkbox -- toggling one on/off never touches the others' fields or t
   (no `BackupManifest.CURRENT_VERSION` bump needed -- it's a purely additive, nullable field, so an
   older export without it just deserializes with `description == null`). Two static
   warnings are shown above the table: using this is at the admin's own risk (anyone scanning the
-  domain can see the port is open), and to make sure the port is open in the firewall too. Always
-  TCP -- no protocol choice, since nothing else exists yet (`PortForwardingProtocol`).
+  domain can see the port is open), and to make sure the port is open in the firewall too. A third,
+  conditional one appears whenever `GatewayPortsChecker.isConfigured()` is false: "Port forwarding
+  is disabled until GatewayPorts is configured on the server host" -- informational only, never
+  blocks saving, since the admin can't fix a host-level sshd setting from this page (see
+  `GatewayPortsChecker` below for why this can be silently broken with no error anywhere else).
+  Always TCP -- no protocol choice, since nothing else exists yet (`PortForwardingProtocol`).
+
+  **GatewayPorts**: a Port Forwarding tunnel's public port is bound via a real SSH remote-forward
+  through the host's actual sshd (`AllowExternalTcp`/`permitlisten="0.0.0.0:<port>"`, see
+  `selfieproxy-reverseproxy/CLAUDE.md`'s `tunnel_manager.go` reference) -- but sshd has its own,
+  independent `GatewayPorts` directive gating that (default `no`), which silently forces the bind
+  back to loopback-only with no error anywhere: the SSH session and the tunnel both still report
+  success, only the public port never actually opens. `GatewayPortsChecker`
+  (`domain/GatewayPortsChecker.java`) reads the host's real `/etc/ssh/sshd_config` -- bind-mounted
+  read-only into `selfieproxy-portal` (`selfieproxy.sshd-config-path`, `docker-compose.yaml`; no
+  `user:` override needed, since the container already runs as root and stock Ubuntu ships this
+  file world-readable anyway) -- and reports whether `GatewayPorts` is `yes`/`clientspecified`
+  (works) versus `no`/absent (broken). Deliberately only parses that one file, not any `Include`-d
+  snippet under `sshd_config.d/`, an accepted simplification since this is advisory, not a hard
+  gate. Surfaced in three places: this edit-page warning; the Servers list's existing red/green
+  `status-dot` (`DashboardController.loadServerStatusItems`, alongside the homelab-disconnected/
+  DNS-mismatch checks -- reuses that same mechanism, so a Port-Forwarding-only server's row also
+  grays out its otherwise-unrelated Web/Terminal/Remote Desktop Connect buttons, an accepted
+  tradeoff); and an unconditional startup log banner (`GatewayPortsStartupWarning`, same
+  `ApplicationReadyEvent` idiom as `TunnelReconciler`) printed on every boot where it's
+  misconfigured, regardless of whether any Server currently uses Port Forwarding.
 
 Terminal's and Remote Desktop's tunnels each live on an internal, never-shown FQDN under the
 *primary* domain (`allow-external-tcp: false`, see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core

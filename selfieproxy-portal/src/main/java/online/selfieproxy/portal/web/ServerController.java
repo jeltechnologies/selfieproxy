@@ -24,6 +24,7 @@ import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.ServerProtocol;
 import online.selfieproxy.portal.domain.DnsLabelValidator;
 import online.selfieproxy.portal.domain.DomainService;
+import online.selfieproxy.portal.domain.GatewayPortsChecker;
 import online.selfieproxy.portal.domain.Server;
 import online.selfieproxy.portal.domain.ServerStore;
 import online.selfieproxy.portal.domain.HiddenTunnelFqdnAssigner;
@@ -65,12 +66,13 @@ public class ServerController {
 	private final AgentStatusService agentStatusService;
 	private final LastUsedServerDefaultsStore lastUsedServerDefaultsStore;
 	private final HiddenTunnelFqdnAssigner fqdnAssigner;
+	private final GatewayPortsChecker gatewayPortsChecker;
 
 	public ServerController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			BoringProxyProperties properties, ServerStore serverStore, NetworkServiceCredentialCipher cipher,
 			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
 			AgentStatusService agentStatusService, LastUsedServerDefaultsStore lastUsedServerDefaultsStore,
-			HiddenTunnelFqdnAssigner fqdnAssigner) {
+			HiddenTunnelFqdnAssigner fqdnAssigner, GatewayPortsChecker gatewayPortsChecker) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.properties = properties;
@@ -81,6 +83,7 @@ public class ServerController {
 		this.agentStatusService = agentStatusService;
 		this.lastUsedServerDefaultsStore = lastUsedServerDefaultsStore;
 		this.fqdnAssigner = fqdnAssigner;
+		this.gatewayPortsChecker = gatewayPortsChecker;
 	}
 
 	@GetMapping("/servers/new")
@@ -101,6 +104,7 @@ public class ServerController {
 		model.addAttribute("domains", domainService.allDomains());
 		model.addAttribute("homelabs", homelabs);
 		model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
+		model.addAttribute("gatewayPortsConfigured", gatewayPortsChecker.isConfigured());
 		return "edit-server";
 	}
 
@@ -116,6 +120,7 @@ public class ServerController {
 		model.addAttribute("homelabs", homelabs());
 		model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
 		model.addAttribute("certPending", certPending(server));
+		model.addAttribute("gatewayPortsConfigured", gatewayPortsChecker.isConfigured());
 		return "edit-server";
 	}
 
@@ -132,6 +137,7 @@ public class ServerController {
 			model.addAttribute("domains", domainService.allDomains());
 			model.addAttribute("homelabs", homelabs());
 			model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
+			model.addAttribute("gatewayPortsConfigured", gatewayPortsChecker.isConfigured());
 			return "edit-server";
 		}
 
@@ -160,6 +166,7 @@ public class ServerController {
 			model.addAttribute("domains", domainService.allDomains());
 			model.addAttribute("homelabs", homelabs());
 			model.addAttribute("homelabOnline", agentStatusService.onlineByAgentName());
+			model.addAttribute("gatewayPortsConfigured", gatewayPortsChecker.isConfigured());
 			return "edit-server";
 		}
 

@@ -22,6 +22,7 @@ import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.DomainFilterPreferenceStore;
 import online.selfieproxy.portal.domain.DomainService;
+import online.selfieproxy.portal.domain.GatewayPortsChecker;
 import online.selfieproxy.portal.domain.Server;
 import online.selfieproxy.portal.domain.ServerStore;
 
@@ -35,11 +36,12 @@ public class DashboardController {
 	private final AgentStatusService agentStatusService;
 	private final BoringProxyProperties properties;
 	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
+	private final GatewayPortsChecker gatewayPortsChecker;
 
 	public DashboardController(BoringProxyClient boringProxyClient, ServerStore serverStore,
 			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
 			AgentStatusService agentStatusService, BoringProxyProperties properties,
-			DomainFilterPreferenceStore domainFilterPreferenceStore) {
+			DomainFilterPreferenceStore domainFilterPreferenceStore, GatewayPortsChecker gatewayPortsChecker) {
 		this.boringProxyClient = boringProxyClient;
 		this.serverStore = serverStore;
 		this.thisServerAgentProperties = thisServerAgentProperties;
@@ -47,6 +49,7 @@ public class DashboardController {
 		this.agentStatusService = agentStatusService;
 		this.properties = properties;
 		this.domainFilterPreferenceStore = domainFilterPreferenceStore;
+		this.gatewayPortsChecker = gatewayPortsChecker;
 	}
 
 	@GetMapping("/servers")
@@ -121,10 +124,12 @@ public class DashboardController {
 	}
 
 	/**
-	 * Whether each server is actually reachable right now: its homelab connected and (for a Web-enabled
-	 * server) its domain's DNS actually pointing at this server (offline=false means fully OK -- green
+	 * Whether each server is actually reachable right now: its homelab connected, (for a Web-enabled
+	 * server) its domain's DNS actually pointing at this server, and (for a Port-Forwarding-enabled
+	 * server) the host's sshd actually configured to let that tunnel's remote-forward bind
+	 * non-loopback (see GatewayPortsChecker) -- offline=false means fully OK -- green
 	 * dot, no column text; true means red, with the specific problem(s) named rather than one
-	 * generic label -- see the Status column on dashboard.html), plus whether Web's certificate is
+	 * generic label -- see the Status column on dashboard.html, plus whether Web's certificate is
 	 * still a temporary self-signed one (see selfieproxy-reverseproxy's TunnelManager) -- only Web
 	 * ever gets a managed cert, so this is skipped entirely for an server with Web disabled.
 	 */
@@ -141,6 +146,9 @@ public class DashboardController {
 			}
 			if (server.hasWeb() && domainService.hasDnsMismatch(server.fqdn(), serverIp)) {
 				issues.add("Domain not correctly configured.");
+			}
+			if (server.hasPortForwarding() && !gatewayPortsChecker.isConfigured()) {
+				issues.add("GatewayPorts is not configured in sshd_config -- Port Forwarding will not work.");
 			}
 			boolean offline = !issues.isEmpty();
 			TunnelDto webTunnel = server.hasWeb() ? tunnels.get(server.fqdn()) : null;

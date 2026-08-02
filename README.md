@@ -102,6 +102,8 @@ On top of boringproxy we added:
    Servers page), also open whichever port you choose as its "Port exposed to the internet"
    — that's a separate, arbitrary port you pick per server, so it isn't covered by the three
    above and needs its own firewall rule (`sudo ufw allow <port>/tcp`) before it's reachable.
+   Port Forwarding also requires `GatewayPorts clientspecified` in `/etc/ssh/sshd_config`
+   (then `sudo systemctl restart sshd`) — mandatory for Port Forwarding, not needed otherwise.
 
 3. On the server, download the compose file and env template:
 

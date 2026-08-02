@@ -435,13 +435,6 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	margin-bottom: 0;
 }
 
-.port-forwarding-table input[type="number"]:read-only,
-.port-forwarding-table input[type="text"]:read-only {
-	background: var(--border);
-	color: var(--muted);
-	cursor: default;
-}
-
 .cert-pending-badge {
 	display: inline-block;
 	margin-left: 0.5rem;

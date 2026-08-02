@@ -122,10 +122,11 @@
 	 * row is always a blank, editable
 	 * ("port-forwarding-entry-blank") row showing "Add" instead of "Remove" -- its inputs are
 	 * already named, so typing into it and pressing OK directly (without ever clicking "Add")
-	 * still saves it. Clicking "Add" just locks that row read-only (so it can no longer be
-	 * accidentally retyped -- Remove + re-add is how you change an already-added port) and appends
-	 * a fresh blank row for the next one, unless the cap is now reached. Removing a row never needs
-	 * confirmation -- the page's own Cancel link already covers "I didn't mean to change this."
+	 * still saves it. Clicking "Add" turns that row into an ordinary already-added row (Remove
+	 * button, stays editable -- server-side validation has the final say on whatever it's changed
+	 * to before submit) and appends a fresh blank row for the next one, unless the cap is now
+	 * reached. Removing a row never needs confirmation -- the page's own Cancel link already
+	 * covers "I didn't mean to change this."
 	 */
 	function makeBlankPortForwardingRow() {
 		var row = document.createElement("tr");
@@ -210,13 +211,6 @@
 			}
 			if (!reportPortForwardingRowDuplicates(row, inputs[0], inputs[1])) {
 				return;
-			}
-			inputs.forEach(function (input) {
-				input.setAttribute("readonly", "readonly");
-			});
-			var descriptionInput = row.querySelector('input[name="portForwardingDescription"]');
-			if (descriptionInput) {
-				descriptionInput.setAttribute("readonly", "readonly");
 			}
 			row.classList.remove("port-forwarding-entry-blank");
 			event.target.textContent = "Remove";

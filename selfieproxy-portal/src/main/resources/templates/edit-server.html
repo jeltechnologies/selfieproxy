@@ -189,6 +189,9 @@
 						port is open and attempt to connect to it.
 					</p>
 					<p class="warning">Make sure to open the exposed port(s) in your firewall.</p>
+					<p class="warning" th:if="${!gatewayPortsConfigured}">
+						Port forwarding is disabled until GatewayPorts is configured on the server host.
+					</p>
 					<table class="port-forwarding-table">
 						<thead>
 							<tr>
@@ -201,11 +204,11 @@
 						<tbody id="port-forwarding-rows">
 							<tr class="port-forwarding-entry" th:each="entry : ${server.portForwarding()}">
 								<td><input type="number" name="portForwardingTargetPort" th:value="${entry.targetPort()}"
-										   min="1" max="65535" step="1" readonly></td>
+										   min="1" max="65535" step="1"></td>
 								<td><input type="number" name="portForwardingPublicPort" th:value="${entry.publicPort()}"
-										   min="1024" max="65535" step="1" readonly></td>
+										   min="1024" max="65535" step="1"></td>
 								<td><input type="text" name="portForwardingDescription" th:value="${entry.description()}"
-										   maxlength="200" placeholder="(optional)" readonly></td>
+										   maxlength="200" placeholder="(optional)"></td>
 								<td><button type="button" class="button-small remove-port-forwarding-row">Remove</button></td>
 							</tr>
 							<tr class="port-forwarding-entry port-forwarding-entry-blank"

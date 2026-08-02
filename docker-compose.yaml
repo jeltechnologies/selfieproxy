@@ -55,6 +55,7 @@ services:
       - ./data/selfieproxy:/data
       - ./data/selfieproxy/sites-conf:/sites-conf
       - ./data/selfieproxy/sites:/sites
+      - /etc/ssh/sshd_config:/etc/ssh/sshd_config:ro
     ports:
       - "127.0.0.1:8081:8080"
     logging: *default-logging
