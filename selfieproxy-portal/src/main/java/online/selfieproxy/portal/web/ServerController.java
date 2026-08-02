@@ -9,6 +9,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 import online.selfieproxy.portal.boringproxy.AgentStatusService;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
+import online.selfieproxy.portal.boringproxy.BoringProxyException;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
@@ -45,6 +48,8 @@ import jakarta.servlet.http.HttpServletRequest;
 
 @Controller
 public class ServerController {
+
+	private static final Logger log = LoggerFactory.getLogger(ServerController.class);
 
 	/** Well-known/system port range (SSH, HTTPS, ...) that must never be exposed as Port Forwarding's public port. */
 	private static final int RESERVED_PORT_MAX = 1023;
@@ -177,9 +182,9 @@ public class ServerController {
 		Server server = serverStore.find(fqdn);
 		if (server != null) {
 			tunnelMapper.tunnelPlans(server, OWNER).values()
-					.forEach(plan -> boringProxyClient.deleteTunnel(plan.fqdn()));
+					.forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
 			tunnelMapper.portForwardingTunnelPlans(server, OWNER)
-					.forEach(plan -> boringProxyClient.deleteTunnel(plan.fqdn()));
+					.forEach(plan -> deleteTunnelIgnoringMissing(plan.fqdn()));
 		}
 		serverStore.delete(fqdn);
 		return "redirect:/servers";
@@ -255,7 +260,7 @@ public class ServerController {
 			}
 		}
 
-		toDelete.forEach(boringProxyClient::deleteTunnel);
+		toDelete.forEach(this::deleteTunnelIgnoringMissing);
 		if (!toDelete.isEmpty() && (!toCreate.isEmpty() || !portForwardsToCreate.isEmpty())) {
 			sleep();
 		}
@@ -271,6 +276,26 @@ public class ServerController {
 		}
 		portForwardsToCreate.forEach(plan -> boringProxyClient.createTunnel(plan.request()));
 		return result;
+	}
+
+	/**
+	 * The Tunnel record can go stale (eg. already deleted by an earlier, partially-failed save of
+	 * this same Server -- see syncTunnels) -- don't let that block the rest of the sync, mirrors
+	 * DomainsController/LocalWebsiteController/BackupService's own identical helper. Without this,
+	 * a single already-gone tunnel throws out of syncTunnels before serverStore.save() runs, which
+	 * both discards the edit just submitted (eg. a renamed subdomain's Port Forwarding entries) and
+	 * makes every future save attempt fail the exact same way, since the stored record keeps
+	 * pointing at the now-permanently-missing old tunnel.
+	 */
+	private void deleteTunnelIgnoringMissing(String fqdn) {
+		try {
+			boringProxyClient.deleteTunnel(fqdn);
+		} catch (BoringProxyException e) {
+			if (!"Tunnel doesn't exist".equals(e.getMessage())) {
+				throw e;
+			}
+			log.warn("Tunnel {} was already gone from boringproxy; continuing", fqdn);
+		}
 	}
 
 	private void sleep() {
