@@ -140,7 +140,7 @@ class BackupServiceTest {
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, 51000, "root", "cipher-ssh"),
 				new RemoteDesktopConfig("proxmox-example-com-3389.example.com", RemoteDesktopProtocol.RDP, 3389,
 						51001, "admin", "cipher-rdp", true),
-				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080)));
+				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080, "Game server")));
 		when(serverStore.values()).thenReturn(List.of(server));
 		when(localWebsiteStore.list()).thenReturn(List.of());
 
@@ -163,6 +163,7 @@ class BackupServiceTest {
 		assertNull(exported.remoteDesktop().encryptedSecret(), "an export must never carry a live credential");
 		assertEquals(1234, exported.portForwarding().get(0).publicPort());
 		assertEquals(8080, exported.portForwarding().get(0).targetPort());
+		assertEquals("Game server", exported.portForwarding().get(0).description());
 	}
 
 	@Test
@@ -263,7 +264,7 @@ class BackupServiceTest {
 				new WebConfig(Protocol.HTTPS, 443, false),
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, null, "root", null),
 				null,
-				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080)));
+				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080, "Game server")));
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of(), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"));
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -297,6 +298,7 @@ class BackupServiceTest {
 		assertEquals(55555, saved.terminal().exposedPort());
 		assertNull(saved.remoteDesktop());
 		assertEquals(1234, saved.portForwarding().get(0).publicPort());
+		assertEquals("Game server", saved.portForwarding().get(0).description(), "description must survive restore's fqdn rebuild");
 	}
 
 	@Test

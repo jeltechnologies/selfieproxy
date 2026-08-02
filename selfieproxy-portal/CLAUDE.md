@@ -233,12 +233,16 @@ own enable checkbox -- toggling one on/off never touches the others' fields or t
   own default RDP certificate, so there was never a real choice to expose).
 - **Port Forwarding**: up to 8 individual forwarded TCP ports -- never a range, each is its own
   boringproxy tunnel (`MAX_PORT_FORWARDING_ENTRIES` in `ServerController`). Shown as a small table
-  (`Homelab server port` | `Port exposed to the internet` | blank), modeled on a typical router's
-  port-forwarding page: each already-added row is read-only with a **Remove** button (no
-  confirmation needed -- the page's own Cancel already covers "I didn't mean to change this"); a
-  trailing blank row is always directly submittable as-is (typing into it and clicking the form's
-  OK works without ever clicking the row's own **Add**), and clicking **Add** just locks that row
-  read-only and appends a fresh blank row unless the 8-entry cap is reached. Every port field is
+  (`Homelab server port` | `Port exposed to the internet` | `Description (optional)` | blank),
+  modeled on a typical router's port-forwarding page: each already-added row is read-only with a
+  **Remove** button (no confirmation needed -- the page's own Cancel already covers "I didn't mean
+  to change this"); a trailing blank row is always directly submittable as-is (typing into it and
+  clicking the form's OK works without ever clicking the row's own **Add**), and clicking **Add**
+  just locks that row read-only and appends a fresh blank row unless the 8-entry cap is reached.
+  The Description column (`PortForwardingConfig.description`) is a free-text, per-entry label
+  (e.g. "Minecraft server") -- purely cosmetic, optional, never validated or checked for
+  uniqueness, and included as-is in a configuration export/import (`BackupService`) alongside the
+  rest of the entry. Every port field is
   constrained to 1-65535 (`min`/`max`/`step` plus server-side `validatePortRange`); Add and direct
   submit both block, client-side, a homelab-server-port or public-port value that duplicates
   another row already in the table, ahead of the authoritative server-side check. Two static

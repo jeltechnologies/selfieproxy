@@ -352,14 +352,16 @@ public class ServerController {
 			PortForwardingProtocol protocol = PortForwardingProtocol.TCP;
 			List<Integer> targetPorts = form.portForwardingTargetPort() != null ? form.portForwardingTargetPort() : List.of();
 			List<Integer> publicPorts = form.portForwardingPublicPort() != null ? form.portForwardingPublicPort() : List.of();
+			List<String> descriptions = form.portForwardingDescription() != null ? form.portForwardingDescription() : List.of();
 			int entryCount = Math.min(targetPorts.size(), publicPorts.size());
 			portForwarding = new ArrayList<>();
 			for (int i = 0; i < entryCount; i++) {
 				int publicPort = publicPorts.get(i) != null ? publicPorts.get(i) : 0;
 				int targetPort = targetPorts.get(i) != null ? targetPorts.get(i) : 0;
+				String description = i < descriptions.size() ? blankToNull(descriptions.get(i)) : null;
 				String hiddenFqdn = fqdnAssigner.assign(appFqdn, String.valueOf(publicPort), domain, ownHiddenFqdns);
 				ownHiddenFqdns.add(hiddenFqdn);
-				portForwarding.add(new PortForwardingConfig(hiddenFqdn, protocol, publicPort, targetPort));
+				portForwarding.add(new PortForwardingConfig(hiddenFqdn, protocol, publicPort, targetPort, description));
 			}
 		} else {
 			portForwarding = null;

@@ -194,6 +194,7 @@
 							<tr>
 								<th>Homelab server port</th>
 								<th>Port exposed to the internet</th>
+								<th>Description (optional)</th>
 								<th></th>
 							</tr>
 						</thead>
@@ -203,12 +204,15 @@
 										   min="1" max="65535" step="1" readonly></td>
 								<td><input type="number" name="portForwardingPublicPort" th:value="${entry.publicPort()}"
 										   min="1024" max="65535" step="1" readonly></td>
+								<td><input type="text" name="portForwardingDescription" th:value="${entry.description()}"
+										   maxlength="100" readonly></td>
 								<td><button type="button" class="button-small remove-port-forwarding-row">Remove</button></td>
 							</tr>
 							<tr class="port-forwarding-entry port-forwarding-entry-blank"
 								th:if="${server.portForwarding() == null or server.portForwarding().size() < 8}">
 								<td><input type="number" name="portForwardingTargetPort" min="1" max="65535" step="1"></td>
 								<td><input type="number" name="portForwardingPublicPort" min="1024" max="65535" step="1"></td>
+								<td><input type="text" name="portForwardingDescription" maxlength="100"></td>
 								<td><button type="button" class="button-small add-port-forwarding-row">Add</button></td>
 							</tr>
 						</tbody>

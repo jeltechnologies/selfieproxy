@@ -102,8 +102,8 @@
 
 	/**
 	 * Port Forwarding can forward up to 8 individual ports (never a range -- each is its own
-	 * boringproxy tunnel), each its own table row of two port fields (Host and Protocol are
-	 * shared/fixed, so they're not per-row columns). The last row is always a blank, editable
+	 * boringproxy tunnel), each its own table row of two port fields plus an optional, free-text
+	 * description (Host and Protocol are shared/fixed, so they're not per-row columns). The last row is always a blank, editable
 	 * ("port-forwarding-entry-blank") row showing "Add" instead of "Remove" -- its inputs are
 	 * already named, so typing into it and pressing OK directly (without ever clicking "Add")
 	 * still saves it. Clicking "Add" just locks that row read-only (so it can no longer be
@@ -117,6 +117,7 @@
 		row.innerHTML =
 			'<td><input type="number" name="portForwardingTargetPort" min="1" max="65535" step="1"></td>' +
 			'<td><input type="number" name="portForwardingPublicPort" min="1024" max="65535" step="1"></td>' +
+			'<td><input type="text" name="portForwardingDescription" maxlength="100"></td>' +
 			'<td><button type="button" class="button-small add-port-forwarding-row">Add</button></td>';
 		return row;
 	}
@@ -194,7 +195,7 @@
 			if (!reportPortForwardingRowDuplicates(row, inputs[0], inputs[1])) {
 				return;
 			}
-			inputs.forEach(function (input) {
+			Array.prototype.slice.call(row.querySelectorAll("input")).forEach(function (input) {
 				input.setAttribute("readonly", "readonly");
 			});
 			row.classList.remove("port-forwarding-entry-blank");
@@ -222,11 +223,15 @@
 		var inputs = blankRow.querySelectorAll("input[type=number]");
 		var targetInput = inputs[0];
 		var publicInput = inputs[1];
+		var descriptionInput = blankRow.querySelector('input[name="portForwardingDescription"]');
 		var targetFilled = targetInput.value.trim() !== "";
 		var publicFilled = publicInput.value.trim() !== "";
 		if (!targetFilled && !publicFilled) {
 			targetInput.removeAttribute("name");
 			publicInput.removeAttribute("name");
+			if (descriptionInput) {
+				descriptionInput.removeAttribute("name");
+			}
 			return true;
 		}
 		if (targetFilled !== publicFilled) {

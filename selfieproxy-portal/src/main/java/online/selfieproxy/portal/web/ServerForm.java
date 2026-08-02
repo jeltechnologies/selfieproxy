@@ -15,6 +15,8 @@ import online.selfieproxy.portal.domain.RemoteDesktopProtocol;
  * repeatable target/public port pairs, rendered as table rows (see edit-server.html); Spring binds
  * these from same-named, repeated &lt;input&gt;s in document order, so
  * portForwardingTargetPort.get(i)/portForwardingPublicPort.get(i) are always the i-th pair.
+ * portForwardingDescription is an optional, free-text label per row -- same document-order
+ * indexing, may be blank/shorter than the port lists.
  */
 public record ServerForm(
 		String subdomain,
@@ -40,5 +42,6 @@ public record ServerForm(
 		// Port Forwarding row
 		Boolean portForwardingEnabled,
 		List<Integer> portForwardingPublicPort,
-		List<Integer> portForwardingTargetPort) {
+		List<Integer> portForwardingTargetPort,
+		List<String> portForwardingDescription) {
 }
