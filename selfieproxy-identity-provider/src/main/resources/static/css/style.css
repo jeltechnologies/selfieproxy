@@ -148,6 +148,9 @@ body {
 	text-align: center;
 	font-size: 0.75rem;
 }
+.login-footer a,
+.login-footer a:visited { color: inherit; text-decoration: underline; }
+.login-footer a:hover { color: var(--text); }
 
 label {
 	display: block;
