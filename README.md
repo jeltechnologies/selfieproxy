@@ -39,14 +39,12 @@ If your business requires these features, use a commercial product instead!
 
 ## Implementation
 
-Selfie Proxy's reverse tunnel engine (`selfieproxy-reverseproxy`) is a fork of
-[boringproxy](https://github.com/boringproxy/boringproxy) by Anders Pitman, which is no longer
-actively maintained. Written in Go, it's lightweight and fast. Selfie Proxy itself is a larger
-system built around that engine — the admin portal, identity provider, and other services are
-our own code, not part of the fork. 
+Selfie Proxy's reverse tunnel engine (`selfieproxy-reverseproxy`) is written in Go — lightweight
+and fast. The admin portal, identity provider, and every other service are a larger system built
+around that engine, all Selfie Proxy's own code.
 
-On top of boringproxy we added:
-- A new admin portal aimed at home users instead of boringproxy's networking-first UI.
+Selfie Proxy includes:
+- An admin portal aimed at home users, not networking experts.
 - WebSocket support.
 - Per-server authentication for exposed servers.
 - Centralized agent ("client") management from the admin portal.
@@ -55,7 +53,7 @@ On top of boringproxy we added:
 - Static website hosting.
 - Browser-based Remote Desktop and SSH terminal access to homelab machines.
 - Export/import configuration for every homelab, server, and static website.
-- Improved security by replacing RSA keys with Ed25519 encryption between agent and server.
+- Ed25519 encryption between agent and server.
 - A one-command Docker install.
 
 ## Requirements

@@ -19,10 +19,14 @@ Requires Go 1.26+ (bumped from 1.17 when the embedded OIDC Relying Party was add
 `github.com/coreos/go-oidc/v3` and `golang.org/x/oauth2` both need a modern toolchain; see
 `Dockerfile`'s `golang:1.26-alpine` builder stage).
 
-```bash
-# One-time: logo.png must exist at repo root (embedded via go:embed in ui_handler.go)
-./scripts/generate_logo.sh   # requires inkscape; logo.png is already checked in, so usually not needed
+Selfie Proxy only ever builds this via Docker (`docker compose build`, root `CLAUDE.md`) — `Dockerfile`'s
+builder stage runs the `go build` below itself; there's no wrapper script and no `go:embed`
+assets left in this fork (see "Web UI" below for what used to embed `logo.png`/`templates/`,
+both removed along with it).
 
+For a manual local build outside Docker:
+
+```bash
 cd cmd/boringproxy
 go build
 # or with version info:
@@ -31,8 +35,6 @@ go build -ldflags "-X main.Version=$(git describe --tags)"
 # allow binding to low ports (80/443) without root:
 sudo setcap cap_net_bind_service=+ep boringproxy
 ```
-
-`scripts/build.sh` does the build + setcap in one step. `scripts/build_release.sh` cross-compiles for all supported platforms (see `.goreleaser.yml`) and is used for tagged releases.
 
 There are no test files in this repo (`*_test.go` does not exist) and no lint config — `go build ./...` and `go vet ./...` are the available correctness checks.
 
@@ -76,13 +78,19 @@ A domain with no `Tunnel` record at all used to fail the TLS handshake itself be
 
 ### Authorization model
 
-Every access token maps to a `TokenData{Owner, Agent}`. If `Agent` is set, the token is scoped to one agent and can only be used to poll `/api/tunnels`/`/api/agents` for that agent — not to manage tunnels/users/tokens via the web UI or general API. Otherwise the token acts as its `Owner` user, and `User.IsAdmin` gates cross-user operations (creating tunnels/tokens for other users, managing all users). This scoped-token mechanism is also how Selfie Proxy's per-agent secrets work: an agent-scoped token is minted only for an agent name already registered under a user (`Api.CreateToken` refuses otherwise), so an agent's "secret" is just its own restricted access token. This logic is duplicated between `api.go` (JSON API, used by agents and directly) and `ui_handler.go` (server-rendered web UI, which calls into the same `Api` methods) — when changing authorization rules, both call sites matter, though several handlers have `// TODO: handle security checks in api` markers indicating the check still lives in `ui_handler.go` rather than `api.go`.
+Every access token maps to a `TokenData{Owner, Agent}`. If `Agent` is set, the token is scoped to one agent and can only be used to poll `/api/tunnels`/`/api/agents` for that agent — not to manage tunnels/users/tokens via the web UI or general API. Otherwise the token acts as its `Owner` user, and `User.IsAdmin` gates cross-user operations (creating tunnels/tokens for other users, managing all users). This scoped-token mechanism is also how Selfie Proxy's per-agent secrets work: an agent-scoped token is minted only for an agent name already registered under a user (`Api.CreateToken` refuses otherwise), so an agent's "secret" is just its own restricted access token. This logic lives solely in `api.go` (JSON API, used by agents and directly) now — see "Web UI" below for the server-rendered UI that used to duplicate it.
 
-### Web UI (`ui_handler.go` + `templates/*.tmpl`) -- disabled in Selfie Proxy
+### Web UI -- removed
 
-Server-rendered via `html/template`, templates embedded with `go:embed`. `WebUiHandler.handleWebUiRequest` is a single big switch over `r.URL.Path` (not a router/mux) sitting behind the same token-cookie/`access_token` auth as the API. Slow operations (tunnel creation, which may block on ACME cert issuance) use a 100ms-timeout + polling `/loading` page pattern with a pending-request map (`pendingRequests`) keyed by a random ID, rather than blocking the initial request indefinitely.
-
-Superseded by Selfie Proxy's own admin portal, this legacy UI is no longer wired up: `boringproxy.go`'s main handler never constructs a `WebUiHandler` and returns 403 for any admin-domain request that isn't under `/api/` or `/rest/` (both of which stay live, since the remote agent depends on `/api/` and selfieproxy-portal's `BoringProxyClient` depends on `/rest/`, both reached over the public admin-domain hostname). The `ui_handler.go`/`templates/` code itself is untouched -- only the routing call site was removed -- so re-enabling it is a one-line change in `boringproxy.go` if ever needed.
+Upstream boringproxy shipped a server-rendered admin UI (`ui_handler.go` + `templates/*.tmpl`,
+`html/template` with `go:embed`, plus `logo.png`). Superseded by Selfie Proxy's own admin portal,
+it was never wired up here — `boringproxy.go`'s main handler never constructed a `WebUiHandler`
+and returns 403 for any admin-domain request that isn't under `/api/` or `/rest/` (both of which
+stay live, since the remote agent depends on `/api/` and selfieproxy-portal's `BoringProxyClient`
+depends on `/rest/`, both reached over the public admin-domain hostname). Since nothing ever
+called into it, `ui_handler.go`, `templates/`, and `logo.png` were deleted outright rather than
+kept as dead code -- there's no "one-line re-enable" anymore; restoring this UI would mean
+pulling it back from git history.
 
 ### Portal domain (`-portal-domain`/`-portal-port`, `boringproxy.go`)
 

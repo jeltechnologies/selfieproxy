@@ -34,3 +34,9 @@ selfieproxy-remote-console/target
 # Already covered by *.zip above; called out explicitly since it's a deliberate build artifact.
 /local-website-demo.zip
 
+# Compiled Go binary from running `go build` locally in cmd/boringproxy -- Docker always builds
+# fresh (selfieproxy-reverseproxy/Dockerfile), so this is never a real deploy artifact, just a
+# stray local-build leftover that's been accidentally committed before. Only the binary itself,
+# not the whole cmd/ directory -- main.go there is the real CLI entrypoint and must stay tracked.
+/selfieproxy-reverseproxy/cmd/boringproxy/boringproxy
+
