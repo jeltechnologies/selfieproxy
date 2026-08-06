@@ -23,7 +23,12 @@ repo, and `selfieproxy-reverseproxy/CLAUDE.md` for the underlying tunnel engine 
 
 The portal has no login of its own (see root `CLAUDE.md`'s "Running" section for the full
 OIDC/env-var picture) — boringproxy gates the portal domain before any request reaches this
-container. After a successful login the user lands on the Servers page.
+container. After a successful login the user lands on `/`, which redirects to the Servers page
+if at least one Server is already configured, or the Homelabs page otherwise (`AgentController.landing`)
+-- a fresh install has nothing to show on Servers yet, so it makes more sense to land where the
+admin still has to act first (connecting a Homelab). The Homelabs page itself lives at
+`/homelabs`, a stable URL independent of this landing-page logic (the nav's "Homelabs" tab and
+every homelab-management redirect target it directly, not `/`).
 
 - A Server's Web protocol can opt in to the same single sign on gate (the authentication
   checkbox on its edit page) — available for both HTTP and HTTPS homelab servers, since a Server's Web

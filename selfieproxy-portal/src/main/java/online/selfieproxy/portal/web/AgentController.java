@@ -22,6 +22,7 @@ import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 import online.selfieproxy.portal.domain.DnsLabelValidator;
+import online.selfieproxy.portal.domain.ServerStore;
 
 @Controller
 public class AgentController {
@@ -33,13 +34,16 @@ public class AgentController {
 	private final AgentStatusService agentStatusService;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final BoringProxyProperties boringProxyProperties;
+	private final ServerStore serverStore;
 
 	public AgentController(BoringProxyClient boringProxyClient, AgentStatusService agentStatusService,
-			ThisServerAgentProperties thisServerAgentProperties, BoringProxyProperties boringProxyProperties) {
+			ThisServerAgentProperties thisServerAgentProperties, BoringProxyProperties boringProxyProperties,
+			ServerStore serverStore) {
 		this.boringProxyClient = boringProxyClient;
 		this.agentStatusService = agentStatusService;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.boringProxyProperties = boringProxyProperties;
+		this.serverStore = serverStore;
 	}
 
 	/** Shown alongside the connect-this-homelab instructions on the add/edit homelab page. */
@@ -48,7 +52,13 @@ public class AgentController {
 		return boringProxyProperties.adminDomain();
 	}
 
+	/** Landing page: Servers once at least one is configured, Homelabs beforehand -- a fresh install has nothing to show on Servers yet. */
 	@GetMapping("/")
+	public String landing() {
+		return serverStore.values().isEmpty() ? "redirect:/homelabs" : "redirect:/servers";
+	}
+
+	@GetMapping("/homelabs")
 	public String list(Model model) {
 		model.addAttribute("agents", loadAgentListItems());
 		return "agents";
@@ -71,7 +81,7 @@ public class AgentController {
 	@GetMapping("/agents/{name}/edit")
 	public String editAgent(@PathVariable String name, Model model) {
 		if (isThisServer(name)) {
-			return "redirect:/";
+			return "redirect:/homelabs";
 		}
 		model.addAttribute("agent", new AgentView(name, secretFor(name)));
 		model.addAttribute("isNew", false);
@@ -96,12 +106,12 @@ public class AgentController {
 	@PostMapping("/agents/{name}")
 	public String rename(@PathVariable String name, @ModelAttribute AgentForm form, Model model) {
 		if (isThisServer(name)) {
-			return "redirect:/";
+			return "redirect:/homelabs";
 		}
 		String newName = form.name();
 
 		if (newName.equals(name)) {
-			return "redirect:/";
+			return "redirect:/homelabs";
 		}
 
 		List<String> errors = validateName(newName, name);
@@ -123,13 +133,13 @@ public class AgentController {
 		retargetTokensForAgent(name, newName);
 		retargetTunnelsForAgent(name, newName);
 		boringProxyClient.deleteAgent(OWNER, name);
-		return "redirect:/";
+		return "redirect:/homelabs";
 	}
 
 	@PostMapping("/agents/{name}/regenerate-secret")
 	public String regenerateSecret(@PathVariable String name) {
 		if (isThisServer(name)) {
-			return "redirect:/";
+			return "redirect:/homelabs";
 		}
 		deleteTokensForAgent(name);
 		boringProxyClient.createToken(OWNER, name);
@@ -139,11 +149,11 @@ public class AgentController {
 	@PostMapping("/agents/{name}/delete")
 	public String delete(@PathVariable String name) {
 		if (isThisServer(name)) {
-			return "redirect:/";
+			return "redirect:/homelabs";
 		}
 		deleteTokensForAgent(name);
 		boringProxyClient.deleteAgent(OWNER, name);
-		return "redirect:/";
+		return "redirect:/homelabs";
 	}
 
 	/** "This Server" is an ordinary Agent under the hood, but it's reserved for the Local Websites feature, not a Homelab a user manages here. */
