@@ -36,6 +36,7 @@
 				</form>
 				<a th:href="@{/domains}" th:classappend="${active == 'domains'} ? 'active'">Domains</a>
 				<a th:if="${showUsersLink}" th:href="@{/users}" th:classappend="${active == 'users'} ? 'active'">Users</a>
+				<a th:if="${showUsersLink}" th:href="@{/login-screen}" th:classappend="${active == 'login-screen'} ? 'active'">Login screen</a>
 				<a th:href="@{/export-configuration}" th:classappend="${active == 'export'} ? 'active'">Export configuration</a>
 				<a th:href="@{/import-configuration}" th:classappend="${active == 'import'} ? 'active'">Import configuration</a>
 				<form method="post" th:action="@{/logout}">

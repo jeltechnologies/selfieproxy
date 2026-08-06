@@ -22,6 +22,12 @@ import java.util.List;
  *                       "pick some, not others" selection concept for a single global setting
  * @param terminalSettings the SSH console's font size/font family/color theme (see TerminalSettingsStore) --
  *                       same unconditional treatment as theme above
+ * @param loginScreenSettings the identity-provider login/change-password/logged-out pages' branding (see
+ *                       LoginScreenSettingsStore) -- same unconditional treatment as theme above. Nullable
+ *                       (rather than version-bumped) purely so an export taken before this field existed
+ *                       still deserializes cleanly; BackupService only applies it on restore when non-null.
+ *                       Its two background-image files (if any) travel alongside it in the backup ZIP
+ *                       under login-screen/, not in this manifest -- see BackupService.writeBackup.
  */
 public record BackupManifest(
 		int version,
@@ -31,7 +37,8 @@ public record BackupManifest(
 		List<Server> servers,
 		List<LocalWebsite> localWebsites,
 		String theme,
-		TerminalSettings terminalSettings) {
+		TerminalSettings terminalSettings,
+		LoginScreenSettings loginScreenSettings) {
 
 	// Bumped 3->4 when the "exposedApps" field/concept was renamed to "servers" throughout the
 	// Java codebase -- an old export is cleanly rejected by readManifest's version check instead

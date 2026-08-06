@@ -122,6 +122,17 @@ body {
 	padding: 2rem 0;
 }
 
+/* Custom login-screen background image (see LoginScreenSettings/GlobalModelAttributes'
+   loginScreenBackgroundUrl) -- .login-body already covers the full viewport, so this only needs
+   to scale the image down/up to fit entirely within it (never cropped, aspect ratio preserved)
+   and centered. "auto" (the image's own natural size) was tried first, but that crops whenever
+   the image is bigger than the viewport -- only the centered portion that fits stays visible. */
+.login-body.has-background {
+	background-size: contain;
+	background-position: center;
+	background-repeat: no-repeat;
+}
+
 .login-card {
 	background: var(--card-bg);
 	border: 1px solid var(--border);

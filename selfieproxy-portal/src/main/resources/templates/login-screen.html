@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html th:attr="data-theme=${theme}" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(title='Login screen - Selfie Proxy')}"></head>
+<body>
+	<header th:replace="~{fragments/layout :: topbar(active='login-screen')}"></header>
+
+	<main class="page">
+		<h1>Login screen</h1>
+		<p class="page-subtitle">Customize the login page shown by the built-in Identity Provider.</p>
+
+		<ul class="errors" th:if="${errors != null and not #lists.isEmpty(errors)}">
+			<li th:each="e : ${errors}" th:text="${e}"></li>
+		</ul>
+
+		<form id="login-screen-form" method="post" th:action="@{/login-screen}">
+			<div class="field">
+				<label>
+					<input type="checkbox" name="logoEnabled" value="true" th:checked="${settings.logoEnabled()}">
+					Show logo
+				</label>
+			</div>
+
+			<div class="field">
+				<label for="title">Title</label>
+				<input type="text" id="title" name="title" th:value="${settings.title()}" maxlength="100">
+			</div>
+
+			<div class="field">
+				<label for="slogan">Slogan</label>
+				<input type="text" id="slogan" name="slogan" th:value="${settings.slogan()}" maxlength="200">
+			</div>
+
+			<div class="field-row">
+				<div class="field">
+					<label for="usernameLabel">Username label</label>
+					<input type="text" id="usernameLabel" name="usernameLabel" th:value="${settings.usernameLabel()}" maxlength="50">
+				</div>
+				<div class="field">
+					<label for="passwordLabel">Password label</label>
+					<input type="text" id="passwordLabel" name="passwordLabel" th:value="${settings.passwordLabel()}" maxlength="50">
+				</div>
+			</div>
+
+			<div class="field">
+				<label for="loginButtonLabel">Login button label</label>
+				<input type="text" id="loginButtonLabel" name="loginButtonLabel" th:value="${settings.loginButtonLabel()}" maxlength="50">
+			</div>
+
+			<div class="field">
+				<label>
+					<input type="checkbox" name="footerEnabled" value="true" th:checked="${settings.footerEnabled()}">
+					Show "Powered by Selfie Proxy - MIT licensed" footer
+				</label>
+			</div>
+		</form>
+
+		<h2>Background image</h2>
+		<p class="muted">Shown behind the login card, scaled to fit the screen without cropping (aspect ratio preserved). Set independently for light and dark mode.</p>
+
+		<div class="field-row">
+			<div class="field">
+				<label>Light mode</label>
+				<img th:if="${settings.backgroundLightFilename() != null}" th:src="@{/login-screen/preview/light}"
+					 class="background-preview" alt="Light mode background preview">
+				<p th:if="${settings.backgroundLightFilename() == null}" class="muted">No image uploaded.</p>
+				<form method="post" th:action="@{/login-screen/background/light}" enctype="multipart/form-data">
+					<input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp">
+					<button type="submit" class="button-small">Upload</button>
+				</form>
+				<form method="post" th:if="${settings.backgroundLightFilename() != null}"
+					  th:action="@{/login-screen/background/light/remove}">
+					<button type="submit" class="button-small button-danger">Remove</button>
+				</form>
+			</div>
+
+			<div class="field">
+				<label>Dark mode</label>
+				<img th:if="${settings.backgroundDarkFilename() != null}" th:src="@{/login-screen/preview/dark}"
+					 class="background-preview" alt="Dark mode background preview">
+				<p th:if="${settings.backgroundDarkFilename() == null}" class="muted">No image uploaded.</p>
+				<form method="post" th:action="@{/login-screen/background/dark}" enctype="multipart/form-data">
+					<input type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp">
+					<button type="submit" class="button-small">Upload</button>
+				</form>
+				<form method="post" th:if="${settings.backgroundDarkFilename() != null}"
+					  th:action="@{/login-screen/background/dark/remove}">
+					<button type="submit" class="button-small button-danger">Remove</button>
+				</form>
+			</div>
+		</div>
+
+		<div class="button-panel">
+			<button type="submit" form="login-screen-form" class="button">OK</button>
+			<button type="submit" form="defaults-form" class="button button-cancel">Set to Defaults</button>
+			<a class="button button-cancel" th:href="@{/}">Cancel</a>
+		</div>
+
+		<form id="defaults-form" method="post" th:action="@{/login-screen/defaults}"></form>
+	</main>
+
+	<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

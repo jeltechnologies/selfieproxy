@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Selfie Proxy Logout</title>
+	<title th:text="${loginScreenSettings.title()} + ' Logout'">Selfie Proxy Logout</title>
 	<link rel="stylesheet" th:href="@{/css/style.css}">
 
 	<link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
@@ -14,9 +14,10 @@
 	<link rel="manifest" th:href="@{/site.webmanifest}">
 	<meta name="theme-color" content="#ffffff">
 </head>
-<body class="login-body">
+<body class="login-body" th:classappend="${loginScreenBackgroundUrl != null} ? 'has-background'"
+	  th:style="${loginScreenBackgroundUrl != null} ? ('background-image:url(' + ${loginScreenBackgroundUrl} + ')')">
 	<main class="login-card">
-		<h1>Selfie Proxy</h1>
+		<h1 th:text="${loginScreenSettings.title()}">Selfie Proxy</h1>
 
 		<p>You have been logged out.</p>
 
@@ -24,6 +25,6 @@
 			<a th:href="${returnTo}" class="button">Log in again</a>
 		</div>
 	</main>
-	<footer class="login-footer muted">Powered by <a href="https://www.selfieproxy.net">Selfie Proxy</a> - MIT licensed</footer>
+	<footer th:if="${loginScreenSettings.footerEnabled()}" class="login-footer muted">Powered by <a href="https://www.selfieproxy.net">Selfie Proxy</a> - MIT licensed</footer>
 </body>
 </html>

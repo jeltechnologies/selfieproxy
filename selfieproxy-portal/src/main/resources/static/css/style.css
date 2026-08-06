@@ -463,6 +463,15 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	padding-left: 1.2rem;
 }
 
+.background-preview {
+	display: block;
+	max-width: 100%;
+	max-height: 160px;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	margin-bottom: 0.5rem;
+}
+
 .page-header {
 	display: flex;
 	align-items: center;

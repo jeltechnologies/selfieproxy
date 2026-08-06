@@ -73,9 +73,12 @@ class BackupServiceTest {
 		ThemeStore themeStore = new ThemeStore(tempDir.resolve("theme.json").toString());
 		TerminalSettingsStore terminalSettingsStore =
 				new TerminalSettingsStore(tempDir.resolve("remote-console-settings.json").toString());
+		LoginScreenSettingsStore loginScreenSettingsStore =
+				new LoginScreenSettingsStore(tempDir.resolve("login-screen-settings.json").toString());
 		return new BackupService(boringProxyClient, tunnelMapper, boringProxyProperties, serverStore,
 				fqdnAssigner, localWebsiteStore, staticSiteProvisioner, sitesWebserverProperties,
-				thisServerAgentProperties, themeStore, terminalSettingsStore, backupProperties);
+				thisServerAgentProperties, themeStore, terminalSettingsStore, loginScreenSettingsStore,
+				backupProperties, tempDir.resolve("login-screen").toString());
 	}
 
 	@Test
@@ -168,7 +171,7 @@ class BackupServiceTest {
 	@Test
 	void stageRestoreRejectsZipSlipEntries() throws IOException {
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of(), List.of(), List.of(), "light", new TerminalSettings(15, "dark", "default"));
+				"example.com", List.of(), List.of(), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -194,7 +197,7 @@ class BackupServiceTest {
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
 				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"));
+				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -228,7 +231,7 @@ class BackupServiceTest {
 		Server server = new Server(null, "example.com", "lab1", "127.0.0.1",
 				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"));
+				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -265,7 +268,7 @@ class BackupServiceTest {
 				null,
 				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080, null)));
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of(), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"));
+				"example.com", List.of(), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -303,7 +306,7 @@ class BackupServiceTest {
 	void applyRestoreSkipsContentRestoreForRedirectModeLocalWebsite() throws IOException {
 		LocalWebsite site = new LocalWebsite("old", "example.com", "https://www.example.com", false);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
-				"example.com", List.of(), List.of(), List.of(site), "light", new TerminalSettings(15, "dark", "default"));
+				"example.com", List.of(), List.of(), List.of(site), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
 		try (ZipOutputStream zip = new ZipOutputStream(zipBytes)) {
 			zip.putNextEntry(new ZipEntry("manifest.json"));
@@ -336,7 +339,7 @@ class BackupServiceTest {
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingServer, newServer),
 				List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("newsite", "example.com", null, false)),
-				"light", new TerminalSettings(15, "dark", "default"));
+				"light", new TerminalSettings(15, "dark", "default"), null);
 
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		when(serverStore.find("blog.example.com")).thenReturn(existingServer);

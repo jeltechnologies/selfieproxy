@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
@@ -23,6 +24,7 @@ import java.util.zip.ZipOutputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
@@ -61,6 +63,7 @@ public class BackupService {
 	private static final String OWNER = "admin";
 	private static final String MANIFEST_ENTRY = "manifest.json";
 	private static final String LOCAL_WEBSITES_PREFIX = "local-websites/";
+	private static final String LOGIN_SCREEN_IMAGES_PREFIX = "login-screen/";
 	/** boringproxy's own error text for deleting a tunnel that's already gone -- see BoringProxyException, mirrors LocalWebsiteController.deleteTunnelIgnoringMissing. */
 	private static final String TUNNEL_MISSING_MESSAGE = "Tunnel doesn't exist";
 	/** Same wait ServerController/LocalWebsiteController already use between deleting and recreating a tunnel. */
@@ -85,6 +88,8 @@ public class BackupService {
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final ThemeStore themeStore;
 	private final TerminalSettingsStore terminalSettingsStore;
+	private final LoginScreenSettingsStore loginScreenSettingsStore;
+	private final Path loginScreenImagesDir;
 	private final Path stagingRoot;
 
 	public BackupService(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
@@ -92,7 +97,9 @@ public class BackupService {
 			HiddenTunnelFqdnAssigner fqdnAssigner, LocalWebsiteStore localWebsiteStore,
 			StaticSiteProvisioner staticSiteProvisioner, SitesWebserverProperties sitesWebserverProperties,
 			ThisServerAgentProperties thisServerAgentProperties, ThemeStore themeStore,
-			TerminalSettingsStore terminalSettingsStore, BackupProperties backupProperties) {
+			TerminalSettingsStore terminalSettingsStore, LoginScreenSettingsStore loginScreenSettingsStore,
+			BackupProperties backupProperties,
+			@Value("${selfieproxy.login-screen-images-path}") String loginScreenImagesPath) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.boringProxyProperties = boringProxyProperties;
@@ -104,6 +111,8 @@ public class BackupService {
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.themeStore = themeStore;
 		this.terminalSettingsStore = terminalSettingsStore;
+		this.loginScreenSettingsStore = loginScreenSettingsStore;
+		this.loginScreenImagesDir = Path.of(loginScreenImagesPath);
 		this.stagingRoot = Path.of(backupProperties.restoreStagingPath());
 	}
 
@@ -124,7 +133,31 @@ public class BackupService {
 				String fqdn = site.fqdn();
 				staticSiteProvisioner.writeEntries(fqdn, LOCAL_WEBSITES_PREFIX + fqdn + "/", zip);
 			}
+
+			writeLoginScreenImages(manifest.loginScreenSettings(), zip);
 		}
+	}
+
+	/** Embeds whichever background image files are actually configured, so a restore onto a different server doesn't end up with settings referencing files that were never copied over. */
+	private void writeLoginScreenImages(LoginScreenSettings settings, ZipOutputStream zip) throws IOException {
+		if (settings == null) {
+			return;
+		}
+		writeLoginScreenImage(settings.backgroundLightFilename(), zip);
+		writeLoginScreenImage(settings.backgroundDarkFilename(), zip);
+	}
+
+	private void writeLoginScreenImage(String filename, ZipOutputStream zip) throws IOException {
+		if (filename == null) {
+			return;
+		}
+		Path file = loginScreenImagesDir.resolve(filename);
+		if (!Files.exists(file)) {
+			return;
+		}
+		zip.putNextEntry(new ZipEntry(LOGIN_SCREEN_IMAGES_PREFIX + filename));
+		Files.copy(file, zip);
+		zip.closeEntry();
 	}
 
 	/** Every Homelab except "This Server" -- same filter ServerController.homelabs()/DashboardController already apply. */
@@ -145,7 +178,7 @@ public class BackupService {
 		String createdAt = ZonedDateTime.now(zone).truncatedTo(ChronoUnit.MILLIS).toString();
 		return new BackupManifest(BackupManifest.CURRENT_VERSION, createdAt,
 				boringProxyProperties.primaryDomain(), homelabNames(), servers, localWebsiteStore.list(),
-				themeStore.load().id(), terminalSettingsStore.load());
+				themeStore.load().id(), terminalSettingsStore.load(), loginScreenSettingsStore.load());
 	}
 
 	/** Extracts zipData into a fresh staging directory and validates its manifest, without touching any live state. Returns the staging id for readStagedManifest/applyRestore/cancelStaged. */
@@ -197,7 +230,7 @@ public class BackupService {
 				manifest.homelabs().stream().filter(homelabs::contains).toList(),
 				manifest.servers().stream().filter(server -> serverFqdns.contains(server.fqdn())).toList(),
 				manifest.localWebsites().stream().filter(site -> localWebsiteFqdns.contains(site.fqdn())).toList(),
-				manifest.theme(), manifest.terminalSettings());
+				manifest.theme(), manifest.terminalSettings(), manifest.loginScreenSettings());
 	}
 
 	/**
@@ -243,6 +276,13 @@ public class BackupService {
 				terminalSettingsStore.save(manifest.terminalSettings());
 			} catch (Exception e) {
 				failures.add("SSH console settings: " + e.getMessage());
+			}
+		}
+		if (manifest.loginScreenSettings() != null) {
+			try {
+				restoreLoginScreenSettings(manifest.loginScreenSettings(), stagingDir);
+			} catch (Exception e) {
+				failures.add("Login screen settings: " + e.getMessage());
 			}
 		}
 
@@ -430,6 +470,25 @@ public class BackupService {
 				null,
 				null,
 				null);
+	}
+
+	/** Copies whichever background image files the staged export actually carried (see writeLoginScreenImages) back into the live login-screen images directory before persisting the settings that reference them. */
+	private void restoreLoginScreenSettings(LoginScreenSettings settings, Path stagingDir) throws IOException {
+		copyLoginScreenImage(stagingDir, settings.backgroundLightFilename());
+		copyLoginScreenImage(stagingDir, settings.backgroundDarkFilename());
+		loginScreenSettingsStore.save(settings);
+	}
+
+	private void copyLoginScreenImage(Path stagingDir, String filename) throws IOException {
+		if (filename == null) {
+			return;
+		}
+		Path source = stagingDir.resolve("login-screen").resolve(filename);
+		if (!Files.exists(source)) {
+			return;
+		}
+		Files.createDirectories(loginScreenImagesDir);
+		Files.copy(source, loginScreenImagesDir.resolve(filename), StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	/** Re-zips the staged local-websites/&lt;fqdn&gt;/ directory in memory and feeds it through StaticSiteProvisioner's existing atomic-swap upload path -- local sites are small enough that the extra round trip isn't worth a Path-based overload. */
