@@ -197,6 +197,28 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 	}
 
 	w.WriteHeader(upstreamRes.StatusCode)
+
+	// Plain io.Copy never flushes, so it relies on Go's internal response buffer filling up
+	// (a few KB) before anything reaches the client. That's invisible for ordinary responses,
+	// but an SSE stream sends tiny events far below that threshold -- each one would sit
+	// buffered until the whole response ends, which for a long-lived stream is effectively
+	// never. Flushing after every chunk turns that into "forward each event as it arrives".
+	if flusher, ok := w.(http.Flusher); ok {
+		buf := make([]byte, 32*1024)
+		for {
+			n, readErr := upstreamRes.Body.Read(buf)
+			if n > 0 {
+				if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+					return
+				}
+				flusher.Flush()
+			}
+			if readErr != nil {
+				return
+			}
+		}
+	}
+
 	io.Copy(w, upstreamRes.Body)
 }
 
