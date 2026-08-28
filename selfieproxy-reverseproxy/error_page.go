@@ -21,12 +21,14 @@ main{flex:1 0 auto;width:100%;max-width:1400px;margin:2rem auto;padding:0 1.5rem
 h1{font-size:32px;margin:0 0 0.75rem}
 p{margin:0.5rem 0}
 .app-footer{flex-shrink:0;padding:1rem 0;text-align:center;font-size:0.75rem;color:var(--muted)}
+.app-footer a,.app-footer a:visited{color:inherit;text-decoration:underline}
+.app-footer a:hover{color:var(--text)}
 </style></head><body>
 <header class="topbar"><span class="brand"><svg class="brand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 6.982C9.664 5.309 13.825 8.236 8 12 2.175 8.236 6.336 5.309 8 6.982"/><path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.707L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.646a.5.5 0 0 0 .708-.707L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5z"/></svg>Selfie Proxy</span></header>
 <main><h1>`
 
 const errorPageAfter = `</main>
-<footer class="app-footer">Powered by selfieproxy by Jelte Jansons — built on boringproxy by Anders Pitman — MIT Licensed</footer>
+<footer class="app-footer">Powered by <a href="https://www.selfieproxy.net">Selfie Proxy</a> - MIT licensed</footer>
 </body></html>`
 
 // writeHtmlError renders one of this proxy's own error pages: statusCode as the real HTTP
