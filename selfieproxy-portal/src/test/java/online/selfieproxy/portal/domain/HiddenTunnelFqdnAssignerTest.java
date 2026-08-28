@@ -33,7 +33,7 @@ class HiddenTunnelFqdnAssignerTest {
 	@Test
 	void appendsANumericSuffixOnGenuineCollision() {
 		TunnelDto existingTunnel = new TunnelDto("camunda-nordicsnerd-com-terminal.nordicsnerd.com", null, 0, null,
-				null, 0, null, "127.0.0.1", 22, false, "passthrough", false, false, "admin", "lab1", null, null);
+				null, 0, null, "127.0.0.1", 22, false, "passthrough", false, false, "admin", "lab1", null, null, null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of(existingTunnel.domain(), existingTunnel));
 		HiddenTunnelFqdnAssigner assigner = new HiddenTunnelFqdnAssigner(boringProxyClient);
 
@@ -46,7 +46,7 @@ class HiddenTunnelFqdnAssignerTest {
 	void excludedFqdnsNeverCountAsACollisionAgainstThemselves() {
 		String ownFqdn = "camunda-nordicsnerd-com-terminal.nordicsnerd.com";
 		TunnelDto ownTunnel = new TunnelDto(ownFqdn, null, 0, null, null, 0, null, "127.0.0.1", 22, false,
-				"passthrough", false, false, "admin", "lab1", null, null);
+				"passthrough", false, false, "admin", "lab1", null, null, null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of(ownFqdn, ownTunnel));
 		HiddenTunnelFqdnAssigner assigner = new HiddenTunnelFqdnAssigner(boringProxyClient);
 

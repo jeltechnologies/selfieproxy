@@ -246,6 +246,29 @@ select {
 #redirectToExisting,
 #redirectToCustom { margin-bottom: 0; }
 
+/* Caption over the "Authentication methods" radios (edit-server.html) -- the one label on the
+   page that names a group rather than a single input, so it's set apart from the ordinary
+   field labels it sits among. Scoped to its own class rather than `#web-auth-field > label`,
+   which would also catch the Username/Password/Header name/Token labels nested below it. */
+.auth-method-legend {
+	font-weight: 600;
+	margin-bottom: 0.6rem;
+}
+
+/* The four "Authentication methods" radios (edit-server.html). The global `label` rule is
+   display:block, so each option's text would otherwise sit on its own line under the radio. */
+.auth-method-option {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: var(--text);
+}
+
+.auth-method-option input[type="radio"] { margin: 0; }
+
+/* Indented under the option that owns them, so it's obvious which method they belong to. */
+.auth-method-fields { margin: 0.5rem 0 0 1.6rem; }
+
 .field-row {
 	display: flex;
 	gap: 0.75rem;

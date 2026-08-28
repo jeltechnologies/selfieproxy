@@ -4,13 +4,16 @@ import java.util.List;
 
 import online.selfieproxy.portal.domain.Protocol;
 import online.selfieproxy.portal.domain.RemoteDesktopProtocol;
+import online.selfieproxy.portal.domain.WebAuthMethod;
 
 /**
  * What edit-server.html submits. The original subdomain (when editing) comes from the URL path
  * variable instead. homelabName/host are shared across every protocol. Each row below submits its
- * own enabled/protocol/port/credential fields; terminalSecret/remoteDesktopSecret are the
- * plaintext passwords -- left blank on an edit to keep the previously stored credential unchanged
- * (see ServerController.toServer). Port Forwarding has no protocol field here -- it's always TCP
+ * own enabled/protocol/port/credential fields; webBasicPassword/webTokenValue/terminalSecret/
+ * remoteDesktopSecret are the plaintext credentials -- left blank on an edit to keep the
+ * previously stored one unchanged (see ServerController.toServer). webAuthMethod is the
+ * "Authentication methods" radio group, an exclusive four-way choice, so only one of the Basic
+ * and token credential pairs is ever meaningful on a given submission. Port Forwarding has no protocol field here -- it's always TCP
  * (see ServerController.toServer), so there's nothing for the admin to choose -- just up to 8
  * repeatable target/public port/description triples, rendered as table rows (see edit-server.html);
  * Spring binds these from same-named, repeated &lt;input&gt;s in document order, so
@@ -26,7 +29,11 @@ public record ServerForm(
 		Boolean webEnabled,
 		Protocol webProtocol,
 		Integer webPort,
-		Boolean webSsoProtected,
+		WebAuthMethod webAuthMethod,
+		String webBasicUsername,
+		String webBasicPassword,
+		String webTokenHeaderName,
+		String webTokenValue,
 		// Terminal row
 		Boolean terminalEnabled,
 		Integer terminalPort,

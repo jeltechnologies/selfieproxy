@@ -3,16 +3,23 @@ package online.selfieproxy.portal.domain;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JavaType;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,6 +38,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class ServerStore {
 
+	private static final Logger log = LoggerFactory.getLogger(ServerStore.class);
+	private static final DateTimeFormatter BACKUP_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+
 	private final Path filePath;
 	// New fields are absent -- not merely null -- in servers.json entries written before
 	// they existed; without this, Jackson's default record deserialization treats an absent
@@ -44,6 +54,51 @@ public class ServerStore {
 
 	public ServerStore(@Value("${selfieproxy.servers-path}") String path) {
 		this.filePath = Path.of(path);
+	}
+
+	/**
+	 * Brings a servers.json written by an older image up to the current schema, in place, before
+	 * anything reads it. Runs during bean initialisation rather than on ApplicationReadyEvent (the
+	 * hook AgentBootstrap/TunnelReconciler use) precisely because it has to happen first: Spring
+	 * finishes initialising this bean before injecting it anywhere, so every reader -- including
+	 * TunnelReconciler, which rebuilds boringproxy's entire tunnel set from this store on every
+	 * startup -- already sees migrated data.
+	 *
+	 * <p>Unattended by design. A production upgrade is a `docker compose pull` plus `up -d` with no
+	 * operator step, so a migration needing one would strand the deployment: until it runs, the
+	 * portal can't read servers.json at all (see {@link WebAuthMigration} for why dropping a record
+	 * component is fatal here rather than merely lossy).
+	 *
+	 * <p>Copies the file to a timestamped .bak beside itself before rewriting. That copy is also the
+	 * rollback path -- a migrated file is unreadable by the previous image, which would reject
+	 * authMethod as an unknown property.
+	 */
+	@PostConstruct
+	void migrate() {
+		synchronized (lock) {
+			if (!Files.exists(filePath)) {
+				return;
+			}
+			JsonNode root;
+			try {
+				root = objectMapper.readTree(filePath.toFile());
+			} catch (Exception e) {
+				throw new IllegalStateException("Failed to read " + filePath + " for migration", e);
+			}
+			if (!WebAuthMigration.migrateServers(root)) {
+				return;
+			}
+			Path backup = filePath.resolveSibling(
+					filePath.getFileName() + ".bak-" + LocalDateTime.now().format(BACKUP_STAMP));
+			try {
+				Files.copy(filePath, backup, StandardCopyOption.REPLACE_EXISTING);
+				objectMapper.writeValue(filePath.toFile(), root);
+			} catch (Exception e) {
+				throw new IllegalStateException("Failed to migrate " + filePath, e);
+			}
+			log.info("Migrated {} to the Authentication methods schema (previous contents saved to {})",
+					filePath, backup.getFileName());
+		}
 	}
 
 	public void save(Server server) {

@@ -38,6 +38,7 @@ import online.selfieproxy.portal.domain.Server;
 import online.selfieproxy.portal.domain.ServerStore;
 import online.selfieproxy.portal.domain.Protocol;
 import online.selfieproxy.portal.domain.TerminalConfig;
+import online.selfieproxy.portal.domain.WebAuthMethod;
 import online.selfieproxy.portal.domain.WebConfig;
 
 /**
@@ -87,7 +88,7 @@ class AdminPortalSmokeTest {
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of());
 
 		Server musicServer = new Server("music", "example.com", "home", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, false), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		Server sshServer = new Server("ssh", "example.com", "home", "127.0.0.1", null,
 				new TerminalConfig("ssh-example-com-22.example.com", 22, 51234, "user", null), null, null);
 		serverStore.save(musicServer);
@@ -105,7 +106,7 @@ class AdminPortalSmokeTest {
 
 		when(boringProxyClient.getTunnel(eq("music.example.com"))).thenReturn(
 				new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-						12345, "", "127.0.0.1", 443, false, "server", false, false, "admin", "home", "", ""));
+						12345, "", "127.0.0.1", 443, false, "server", false, false, "admin", "home", "", "", null, null));
 
 		mockMvc.perform(get("/servers/music.example.com/edit").session(session))
 				.andExpect(status().isOk())
@@ -113,7 +114,7 @@ class AdminPortalSmokeTest {
 
 		when(boringProxyClient.createTunnel(any(CreateTunnelRequestDto.class))).thenReturn(
 				new TunnelDto("newapp.example.com", "admin.example.com", 22, "", "user",
-						12345, "", "127.0.0.1", 8080, false, "server", false, false, "admin", "home", "", ""));
+						12345, "", "127.0.0.1", 8080, false, "server", false, false, "admin", "home", "", "", null, null));
 
 		mockMvc.perform(post("/servers")
 						.session(session)
@@ -141,7 +142,7 @@ class AdminPortalSmokeTest {
 				.thenReturn(Map.of("secret-abc", new TokenDataDto("admin", "default")));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "default", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "default", "", "", null, null);
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of("music.example.com", webTunnel));
 
 		mockMvc.perform(get("/").session(session))
@@ -178,9 +179,9 @@ class AdminPortalSmokeTest {
 				.thenReturn(Map.of("secret-abc", new TokenDataDto("admin", "default")));
 
 		TunnelDto webTunnel = new TunnelDto("music.example.com", "admin.example.com", 22, "", "user",
-				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "default", "", "");
+				12345, "", "127.0.0.1", 8096, false, "client", false, false, "admin", "default", "", "", null, null);
 		TunnelDto otherHomelabTunnel = new TunnelDto("ssh.example.com", "admin.example.com", 22, "", "user",
-				51234, "", "127.0.0.1", 22, true, "passthrough", false, false, "admin", "office", "", "");
+				51234, "", "127.0.0.1", 22, true, "passthrough", false, false, "admin", "office", "", "", null, null);
 		when(boringProxyClient.listTunnels())
 				.thenReturn(Map.of("music.example.com", webTunnel, "ssh.example.com", otherHomelabTunnel));
 
@@ -217,7 +218,7 @@ class AdminPortalSmokeTest {
 					request.tunnelPort() != null ? request.tunnelPort() : 0, "", "127.0.0.1",
 					request.clientPort() != null ? request.clientPort() : 0,
 					Boolean.TRUE.equals(request.allowExternalTcp()), request.tlsTermination(), false, false,
-					"admin", "home", "", "");
+					"admin", "home", "", "", null, null);
 			liveTunnels.put(request.domain(), created);
 			return created;
 		});

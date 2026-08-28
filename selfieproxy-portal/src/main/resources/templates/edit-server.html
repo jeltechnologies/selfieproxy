@@ -69,12 +69,75 @@
 				</label>
 				<div id="web-row-fields">
 					<p class="muted">Expose your homelab server as a website, or a REST/SOAP web service.</p>
-					<div class="field" id="web-sso-protected-field">
-						<label>
-							<input type="checkbox" id="webSsoProtected" name="webSsoProtected" value="true"
-								   th:checked="${server.hasWeb() and server.web().ssoProtected()}">
-							Protect by forcing authentication through Selfie Proxy login
-						</label>
+					<div class="field" id="web-auth-field">
+						<label class="auth-method-legend">Authentication methods</label>
+
+						<div class="field">
+							<label class="auth-method-option">
+								<input type="radio" name="webAuthMethod" id="webAuthSso" value="SSO"
+									   th:checked="${!server.hasWeb() or server.web().authMethodOrDefault().name() == 'SSO'}">
+								Protected by Selfie Proxy login (recommended)
+							</label>
+						</div>
+
+						<div class="field">
+							<label class="auth-method-option">
+								<input type="radio" name="webAuthMethod" id="webAuthBasic" value="BASIC"
+									   th:checked="${server.hasWeb() and server.web().authMethodOrDefault().name() == 'BASIC'}">
+								Protected with basic authentication
+							</label>
+							<div class="auth-method-fields" id="web-auth-basic-fields">
+								<div class="field-row">
+									<div class="field">
+										<label for="webBasicUsername">Username</label>
+										<input type="text" id="webBasicUsername" name="webBasicUsername"
+											   th:value="${server.hasWeb() ? server.web().basicUsername() : null}">
+									</div>
+									<div class="field">
+										<label for="webBasicPassword">Password</label>
+										<input type="password" id="webBasicPassword" name="webBasicPassword"
+											   th:attr="data-stored=${server.hasWeb() and server.web().basicPassword() != null} ? 'true' : 'false'"
+											   th:placeholder="${server.hasWeb() and server.web().basicPassword() != null} ? '••••••••'">
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="field">
+							<label class="auth-method-option">
+								<input type="radio" name="webAuthMethod" id="webAuthToken" value="TOKEN"
+									   th:checked="${server.hasWeb() and server.web().authMethodOrDefault().name() == 'TOKEN'}">
+								Protected with token header
+							</label>
+							<div class="auth-method-fields" id="web-auth-token-fields">
+								<p class="muted">
+									The client sends this token on every request. Either the token on its own or
+									the <code>Bearer &lt;token&gt;</code> form is accepted, so it works with clients
+									that add the prefix themselves and with those that don't.
+								</p>
+								<div class="field-row">
+									<div class="field">
+										<label for="webTokenHeaderName">Header name</label>
+										<input type="text" id="webTokenHeaderName" name="webTokenHeaderName"
+											   th:value="${server.hasWeb() and server.web().tokenHeaderName() != null ? server.web().tokenHeaderName() : 'Authorization'}">
+									</div>
+									<div class="field">
+										<label for="webTokenValue">Token</label>
+										<input type="password" id="webTokenValue" name="webTokenValue"
+											   th:attr="data-stored=${server.hasWeb() and server.web().tokenValue() != null} ? 'true' : 'false'"
+											   th:placeholder="${server.hasWeb() and server.web().tokenValue() != null} ? '••••••••'">
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="field">
+							<label class="auth-method-option">
+								<input type="radio" name="webAuthMethod" id="webAuthNone" value="NONE"
+									   th:checked="${server.hasWeb() and server.web().authMethodOrDefault().name() == 'NONE'}">
+								Not protected
+							</label>
+						</div>
 					</div>
 					<div class="field-row">
 						<div class="field">

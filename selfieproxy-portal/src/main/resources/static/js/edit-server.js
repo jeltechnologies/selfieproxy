@@ -10,6 +10,9 @@
 
 	var webEnabledCheckbox = document.getElementById("webEnabled");
 	var webRowFields = document.getElementById("web-row-fields");
+	var webAuthRadios = document.querySelectorAll("input[name=\"webAuthMethod\"]");
+	var webAuthBasicFields = document.getElementById("web-auth-basic-fields");
+	var webAuthTokenFields = document.getElementById("web-auth-token-fields");
 	var webProtocolSelect = document.getElementById("webProtocol");
 	var webPortInput = document.getElementById("webPort");
 
@@ -79,12 +82,53 @@
 	bindMirrored(terminalUsernameInput, remoteDesktopUsernameInput);
 	bindMirrored(terminalSecretInput, remoteDesktopSecretInput);
 
+	/**
+	 * Only the selected authentication method's credential fields are shown, and the hidden ones are
+	 * disabled as well -- display alone still submits them, and the server only ever reads the
+	 * selected method's pair, so leaving them enabled would post credentials that are silently
+	 * discarded. Uses display rather than the visibility+disabled pairing local-websites.js needs
+	 * for its own radios: these blocks sit stacked under their own option rather than side by side,
+	 * so there's no sibling row height to keep stable.
+	 */
+	function updateWebAuthMethod() {
+		var selected = null;
+		webAuthRadios.forEach(function (radio) {
+			if (radio.checked) {
+				selected = radio.value;
+			}
+		});
+		// Gated on the Web row being enabled at all, not just on the selected method: a required
+		// field inside a display:none container makes the whole form unsubmittable, with the
+		// browser refusing to focus what it wants to complain about. Unchecking Web therefore has
+		// to release these too, which is why updateVisibility calls back into this.
+		var webOn = webEnabledCheckbox.checked;
+		toggleAuthFields(webAuthBasicFields, webOn && selected === "BASIC");
+		toggleAuthFields(webAuthTokenFields, webOn && selected === "TOKEN");
+	}
+
+	function toggleAuthFields(container, active) {
+		if (!container) {
+			return;
+		}
+		container.style.display = active ? "" : "none";
+		container.querySelectorAll("input").forEach(function (input) {
+			input.disabled = !active;
+			// Both fields of the selected method are mandatory (mirrors
+			// ServerController.validateWebAuth, which stays the authoritative check) -- except a
+			// credential that is already stored. Those render blank behind a decoy placeholder,
+			// and blank means "keep the current one", so requiring a value there would make an
+			// edit that only changes the port unsubmittable.
+			input.required = active && input.dataset.stored !== "true";
+		});
+	}
+
 	function updateVisibility() {
 		webRowFields.style.display = webEnabledCheckbox.checked ? "" : "none";
 		terminalRowFields.style.display = terminalEnabledCheckbox.checked ? "" : "none";
 		remoteDesktopRowFields.style.display = remoteDesktopEnabledCheckbox.checked ? "" : "none";
 		portForwardingRowFields.style.display = portForwardingEnabledCheckbox.checked ? "" : "none";
 		updateSubdomainRequirement();
+		updateWebAuthMethod();
 	}
 
 	/**
@@ -263,6 +307,9 @@
 	hostInput.addEventListener("input", updateHostEchoes);
 
 	webEnabledCheckbox.addEventListener("change", updateVisibility);
+	webAuthRadios.forEach(function (radio) {
+		radio.addEventListener("change", updateWebAuthMethod);
+	});
 	terminalEnabledCheckbox.addEventListener("change", updateVisibility);
 	remoteDesktopEnabledCheckbox.addEventListener("change", updateVisibility);
 	portForwardingEnabledCheckbox.addEventListener("change", updateVisibility);

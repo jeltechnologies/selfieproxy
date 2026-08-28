@@ -37,6 +37,7 @@ import online.selfieproxy.portal.config.SitesWebserverProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
 import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -469,6 +470,9 @@ public class BackupService {
 				"server",
 				null,
 				null,
+				null,
+				null,
+				null,
 				null);
 	}
 
@@ -509,7 +513,14 @@ public class BackupService {
 		}
 		BackupManifest manifest;
 		try {
-			manifest = objectMapper.readValue(manifestFile.toFile(), BackupManifest.class);
+			// Read as a tree and migrate first, exactly as ServerStore does on startup: an export
+			// taken before the Authentication methods change carries ssoProtected, which this
+			// mapper (FAIL_ON_UNKNOWN_PROPERTIES left on) would otherwise reject outright. Doing it
+			// here rather than bumping CURRENT_VERSION is deliberate -- a version bump makes the
+			// check below *reject* older exports, when the whole point is to keep importing them.
+			JsonNode root = objectMapper.readTree(manifestFile.toFile());
+			WebAuthMigration.migrateServers(root.get("servers"));
+			manifest = objectMapper.treeToValue(root, BackupManifest.class);
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Failed to read configuration export manifest.json", e);
 		}

@@ -74,6 +74,12 @@ type Tunnel struct {
 	AgentName    string `json:"agent_name"`
 	AuthUsername string `json:"auth_username"`
 	AuthPassword string `json:"auth_password"`
+	// AuthTokenValue is the machine-usable alternative to SsoProtected: a static shared
+	// secret presented in a header, for an API client that can't follow the single
+	// sign on gate's 302. AuthTokenHeader names the header to read it from, defaulting
+	// to Authorization when empty. See checkTunnelAuth in http_proxy.go.
+	AuthTokenHeader string `json:"auth_token_header"`
+	AuthTokenValue  string `json:"auth_token_value"`
 }
 
 func NewDatabase(path string) (*Database, error) {

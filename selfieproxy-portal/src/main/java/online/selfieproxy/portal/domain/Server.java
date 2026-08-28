@@ -78,9 +78,10 @@ public record Server(
 				terminal, remoteDesktop.withEncryptedSecret(newEncryptedSecret), portForwarding);
 	}
 
-	/** Same record with both credential slots cleared -- used when building a configuration export (see BackupService). */
+	/** Same record with every credential slot cleared -- used when building a configuration export (see BackupService). */
 	public Server withoutSecrets() {
-		return new Server(subdomain, domain, homelabName, host, web,
+		return new Server(subdomain, domain, homelabName, host,
+				web == null ? null : web.withoutSecret(),
 				terminal == null ? null : terminal.withoutSecret(),
 				remoteDesktop == null ? null : remoteDesktop.withoutSecret(),
 				portForwarding);

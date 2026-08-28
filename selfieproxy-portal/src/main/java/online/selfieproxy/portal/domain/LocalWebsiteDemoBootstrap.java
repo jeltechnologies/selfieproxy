@@ -137,6 +137,9 @@ public class LocalWebsiteDemoBootstrap {
 				"server",
 				null,
 				null,
+				null,
+				null,
+				null,
 				null);
 	}
 

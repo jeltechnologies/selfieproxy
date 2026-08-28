@@ -21,6 +21,9 @@ public record CreateTunnelRequestDto(
 		String password,
 		@JsonProperty("tls-termination") String tlsTermination,
 		@JsonProperty("sso-protect") Boolean ssoProtect,
+		@JsonProperty("token-protect") Boolean tokenProtect,
+		@JsonProperty("token-header") String tokenHeader,
+		@JsonProperty("token-value") String tokenValue,
 		@JsonProperty("ssh-server-addr") String sshServerAddr,
 		@JsonProperty("ssh-server-port") Integer sshServerPort) {
 }

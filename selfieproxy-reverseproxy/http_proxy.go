@@ -1,6 +1,7 @@
 package boringproxy
 
 import (
+	"crypto/subtle"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // upstreamErrorMode controls how proxyRequest reports a failure to reach address:port -- the
@@ -38,21 +38,8 @@ const (
 
 func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpClient *http.Client, address string, port int, errorMode upstreamErrorMode) {
 
-	if tunnel.AuthUsername != "" || tunnel.AuthPassword != "" {
-		username, password, ok := r.BasicAuth()
-		if !ok {
-			w.Header()["WWW-Authenticate"] = []string{"Basic"}
-			w.WriteHeader(401)
-			return
-		}
-
-		if username != tunnel.AuthUsername || password != tunnel.AuthPassword {
-			w.Header()["WWW-Authenticate"] = []string{"Basic"}
-			w.WriteHeader(401)
-			// TODO: should probably use a better form of rate limiting
-			time.Sleep(2 * time.Second)
-			return
-		}
+	if !checkTunnelAuth(w, r, tunnel) {
+		return
 	}
 
 	if isWebsocketUpgrade(r) {
@@ -220,6 +207,75 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 	}
 
 	io.Copy(w, upstreamRes.Body)
+}
+
+// checkTunnelAuth enforces a tunnel's own credential gate -- the machine-usable
+// alternative to the single sign on gate, which answers an unauthenticated request with a
+// 302 to the IdP (see oidc_auth.go's RequireAuth) that no API client can follow. At most
+// one gate is ever configured on a tunnel: selfieproxy-portal models this as a four-way
+// exclusive choice (WebAuthMethod), so single sign on and the two credential methods here
+// are mutually exclusive by construction -- and the single sign on check runs earlier
+// anyway, in boringproxy.go's dispatch, so a tunnel carrying both would never reach here.
+// The portal/sso/console synthetic tunnels pass a zero-valued Tunnel and so are exempt.
+//
+// Returns true if the request may proceed; false if it has already written a 401 and the
+// caller must return immediately.
+//
+// The matched header is removed before the request is forwarded upstream: proxyRequest
+// clones the header map wholesale, and the agent's own hop to the homelab backend is plain
+// HTTP whenever the Server's Web protocol is HTTP, so leaving the credential in place would
+// put it on the homelab LAN in the clear for a backend that has no use for it.
+func checkTunnelAuth(w http.ResponseWriter, r *http.Request, tunnel Tunnel) bool {
+
+	if tunnel.AuthUsername != "" || tunnel.AuthPassword != "" {
+		username, password, ok := r.BasicAuth()
+		// Both comparisons run unconditionally rather than short-circuiting, so response
+		// timing reveals nothing about how much of the credential was correct.
+		usernameOk := secureEqual(username, tunnel.AuthUsername)
+		passwordOk := secureEqual(password, tunnel.AuthPassword)
+		if !ok || !usernameOk || !passwordOk {
+			w.Header()["WWW-Authenticate"] = []string{`Basic realm="Selfie Proxy"`}
+			w.WriteHeader(http.StatusUnauthorized)
+			return false
+		}
+		r.Header.Del("Authorization")
+		return true
+	}
+
+	if tunnel.AuthTokenValue != "" {
+		header := tunnel.AuthTokenHeader
+		if header == "" {
+			header = "Authorization"
+		}
+
+		// Accept the bare token as well as the "Bearer <token>" form. Camunda's AI Agent
+		// and MCP Remote Client connectors both send an API key as
+		// "Authorization: Bearer <key>", while a custom header (X-Api-Key and friends) is
+		// conventionally the raw value -- accepting both means either configuration works
+		// without the admin having to know which one their client uses. Deliberately no
+		// WWW-Authenticate header: a "Basic" challenge would send a browser into a native
+		// password prompt this method has no answer for, and a bare "Bearer" challenge
+		// makes a spec-compliant MCP client start an OAuth discovery round trip that this
+		// static-token gate cannot complete.
+		presented := r.Header.Get(header)
+		bareOk := secureEqual(presented, tunnel.AuthTokenValue)
+		bearerOk := secureEqual(presented, "Bearer "+tunnel.AuthTokenValue)
+		if !bareOk && !bearerOk {
+			w.WriteHeader(http.StatusUnauthorized)
+			return false
+		}
+		r.Header.Del(header)
+		return true
+	}
+
+	return true
+}
+
+// secureEqual compares a presented credential against the expected one in constant time,
+// so it can't be recovered a byte at a time from response timing. ConstantTimeCompare
+// itself returns 0 for differing lengths, which is why no length check precedes it.
+func secureEqual(presented, expected string) bool {
+	return subtle.ConstantTimeCompare([]byte(presented), []byte(expected)) == 1
 }
 
 func isWebsocketUpgrade(r *http.Request) bool {

@@ -37,6 +37,7 @@ import online.selfieproxy.portal.domain.RemoteDesktopConfig;
 import online.selfieproxy.portal.domain.RemoteDesktopProtocol;
 import online.selfieproxy.portal.domain.TerminalConfig;
 import online.selfieproxy.portal.domain.TunnelMapper;
+import online.selfieproxy.portal.domain.WebAuthMethod;
 import online.selfieproxy.portal.domain.WebConfig;
 import online.selfieproxy.portal.security.NetworkServiceCredentialCipher;
 import online.selfieproxy.portal.session.PortalSession;
@@ -97,7 +98,7 @@ public class ServerController {
 		// Web starts enabled and SSO-protected by default -- the common case is a single-sign-on
 		// protected website, and the admin opts out rather than in. Every other protocol checkbox
 		// still starts unchecked -- the admin picks which of those to enable.
-		WebConfig defaultWeb = new WebConfig(Protocol.HTTPS, 443, true);
+		WebConfig defaultWeb = new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null);
 		Server server = new Server("", defaultDomain, defaultHomelab, "127.0.0.1", defaultWeb, null, null, null);
 		model.addAttribute("server", server);
 		model.addAttribute("isNew", true);
@@ -316,10 +317,31 @@ public class ServerController {
 			}
 		}
 
-		WebConfig web = enabled(form.webEnabled())
-				? new WebConfig(form.webProtocol() != null ? form.webProtocol() : Protocol.HTTPS,
-						form.webPort() != null ? form.webPort() : 0, Boolean.TRUE.equals(form.webSsoProtected()))
-				: null;
+		WebConfig web;
+		if (enabled(form.webEnabled())) {
+			// Unlike the other three protocols, this branch used to ignore `existing` entirely --
+			// it now has credentials to carry forward, so it needs the same blank-means-unchanged
+			// treatment Terminal/Remote Desktop already get.
+			WebConfig previousWeb = existing != null ? existing.web() : null;
+			WebAuthMethod authMethod = form.webAuthMethod() != null ? form.webAuthMethod() : WebAuthMethod.SSO;
+			// Only the selected method's credentials are kept. Switching away from a method and
+			// saving deliberately discards its credential rather than parking it: leaving a stale
+			// secret in servers.json for a gate that's no longer active is exactly the kind of
+			// thing an admin would never think to clean up.
+			String basicUsername = authMethod == WebAuthMethod.BASIC ? blankToNull(form.webBasicUsername()) : null;
+			String basicPassword = authMethod == WebAuthMethod.BASIC
+					? resolveSecret(form.webBasicPassword(), previousWeb != null ? previousWeb.basicPassword() : null)
+					: null;
+			String tokenHeaderName = authMethod == WebAuthMethod.TOKEN ? blankToNull(form.webTokenHeaderName()) : null;
+			String tokenValue = authMethod == WebAuthMethod.TOKEN
+					? resolveSecret(form.webTokenValue(), previousWeb != null ? previousWeb.tokenValue() : null)
+					: null;
+			web = new WebConfig(form.webProtocol() != null ? form.webProtocol() : Protocol.HTTPS,
+					form.webPort() != null ? form.webPort() : 0, authMethod,
+					basicUsername, basicPassword, tokenHeaderName, tokenValue);
+		} else {
+			web = null;
+		}
 
 		TerminalConfig terminal;
 		if (enabled(form.terminalEnabled())) {
@@ -375,6 +397,49 @@ public class ServerController {
 		}
 
 		return new Server(subdomain, domain, form.homelabName(), form.host(), web, terminal, remoteDesktop, portForwarding);
+	}
+
+	/**
+	 * The credentials are checked against the already-resolved WebConfig rather than the raw form,
+	 * so a blank field on an edit that kept a stored credential passes -- resolveSecret has already
+	 * carried the previous value forward by this point.
+	 */
+	private void validateWebAuth(WebConfig web, List<String> errors) {
+		if (web.authMethodOrDefault() == WebAuthMethod.BASIC) {
+			if (web.basicUsername() == null) {
+				errors.add("Enter a username for basic authentication.");
+			}
+			if (web.basicPassword() == null) {
+				errors.add("Enter a password for basic authentication.");
+			}
+		}
+		if (web.authMethodOrDefault() == WebAuthMethod.TOKEN) {
+			// The header name is required rather than quietly defaulting to Authorization: the
+			// admin has to hand the exact header to whoever configures the client, so leaving it
+			// implicit here just moves the guesswork somewhere it can't be checked. The form
+			// pre-fills "Authorization" so the common case is still a single field to fill in.
+			if (web.tokenHeaderName() == null) {
+				errors.add("Enter a header name for token header authentication.");
+			} else if (!isHttpHeaderName(web.tokenHeaderName())) {
+				errors.add("Header name can only contain letters, numbers, and the characters !#$%&'*+-.^_`|~");
+			}
+			if (web.tokenValue() == null) {
+				errors.add("Enter a token for token header authentication.");
+			}
+		}
+	}
+
+	/** RFC 9110's `token` production -- the only thing that can legally name a header. */
+	private boolean isHttpHeaderName(String value) {
+		for (int i = 0; i < value.length(); i++) {
+			char c = value.charAt(i);
+			boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+					|| "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+			if (!allowed) {
+				return false;
+			}
+		}
+		return !value.isEmpty();
 	}
 
 	private boolean enabled(Boolean value) {
@@ -458,6 +523,7 @@ public class ServerController {
 
 		if (server.hasWeb()) {
 			validatePortRange(server.web().port(), "Homelab server port", errors);
+			validateWebAuth(server.web(), errors);
 		}
 		if (server.hasTerminal()) {
 			validatePortRange(server.terminal().port(), "Homelab server port", errors);

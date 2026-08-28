@@ -401,6 +401,22 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		}
 	}
 
+	// Same shape as password-protect above, for clients that can present a static
+	// token in a header but can't do Basic (eg. Camunda's AI Agent connector, whose
+	// only credential field is an API key sent as "Authorization: Bearer <key>").
+	tokenProtect := params.Get("token-protect") == "on"
+
+	var tokenHeader string
+	var tokenValue string
+	if tokenProtect {
+		tokenValue = params.Get("token-value")
+		if tokenValue == "" {
+			return nil, errors.New("Token required")
+		}
+
+		tokenHeader = params.Get("token-header")
+	}
+
 	tlsTerm := params.Get("tls-termination")
 	if tlsTerm != "server" && tlsTerm != "client" && tlsTerm != "passthrough" && tlsTerm != "client-tls" && tlsTerm != "server-tls" {
 		return nil, errors.New("Invalid tls-termination parameter")
@@ -432,6 +448,8 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		AllowExternalTcp: allowExternalTcp,
 		AuthUsername:     username,
 		AuthPassword:     password,
+		AuthTokenHeader:  tokenHeader,
+		AuthTokenValue:   tokenValue,
 		TlsTermination:   tlsTerm,
 		SsoProtected:     ssoProtect,
 		ServerAddress:    sshServerAddr,

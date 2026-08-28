@@ -37,6 +37,7 @@ import online.selfieproxy.portal.boringproxy.BoringProxyException;
 import online.selfieproxy.portal.boringproxy.dto.AgentStatusDto;
 import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
+import online.selfieproxy.portal.security.NetworkServiceCredentialCipher;
 import online.selfieproxy.portal.config.BackupProperties;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.SitesWebserverProperties;
@@ -68,7 +69,7 @@ class BackupServiceTest {
 
 	private BackupService newService() {
 		BackupProperties backupProperties = new BackupProperties(tempDir.resolve("staging").toString());
-		TunnelMapper tunnelMapper = new TunnelMapper();
+		TunnelMapper tunnelMapper = new TunnelMapper(new NetworkServiceCredentialCipher(tempDir.resolve("cipher-key").toString()));
 		HiddenTunnelFqdnAssigner fqdnAssigner = new HiddenTunnelFqdnAssigner(boringProxyClient);
 		ThemeStore themeStore = new ThemeStore(tempDir.resolve("theme.json").toString());
 		TerminalSettingsStore terminalSettingsStore =
@@ -85,7 +86,7 @@ class BackupServiceTest {
 	void writeBackupThenStageRestoreRoundTripsManifest() throws IOException {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(server));
 		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null, false)));
 
@@ -108,9 +109,9 @@ class BackupServiceTest {
 	void writeBackupOnlyIncludesSelectedItems() throws IOException {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null), "lab2", new AgentStatusDto(null)));
 		Server blogServer = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		Server shopServer = new Server("shop", "example.com", "lab2", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8081, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8081, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(blogServer, shopServer));
 		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("shopsite", "example.com", null, false)));
 
@@ -139,7 +140,7 @@ class BackupServiceTest {
 	void writeBackupThenStageRestoreRoundTripsMultiProtocolServer() throws IOException {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		Server server = new Server("proxmox", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, true),
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null),
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, 51000, "root", "cipher-ssh"),
 				new RemoteDesktopConfig("proxmox-example-com-3389.example.com", RemoteDesktopProtocol.RDP, 3389,
 						51001, "admin", "cipher-rdp", true),
@@ -195,7 +196,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreCreatesHomelabWithFreshSecretAndRecreatesServerTunnel() throws IOException {
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -229,7 +230,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreAcceptsApexServerWithBlankSubdomain() throws IOException {
 		Server server = new Server(null, "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -263,7 +264,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreCreatesOneTunnelPerEnabledProtocol() throws IOException {
 		Server server = new Server("proxmox", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, false),
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.NONE, null, null, null, null),
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, null, "root", null),
 				null,
 				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080, null)));
@@ -281,7 +282,7 @@ class BackupServiceTest {
 			CreateTunnelRequestDto request = invocation.getArgument(0);
 			return new TunnelDto(request.domain(), null, 0, null, null, 55555, null, "127.0.0.1",
 					request.clientPort(), Boolean.TRUE.equals(request.allowExternalTcp()), request.tlsTermination(),
-					false, false, "admin", "lab1", null, null);
+					false, false, "admin", "lab1", null, null, null, null);
 		});
 
 		BackupService service = newService();
@@ -333,9 +334,9 @@ class BackupServiceTest {
 	@Test
 	void diffManifestFlagsExistingItemsAgainstLiveState() {
 		Server existingServer = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		Server newServer = new Server("shop", "example.com", "lab2", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8081, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8081, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingServer, newServer),
 				List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("newsite", "example.com", null, false)),

@@ -8,7 +8,7 @@ class ServerTest {
 
 	private Server appWithSubdomain(String subdomain) {
 		return new Server(subdomain, "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, false), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
 	}
 
 	@Test

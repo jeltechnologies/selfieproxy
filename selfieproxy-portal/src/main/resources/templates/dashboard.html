@@ -84,6 +84,10 @@
 						<span th:if="${server.hasWeb() and certPendingByDomain.get(server.fqdn())}"
 							  class="cert-pending-badge"
 							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
+						<span th:if="${server.hasWeb() and server.web().authMethodOrDefault().name() == 'BASIC'}"
+							  class="status-badge status-badge-primary" title="Protected with basic authentication">Basic auth</span>
+						<span th:if="${server.hasWeb() and server.web().authMethodOrDefault().name() == 'TOKEN'}"
+							  class="status-badge status-badge-primary" title="Protected with token header">Token</span>
 					</td>
 					<td>
 						<a th:if="${server.hasTerminal()}" class="button-small connect-button"

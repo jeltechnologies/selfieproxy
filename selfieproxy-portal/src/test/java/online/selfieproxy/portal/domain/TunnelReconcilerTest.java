@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
+import online.selfieproxy.portal.security.NetworkServiceCredentialCipher;
 import online.selfieproxy.portal.config.SitesWebserverProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
 
@@ -31,7 +32,7 @@ class TunnelReconcilerTest {
 	@Mock
 	private LocalWebsiteStore localWebsiteStore;
 
-	private final TunnelMapper tunnelMapper = new TunnelMapper();
+	private final TunnelMapper tunnelMapper = new TunnelMapper(new NetworkServiceCredentialCipher("target/test-cipher-key"));
 	private final ThisServerAgentProperties thisServerAgentProperties =
 			new ThisServerAgentProperties("selfieproxy-internal-agent", "/dev/null");
 	private final SitesWebserverProperties sitesWebserverProperties =
@@ -46,9 +47,9 @@ class TunnelReconcilerTest {
 	void deletesEveryExistingTunnelThenRecreatesEveryDesiredOne() {
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of(
 				"stale.example.com", new TunnelDto("stale.example.com", null, 0, null, null, 0, null,
-						null, 0, false, "server", false, false, "admin", "old-lab", null, null)));
+						null, 0, false, "server", false, false, "admin", "old-lab", null, null, null, null)));
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, true), null, null,
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null,
 				List.of(new PortForwardingConfig("blog-example-com-1234.example.com", PortForwardingProtocol.TCP,
 						1234, 8080, "Minecraft server")));
 		when(serverStore.values()).thenReturn(List.of(server));
@@ -67,9 +68,9 @@ class TunnelReconcilerTest {
 	void aFailedDeleteDoesNotAbortTheRestOfReconciliation() {
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of(
 				"stale1.example.com", new TunnelDto("stale1.example.com", null, 0, null, null, 0, null,
-						null, 0, false, "server", false, false, "admin", "old-lab", null, null),
+						null, 0, false, "server", false, false, "admin", "old-lab", null, null, null, null),
 				"stale2.example.com", new TunnelDto("stale2.example.com", null, 0, null, null, 0, null,
-						null, 0, false, "server", false, false, "admin", "old-lab", null, null)));
+						null, 0, false, "server", false, false, "admin", "old-lab", null, null, null, null)));
 		// A single conditional stub covering every deleteTunnel call -- stubbing "stale1" and
 		// leaving "stale2" unstubbed would trip Mockito's strict-stubbing argument-mismatch check
 		// (any explicit stub on a method makes every other invocation of it require one too).
@@ -80,7 +81,7 @@ class TunnelReconcilerTest {
 			return null;
 		}).when(boringProxyClient).deleteTunnel(any());
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, true), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(server));
 		when(localWebsiteStore.list()).thenReturn(List.of());
 
@@ -95,9 +96,9 @@ class TunnelReconcilerTest {
 	void aFailedCreateDoesNotAbortTheRestOfReconciliation() {
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of());
 		Server blog = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, true), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
 		Server shop = new Server("shop", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, true), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(blog, shop));
 		when(localWebsiteStore.list()).thenReturn(List.of());
 		// Same single-conditional-stub idiom as above, applied to createTunnel instead.

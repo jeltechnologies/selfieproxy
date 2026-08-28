@@ -30,15 +30,16 @@ admin still has to act first (connecting a Homelab). The Homelabs page itself li
 `/homelabs`, a stable URL independent of this landing-page logic (the nav's "Homelabs" tab and
 every homelab-management redirect target it directly, not `/`).
 
-- A Server's Web protocol can opt in to the same single sign on gate (the authentication
-  checkbox on its edit page) — available for both HTTP and HTTPS homelab servers, since a Server's Web
-  protocol is always end-to-end encrypted (`TlsMode.MANAGED`, boringproxy's "server" TLS
-  termination either way -- see `Server.canProtectWithSso()`). The edit page used to expose an
-  "Advanced settings" picker letting the admin choose two alternate HTTPS connectivity modes
-  (`TlsMode.BYO_CERT`/`HOP_BY_HOP`, which boringproxy never HTTP-parses and so can't gate with
-  single sign on); that picker has been removed from the UI since nobody used it, but the
-  underlying `TlsMode` enum and `TunnelMapper` mapping are kept as-is in case it's reintroduced
-  later -- every Web protocol submitted through the portal today is unconditionally MANAGED.
+- A Server's Web protocol picks exactly one of four gates, the "Authentication methods" radio
+  group on its edit page (`WebAuthMethod`, `WebConfig.authMethod`) -- see the "Servers" section
+  below for the UI and the "Authentication methods" subsection for what each one does on the wire.
+  Single sign on is one of the four and is the default for a new Server. All four are available
+  for both HTTP and HTTPS homelab servers, since a Server's Web protocol is always end-to-end
+  encrypted (boringproxy's `"server"` TLS termination either way, hardcoded in `TunnelMapper`).
+  The edit page used to expose an "Advanced settings" picker letting the admin choose two alternate
+  HTTPS connectivity modes (a `TlsMode.BYO_CERT`/`HOP_BY_HOP` enum, which boringproxy never
+  HTTP-parses and so can't gate at all); both that picker and the `TlsMode` enum itself are gone
+  from the Java code entirely -- every Web protocol submitted through the portal is `"server"`.
 - The topbar's user menu ("▾ Settings", `fragments/layout.html`) holds a theme toggle button (its
   label flips between "Change to dark mode"/"Change to light mode" depending on the current
   setting, `POST /appearance/toggle`, `web/AppearanceController.java` -- a one-click toggle rather
@@ -221,9 +222,9 @@ own enable checkbox -- toggling one on/off never touches the others' fields or t
   used by every protocol this Server enables, echoed read-only inside each protocol's own fieldset
   next to its own Protocol/port fields (`.host-echo`, kept live via JS as the shared field changes).
 - **Web**: HTTP/HTTPS **Protocol** dropdown (defaults its port to 80/443 unless the admin already
-  typed a custom one, `bindProtocolPortFollow` in `edit-server.js`), **Homelab server port**, and a
-  "Protect by forcing authentication through Selfieproxy login" checkbox (`webSsoProtected` -- see
-  "Login" above). **Subdomain**/**Domain** (dropdown, primary domain first) live in the shared
+  typed a custom one, `bindProtocolPortFollow` in `edit-server.js`), **Homelab server port**, and
+  the **Authentication methods** radio group (`webAuthMethod`, see the subsection right below).
+  **Subdomain**/**Domain** (dropdown, primary domain first) live in the shared
   top-of-form row, composing the FQDN shown live as a label -- they only matter for Web, since
   every other protocol lives on its own hidden, never-shown FQDN (see below) regardless of what
   Subdomain/Domain are set to.
@@ -287,6 +288,72 @@ own enable checkbox -- toggling one on/off never touches the others' fields or t
   `ApplicationReadyEvent` idiom as `TunnelReconciler`) printed on every boot where it's
   misconfigured, regardless of whether any Server currently uses Port Forwarding.
 
+#### Authentication methods
+
+An exclusive four-way radio group (`WebAuthMethod`), in this fixed order, defaulting to the first
+for a new Server (`ServerController.newServer`):
+
+1. **Protected by Selfie Proxy login (recommended)** (`SSO`) -- boringproxy's single sign on gate.
+2. **Protected with basic authentication** (`BASIC`) -- Username + Password.
+3. **Protected with token header** (`TOKEN`) -- Header name + Token.
+4. **Not protected** (`NONE`).
+
+The point of 2 and 3 is that single sign on answers an unauthenticated request with a **302 to the
+identity provider**, which a browser follows and an API client cannot -- so a REST service used to
+have to choose between being unusable by its own clients and being wide open. Which one to reach
+for: Basic is understood by Camunda's REST and MCP Remote Client connectors; the token header is
+the only one *every* Camunda connector accepts, since its AI Agent connector (the OpenAI-compatible
+provider used for a local Ollama) has no Basic mode, only a static API key it sends as
+`Authorization: Bearer <key>`. Camunda's A2A Client connector is a non-starter for any of these at
+present -- its v0 element template states outright that setting authentication headers is not
+supported yet, for the agent-card fetch or the message send, so an A2A agent can only be gated by
+something needing no client-side configuration at all.
+
+The Servers list's Web column badges `BASIC` and `TOKEN` (`.status-badge`, `dashboard.html`), but
+deliberately shows nothing at all for `SSO` or `NONE` -- single sign on is the ordinary case, and a
+"Not protected" warning on every open Server is noise on a list where being open is a perfectly
+normal, deliberate choice.
+
+Both fields of whichever credential method is selected are mandatory -- Basic needs a username and
+a password, token needs a header name and a token (`ServerController.validateWebAuth`, mirrored
+client-side by `edit-server.js`'s `toggleAuthFields` toggling `required`). The header name is
+required rather than quietly defaulting to `Authorization`, since the admin has to hand the exact
+header to whoever configures the client; the form pre-fills `Authorization` as a real value so the
+common case is still one field to fill. Two things the `required` toggle has to account for: an
+already-stored credential renders blank behind its decoy placeholder and means "keep the current
+one", so it is never marked required; and the whole group is released when the Web row itself is
+unchecked, because a required field inside a `display:none` container makes the form unsubmittable
+with a browser error naming no field at all.
+
+Exclusive by design, not by accident: boringproxy checks single sign on in its own dispatch
+(`boringproxy.go`) *before* a tunnel's credential gate (`http_proxy.go`'s `checkTunnelAuth`), so a
+tunnel carrying both would silently only ever honour single sign on. `TunnelMapper.webTunnel`
+switches on the method and sends exactly one of `sso-protect`/`password-protect`/`token-protect`.
+Switching method and saving discards the previous method's credential rather than parking it.
+
+Both credentials are encrypted at rest in servers.json with the same
+`NetworkServiceCredentialCipher` a Terminal/Remote Desktop secret uses, follow the same
+blank-means-unchanged / `••••••••` decoy-placeholder convention on edit, and are stripped from a
+configuration export (`WebConfig.withoutSecret`, `Server.withoutSecrets`) for the same reason --
+the ciphertext is bound to this host's key. `TunnelMapper` is the one place they're decrypted,
+since boringproxy compares them as plaintext. The token is matched against either the bare value or
+the `Bearer <token>` form, so a client that adds the prefix itself and one that doesn't both work,
+and the matched header is stripped before the request is forwarded to the homelab (the agent's own
+hop to an `HTTP` backend is cleartext, and the backend has no use for it).
+
+**Migrating an existing install**: `WebAuthMigration` rewrites the legacy `ssoProtected` boolean
+into `authMethod` (`true` → `SSO`, `false` → `NONE`, preserving behaviour exactly rather than
+applying the new-Server default -- a server deliberately left open must keep working for its
+non-browser clients). It runs from `ServerStore`'s `@PostConstruct`, so before `TunnelReconciler`
+and before any read, and unattended: a production upgrade is a `docker compose pull` plus `up -d`
+with no operator step. This is not optional cleanup -- `ServerStore`'s mapper leaves
+FAIL_ON_UNKNOWN_PROPERTIES enabled, so until it runs, servers.json cannot be read at all, fatally,
+on every path. It copies the file to a timestamped `.bak-` beside itself first, which is also the
+rollback path (a migrated file is unreadable by the previous image). `BackupService.readManifest`
+applies the same transform to an uploaded export, which is why `BackupManifest.CURRENT_VERSION` was
+*not* bumped -- a bump makes the version check reject older exports, when the goal is to keep
+importing them.
+
 Terminal's and Remote Desktop's tunnels each live on an internal, never-shown FQDN under the
 *primary* domain (`allow-external-tcp: false`, see `selfieproxy-reverseproxy/CLAUDE.md`'s "Core
 types" section) -- there's no Domain/public-port concept for them at all. That hidden FQDN's
@@ -317,9 +384,9 @@ every later Connect skips that prompt. `selfieproxy-remote-console` only ever re
 `servers.json`/that key (shared `/data` volume) at connect time, never writes either --
 credential entry always goes through the portal, keeping a single writer for the whole file.
 
-Every Server's Web protocol is always end-to-end encrypted (`TlsMode.MANAGED`) with no user-facing
-choice about it -- see the "Login" section above for why, and for the two alternate connectivity
-modes (`TlsMode.BYO_CERT`/`HOP_BY_HOP`) this used to expose through an "Advanced settings" picker.
+Every Server's Web protocol is always end-to-end encrypted with no user-facing choice about it --
+see the "Login" section above for why, and for the two alternate connectivity modes this used to
+expose through a since-removed "Advanced settings" picker.
 
 Button panel: Cancel (returns to the list, no changes), OK (add/update), Remove (edit only, red
 background/white text, asks for confirmation in an overlay first).
@@ -493,7 +560,11 @@ Local Websites wizard steps' per-item domain picker below. `BackupService` does 
   with a key that never leaves this server (`NetworkServiceCredentialCipher`), so exported
   ciphertext would be undecryptable elsewhere; importing a Server with Terminal and/or Remote
   Desktop enabled lands each in the same "no credential stored yet" state as freshly enabling one
-  with a blank password, prompting for it on the first Connect (see "Servers" above). Also excluded:
+  with a blank password, prompting for it on the first Connect (see "Servers" above). A Web
+  protocol's Basic password / token is excluded on the same grounds (`WebConfig.withoutSecret`),
+  but unlike Terminal/Remote Desktop there's no connect-time prompt to recover it -- an imported
+  Server set to Basic or token authentication keeps the method and needs its credential re-entered
+  on its edit page before that gate can pass anyone. Also excluded:
   `selfieproxy-identity-provider`'s admin account and RSA signing key -- a configuration export
   must never be able to grant login access to a different server, so import never touches
   server-local auth material, only goes through the same `BoringProxyClient` REST calls the rest

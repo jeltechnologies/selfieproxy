@@ -24,5 +24,7 @@ public record TunnelDto(
 		String owner,
 		@JsonProperty("agent_name") String agentName,
 		@JsonProperty("auth_username") String authUsername,
-		@JsonProperty("auth_password") String authPassword) {
+		@JsonProperty("auth_password") String authPassword,
+		@JsonProperty("auth_token_header") String authTokenHeader,
+		@JsonProperty("auth_token_value") String authTokenValue) {
 }
