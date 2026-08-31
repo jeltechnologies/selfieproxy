@@ -39,8 +39,9 @@ class TunnelReconcilerTest {
 			new SitesWebserverProperties("127.0.0.1", 8090, "/sites-conf", "/sites");
 
 	private TunnelReconciler newReconciler() {
-		return new TunnelReconciler(boringProxyClient, tunnelMapper, serverStore, localWebsiteStore,
-				thisServerAgentProperties, sitesWebserverProperties);
+		TunnelRepairService repairService = new TunnelRepairService(boringProxyClient, tunnelMapper, serverStore,
+				localWebsiteStore, thisServerAgentProperties, sitesWebserverProperties);
+		return new TunnelReconciler(boringProxyClient, repairService);
 	}
 
 	@Test
