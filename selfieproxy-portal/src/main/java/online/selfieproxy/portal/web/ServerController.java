@@ -37,6 +37,7 @@ import online.selfieproxy.portal.domain.RemoteDesktopConfig;
 import online.selfieproxy.portal.domain.RemoteDesktopProtocol;
 import online.selfieproxy.portal.domain.TerminalConfig;
 import online.selfieproxy.portal.domain.TunnelMapper;
+import online.selfieproxy.portal.domain.TunnelRepairService;
 import online.selfieproxy.portal.domain.WebAuthMethod;
 import online.selfieproxy.portal.domain.WebConfig;
 import online.selfieproxy.portal.security.NetworkServiceCredentialCipher;
@@ -68,12 +69,14 @@ public class ServerController {
 	private final LastUsedServerDefaultsStore lastUsedServerDefaultsStore;
 	private final HiddenTunnelFqdnAssigner fqdnAssigner;
 	private final GatewayPortsChecker gatewayPortsChecker;
+	private final TunnelRepairService tunnelRepairService;
 
 	public ServerController(BoringProxyClient boringProxyClient, TunnelMapper tunnelMapper,
 			BoringProxyProperties properties, ServerStore serverStore, NetworkServiceCredentialCipher cipher,
 			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
 			AgentStatusService agentStatusService, LastUsedServerDefaultsStore lastUsedServerDefaultsStore,
-			HiddenTunnelFqdnAssigner fqdnAssigner, GatewayPortsChecker gatewayPortsChecker) {
+			HiddenTunnelFqdnAssigner fqdnAssigner, GatewayPortsChecker gatewayPortsChecker,
+			TunnelRepairService tunnelRepairService) {
 		this.boringProxyClient = boringProxyClient;
 		this.tunnelMapper = tunnelMapper;
 		this.properties = properties;
@@ -85,6 +88,7 @@ public class ServerController {
 		this.lastUsedServerDefaultsStore = lastUsedServerDefaultsStore;
 		this.fqdnAssigner = fqdnAssigner;
 		this.gatewayPortsChecker = gatewayPortsChecker;
+		this.tunnelRepairService = tunnelRepairService;
 	}
 
 	@GetMapping("/servers/new")
@@ -115,6 +119,8 @@ public class ServerController {
 		if (server == null) {
 			return "redirect:/servers";
 		}
+		tunnelRepairService.createMissing(server);
+		server = serverStore.find(fqdn);
 		model.addAttribute("server", server);
 		model.addAttribute("isNew", false);
 		model.addAttribute("domains", domainService.allDomains());
@@ -185,9 +191,9 @@ public class ServerController {
 		Server server = serverStore.find(fqdn);
 		if (server != null) {
 			tunnelMapper.tunnelPlans(server, OWNER).values()
-					.forEach(plan -> boringProxyClient.deleteTunnel(plan.fqdn()));
+					.forEach(plan -> boringProxyClient.deleteTunnelIfPresent(plan.fqdn()));
 			tunnelMapper.portForwardingTunnelPlans(server, OWNER)
-					.forEach(plan -> boringProxyClient.deleteTunnel(plan.fqdn()));
+					.forEach(plan -> boringProxyClient.deleteTunnelIfPresent(plan.fqdn()));
 		}
 		serverStore.delete(fqdn);
 		return "redirect:/servers";
@@ -205,8 +211,8 @@ public class ServerController {
 		if (!server.hasWeb()) {
 			return false;
 		}
-		TunnelDto tunnel = boringProxyClient.getTunnel(server.fqdn());
-		return tunnel.certPending();
+		TunnelDto tunnel = boringProxyClient.getTunnelOrNull(server.fqdn());
+		return tunnel != null && tunnel.certPending();
 	}
 
 	/**
@@ -263,7 +269,7 @@ public class ServerController {
 			}
 		}
 
-		toDelete.forEach(boringProxyClient::deleteTunnel);
+		toDelete.forEach(boringProxyClient::deleteTunnelIfPresent);
 		if (!toDelete.isEmpty() && (!toCreate.isEmpty() || !portForwardsToCreate.isEmpty())) {
 			sleep();
 		}

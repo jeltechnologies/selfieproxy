@@ -33,6 +33,9 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class BoringProxyClient {
 
+	/** boringproxy's own error text for a tunnel that no longer exists -- "for domain" is appended on the GET path only (see api.go). */
+	private static final String TUNNEL_MISSING_MESSAGE = "Tunnel doesn't exist";
+
 	private final RestClient restClient;
 	private final InternalTokenProvider tokenProvider;
 	private final ObjectMapper objectMapper = new ObjectMapper();
@@ -183,6 +186,29 @@ public class BoringProxyClient {
 				.header("access_token", token)
 				.retrieve()
 				.body(TunnelDto.class));
+	}
+
+	/** Null rather than an exception when boringproxy has no tunnel for the domain -- a Server can outlive its tunnel (see TunnelRepairService). */
+	public TunnelDto getTunnelOrNull(String domain) {
+		try {
+			return getTunnel(domain);
+		} catch (BoringProxyException e) {
+			if (e.statusCode() != 404) {
+				throw e;
+			}
+			return null;
+		}
+	}
+
+	/** Deleting a tunnel that is already gone must never block the caller's own cleanup -- boringproxy answers that with a 400, not a 404. */
+	public void deleteTunnelIfPresent(String domain) {
+		try {
+			deleteTunnel(domain);
+		} catch (BoringProxyException e) {
+			if (!e.getMessage().startsWith(TUNNEL_MISSING_MESSAGE)) {
+				throw e;
+			}
+		}
 	}
 
 	public void deleteTunnel(String domain) {

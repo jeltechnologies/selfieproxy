@@ -672,6 +672,36 @@ the homelab-side host/IP and port, and TLS termination is always `MANAGED` for W
 (`AllowExternalTcp`) for Port Forwarding. Integration happens through the forked BoringProxy's REST
 API — changes are written to its database and tunnels take effect immediately (`BoringProxyClient`).
 
+### Keeping the two in sync
+
+`ServerStore`/`LocalWebsiteStore` are the source of truth; boringproxy's tunnel set is derived
+state, and the two can drift because every mutation path here is a non-transactional
+delete-then-recreate (`ServerController.syncTunnels`, `DomainsController.renameDomain`,
+`BackupService.restore`, `TunnelReconciler` itself). If the recreate half fails -- a full disk
+breaking boringproxy's `authorized_keys` write, `Tunnel port already in use` from
+`randomOpenPort` colliding with a live tunnel, `Tunnel domain already in use` -- the record
+survives while its tunnel is gone, which takes the Server off the internet with nothing in the UI
+saying so. Two mechanisms close that:
+
+- `TunnelReconciler` (`ApplicationReadyEvent`) deletes every tunnel boringproxy has and rebuilds
+  the full desired set, so orphans and stale settings can't survive a restart.
+- `TunnelRepairService` is add-only: it creates any desired-but-absent tunnel and never deletes or
+  touches an existing one. It runs the recreate half of the reconciliation above, on a 60s
+  `@Scheduled` sweep (`@EnableScheduling` on `AdminPortalApplication`), and on a Server's own edit
+  page. The sweep only creates a tunnel that was *also* missing on the previous sweep -- that
+  two-pass rule is what makes locking unnecessary, since an ordinary edit's delete-recreate window
+  is seconds and can never span two sweeps.
+
+Both go through `TunnelRepairService.createServerTunnels`, which writes the new
+boringproxy-assigned port back into `servers.json` whenever a Terminal/Remote Desktop tunnel is
+recreated -- `selfieproxy-remote-console` dials the recorded `exposedPort`, so recreating those
+tunnels without persisting the new one silently breaks the browser console.
+
+Reads must tolerate a missing tunnel rather than assume one: `BoringProxyClient.getTunnelOrNull`
+(boringproxy answers a missing tunnel with 404 on GET) and `deleteTunnelIfPresent` (400, message
+`Tunnel doesn't exist`, on DELETE) exist for that, and the Servers/dashboard status column reports
+a Web-enabled Server with no tunnel as not routed instead of showing it green.
+
 ## Implementation conventions
 
 - Spring 4 / Java, with JavaScript for the frontend. No Lombok — use modern Java (records, etc.)

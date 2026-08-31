@@ -150,8 +150,11 @@ public class DashboardController {
 			if (server.hasPortForwarding() && !gatewayPortsChecker.isConfigured()) {
 				issues.add("GatewayPorts is not configured in sshd_config -- Port Forwarding will not work.");
 			}
-			boolean offline = !issues.isEmpty();
 			TunnelDto webTunnel = server.hasWeb() ? tunnels.get(server.fqdn()) : null;
+			if (server.hasWeb() && webTunnel == null) {
+				issues.add("Not currently routed -- Selfie Proxy is recreating its tunnel.");
+			}
+			boolean offline = !issues.isEmpty();
 			boolean certPending = webTunnel != null && webTunnel.certPending();
 			items.add(new ServerStatusItem(server.fqdn(), offline, offline ? String.join(" ", issues) : null, certPending));
 		}
