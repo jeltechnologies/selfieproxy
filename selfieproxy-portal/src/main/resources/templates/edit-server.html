@@ -138,6 +138,34 @@
 								Not protected
 							</label>
 						</div>
+
+						<details class="disclosure" id="web-auth-exceptions"
+								 th:attr="open=${server.hasWeb() and !server.web().authExemptPathsOrEmpty().isEmpty()} ? 'open' : null">
+							<summary>Exceptions</summary>
+							<div class="field">
+								<table class="editable-row-table">
+									<thead>
+										<tr>
+											<th>Always allow these addresses without authentication</th>
+											<th></th>
+										</tr>
+									</thead>
+									<tbody id="exempt-path-rows">
+										<tr class="exempt-path-entry"
+											th:each="pattern : ${server.hasWeb()} ? ${server.web().authExemptPathsOrEmpty()} : null">
+											<td><input type="text" name="webAuthExemptPaths" th:value="${pattern}"
+													   maxlength="200" spellcheck="false"></td>
+											<td><button type="button" class="button-small remove-exempt-path-row">Remove</button></td>
+										</tr>
+										<tr class="exempt-path-entry exempt-path-entry-blank">
+											<td><input type="text" name="webAuthExemptPaths" maxlength="200"
+													   spellcheck="false" placeholder="/login*.*"></td>
+											<td><button type="button" class="button-small add-exempt-path-row">Add</button></td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</details>
 					</div>
 					<div class="field-row">
 						<div class="field">
@@ -255,7 +283,7 @@
 					<p class="warning" th:if="${!gatewayPortsConfigured}">
 						Port forwarding is disabled until GatewayPorts is configured on the server host.
 					</p>
-					<table class="port-forwarding-table">
+					<table class="editable-row-table">
 						<thead>
 							<tr>
 								<th>Homelab server port</th>

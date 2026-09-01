@@ -86,7 +86,7 @@ class BackupServiceTest {
 	void writeBackupThenStageRestoreRoundTripsManifest() throws IOException {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(server));
 		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null, false)));
 
@@ -109,9 +109,9 @@ class BackupServiceTest {
 	void writeBackupOnlyIncludesSelectedItems() throws IOException {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null), "lab2", new AgentStatusDto(null)));
 		Server blogServer = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		Server shopServer = new Server("shop", "example.com", "lab2", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8081, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8081, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(blogServer, shopServer));
 		when(localWebsiteStore.list()).thenReturn(List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("shopsite", "example.com", null, false)));
 
@@ -140,7 +140,8 @@ class BackupServiceTest {
 	void writeBackupThenStageRestoreRoundTripsMultiProtocolServer() throws IOException {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		Server server = new Server("proxmox", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null),
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null,
+						List.of("/login*.*", "/static/**")),
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, 51000, "root", "cipher-ssh"),
 				new RemoteDesktopConfig("proxmox-example-com-3389.example.com", RemoteDesktopProtocol.RDP, 3389,
 						51001, "admin", "cipher-rdp", true),
@@ -160,6 +161,10 @@ class BackupServiceTest {
 		Server exported = manifest.servers().get(0);
 		assertEquals("proxmox", exported.subdomain());
 		assertEquals(Protocol.HTTPS, exported.web().protocol());
+		// Unlike a credential, an authentication exception is not host-bound and survives an export
+		// intact -- restoring onto a new host has to bring the same exceptions with it, or the
+		// restored Server quietly starts gating paths it did not gate before.
+		assertEquals(List.of("/login*.*", "/static/**"), exported.web().authExemptPathsOrEmpty());
 		assertEquals("proxmox-example-com-22.example.com", exported.terminal().fqdn());
 		assertEquals(22, exported.terminal().port());
 		assertNull(exported.terminal().encryptedSecret(), "an export must never carry a live credential");
@@ -196,7 +201,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreCreatesHomelabWithFreshSecretAndRecreatesServerTunnel() throws IOException {
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -230,7 +235,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreAcceptsApexServerWithBlankSubdomain() throws IOException {
 		Server server = new Server(null, "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1"), List.of(server), List.of(), "light", new TerminalSettings(15, "dark", "default"), null);
 		ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
@@ -264,7 +269,7 @@ class BackupServiceTest {
 	@Test
 	void applyRestoreCreatesOneTunnelPerEnabledProtocol() throws IOException {
 		Server server = new Server("proxmox", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.NONE, null, null, null, null),
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.NONE, null, null, null, null, null),
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, null, "root", null),
 				null,
 				List.of(new PortForwardingConfig("proxmox-example-com-1234.example.com", PortForwardingProtocol.TCP, 1234, 8080, null)));
@@ -334,9 +339,9 @@ class BackupServiceTest {
 	@Test
 	void diffManifestFlagsExistingItemsAgainstLiveState() {
 		Server existingServer = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8080, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		Server newServer = new Server("shop", "example.com", "lab2", "127.0.0.1",
-				new WebConfig(Protocol.HTTP, 8081, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTP, 8081, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		BackupManifest manifest = new BackupManifest(BackupManifest.CURRENT_VERSION, Instant.now().toString(),
 				"example.com", List.of("lab1", "lab2"), List.of(existingServer, newServer),
 				List.of(new LocalWebsite("blogsite", "example.com", null, false), new LocalWebsite("newsite", "example.com", null, false)),

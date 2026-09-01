@@ -92,8 +92,23 @@ public class TunnelMapper {
 				token ? Boolean.TRUE : null,
 				token ? web.tokenHeaderName() : null,
 				token ? credentials.decrypt(web.tokenValue()) : null,
+				exemptPaths(web, authMethod),
 				null, null);
 		return new ProtocolTunnel(server.fqdn(), request);
+	}
+
+	/**
+	 * The Advanced exceptions list, newline-separated for boringproxy (whose Tunnel keeps it as a
+	 * single string rather than a list, so its agents can still compare tunnels by value -- see
+	 * database.go). Sent as null under NONE: there is no gate left to make an exception to, and
+	 * storing a list boringproxy would never consult only invites someone to read the live tunnel
+	 * later and conclude the paths matter.
+	 */
+	private String exemptPaths(WebConfig web, WebAuthMethod authMethod) {
+		if (authMethod == WebAuthMethod.NONE || web.authExemptPathsOrEmpty().isEmpty()) {
+			return null;
+		}
+		return String.join("\n", web.authExemptPathsOrEmpty());
 	}
 
 	/** allowExternalTcp false binds the tunnel's listener to 127.0.0.1 on the server host -- never internet-reachable, only selfieproxy-remote-console (network_mode: host) can dial it. */
@@ -101,7 +116,7 @@ public class TunnelMapper {
 		TerminalConfig terminal = server.terminal();
 		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
 				terminal.fqdn(), owner, server.homelabName(), terminal.port(), server.host(), null, false, null, null, null,
-				"passthrough", null, null, null, null, null, null);
+				"passthrough", null, null, null, null, null, null, null);
 		return new ProtocolTunnel(terminal.fqdn(), request);
 	}
 
@@ -109,7 +124,7 @@ public class TunnelMapper {
 		RemoteDesktopConfig remoteDesktop = server.remoteDesktop();
 		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
 				remoteDesktop.fqdn(), owner, server.homelabName(), remoteDesktop.port(), server.host(), null, false, null,
-				null, null, "passthrough", null, null, null, null, null, null);
+				null, null, "passthrough", null, null, null, null, null, null, null);
 		return new ProtocolTunnel(remoteDesktop.fqdn(), request);
 	}
 
@@ -117,7 +132,7 @@ public class TunnelMapper {
 	private ProtocolTunnel portForwardingTunnel(Server server, PortForwardingConfig entry, String owner) {
 		CreateTunnelRequestDto request = new CreateTunnelRequestDto(
 				entry.fqdn(), owner, server.homelabName(), entry.targetPort(), server.host(),
-				entry.publicPort(), true, null, null, null, "passthrough", null, null, null, null, null, null);
+				entry.publicPort(), true, null, null, null, "passthrough", null, null, null, null, null, null, null);
 		return new ProtocolTunnel(entry.fqdn(), request);
 	}
 }

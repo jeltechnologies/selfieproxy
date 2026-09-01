@@ -88,7 +88,7 @@ class AdminPortalSmokeTest {
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of());
 
 		Server musicServer = new Server("music", "example.com", "home", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.NONE, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.NONE, null, null, null, null, null), null, null, null);
 		Server sshServer = new Server("ssh", "example.com", "home", "127.0.0.1", null,
 				new TerminalConfig("ssh-example-com-22.example.com", 22, 51234, "user", null), null, null);
 		serverStore.save(musicServer);

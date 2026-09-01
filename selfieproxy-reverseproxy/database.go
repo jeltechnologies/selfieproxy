@@ -80,6 +80,11 @@ type Tunnel struct {
 	// to Authorization when empty. See checkTunnelAuth in http_proxy.go.
 	AuthTokenHeader string `json:"auth_token_header"`
 	AuthTokenValue  string `json:"auth_token_value"`
+	// AuthExemptPaths lists URL path patterns that skip whichever gate above is
+	// configured, newline-separated. A string rather than a []string because agent.go's
+	// SyncTunnels diffs tunnels with ==, which a slice field would make uncompilable.
+	// See authPathExempt in http_proxy.go.
+	AuthExemptPaths string `json:"auth_exempt_paths"`
 }
 
 func NewDatabase(path string) (*Database, error) {

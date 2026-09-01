@@ -45,7 +45,7 @@ class TunnelRepairServiceTest {
 
 	private static Server webServer(String subdomain) {
 		return new Server(subdomain, "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null, null), null, null, null);
 	}
 
 	private static TunnelDto tunnel(String domain, int tunnelPort) {

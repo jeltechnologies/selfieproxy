@@ -13,6 +13,9 @@
 	var webAuthRadios = document.querySelectorAll("input[name=\"webAuthMethod\"]");
 	var webAuthBasicFields = document.getElementById("web-auth-basic-fields");
 	var webAuthTokenFields = document.getElementById("web-auth-token-fields");
+	var webAuthExceptions = document.getElementById("web-auth-exceptions");
+	var exemptPathRows = document.getElementById("exempt-path-rows");
+	var MAX_EXEMPT_PATH_ENTRIES = 20;
 	var webProtocolSelect = document.getElementById("webProtocol");
 	var webPortInput = document.getElementById("webPort");
 
@@ -104,6 +107,14 @@
 		var webOn = webEnabledCheckbox.checked;
 		toggleAuthFields(webAuthBasicFields, webOn && selected === "BASIC");
 		toggleAuthFields(webAuthTokenFields, webOn && selected === "TOKEN");
+		// There is nothing to make an exception to once "Not protected" is selected, so the
+		// whole disclosure goes away rather than sitting there inviting an entry that would do
+		// nothing. Whatever is already typed stays in the textarea and is still submitted and
+		// stored (see ServerController.toServer), so switching back to a real method brings the
+		// exceptions back with it.
+		if (webAuthExceptions) {
+			webAuthExceptions.style.display = webOn && selected !== "NONE" ? "" : "none";
+		}
 	}
 
 	function toggleAuthFields(container, active) {
@@ -245,6 +256,55 @@
 		}
 		return true;
 	}
+
+	/**
+	 * The authentication exceptions under "Exceptions" work exactly like the Port Forwarding rows
+	 * below, minus the numeric/uniqueness rules -- one row per address, a trailing blank row that is
+	 * directly submittable without ever clicking "Add", and no confirmation on Remove (the page's
+	 * own Cancel already covers "I didn't mean to change this"). Blank and duplicate entries are
+	 * dropped server-side (AuthExemptPaths.parse), so nothing here has to guard against them.
+	 */
+	function makeBlankExemptPathRow() {
+		var row = document.createElement("tr");
+		row.className = "exempt-path-entry exempt-path-entry-blank";
+		row.innerHTML =
+			'<td><input type="text" name="webAuthExemptPaths" maxlength="200" spellcheck="false" placeholder="/login*.*"></td>' +
+			'<td><button type="button" class="button-small add-exempt-path-row">Add</button></td>';
+		return row;
+	}
+
+	function ensureTrailingBlankExemptPathRow() {
+		var hasBlankRow = exemptPathRows.querySelector(".exempt-path-entry-blank") !== null;
+		var count = exemptPathRows.querySelectorAll(".exempt-path-entry").length;
+		if (!hasBlankRow && count < MAX_EXEMPT_PATH_ENTRIES) {
+			exemptPathRows.appendChild(makeBlankExemptPathRow());
+		}
+	}
+
+	exemptPathRows.addEventListener("click", function (event) {
+		if (event.target.classList.contains("add-exempt-path-row")) {
+			var row = event.target.closest(".exempt-path-entry");
+			var input = row.querySelector("input");
+			// Nothing typed yet -- put the cursor where the admin has to type rather than adding an
+			// empty row that would only be thrown away on save.
+			if (input.value.trim() === "") {
+				input.focus();
+				return;
+			}
+			row.classList.remove("exempt-path-entry-blank");
+			event.target.textContent = "Remove";
+			event.target.classList.remove("add-exempt-path-row");
+			event.target.classList.add("remove-exempt-path-row");
+			ensureTrailingBlankExemptPathRow();
+			var blankRow = exemptPathRows.querySelector(".exempt-path-entry-blank");
+			if (blankRow) {
+				blankRow.querySelector("input").focus();
+			}
+		} else if (event.target.classList.contains("remove-exempt-path-row")) {
+			event.target.closest(".exempt-path-entry").remove();
+			ensureTrailingBlankExemptPathRow();
+		}
+	});
 
 	portForwardingRows.addEventListener("click", function (event) {
 		if (event.target.classList.contains("add-port-forwarding-row")) {

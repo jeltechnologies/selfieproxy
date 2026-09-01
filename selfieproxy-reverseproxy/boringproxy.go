@@ -501,7 +501,12 @@ func Listen() {
 				return
 			}
 
-			if !requireSsoIfNeeded(w, r, tunnel.Domain, tunnel.SsoProtected) {
+			// The exempt-path list covers this gate too, not just the credential one
+			// inside proxyRequest -- an admin who exempts /login* on a Server protected
+			// by Selfie Proxy login means "don't redirect these to the identity
+			// provider", which is decided here (see authPathExempt in http_proxy.go).
+			ssoProtected := tunnel.SsoProtected && !authPathExempt(tunnel, r.URL.Path)
+			if !requireSsoIfNeeded(w, r, tunnel.Domain, ssoProtected) {
 				return
 			}
 

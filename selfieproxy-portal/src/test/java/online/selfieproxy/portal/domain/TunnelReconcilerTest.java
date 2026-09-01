@@ -50,7 +50,7 @@ class TunnelReconcilerTest {
 				"stale.example.com", new TunnelDto("stale.example.com", null, 0, null, null, 0, null,
 						null, 0, false, "server", false, false, "admin", "old-lab", null, null, null, null)));
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null,
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null, null), null, null,
 				List.of(new PortForwardingConfig("blog-example-com-1234.example.com", PortForwardingProtocol.TCP,
 						1234, 8080, "Minecraft server")));
 		when(serverStore.values()).thenReturn(List.of(server));
@@ -82,7 +82,7 @@ class TunnelReconcilerTest {
 			return null;
 		}).when(boringProxyClient).deleteTunnel(any());
 		Server server = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(server));
 		when(localWebsiteStore.list()).thenReturn(List.of());
 
@@ -97,9 +97,9 @@ class TunnelReconcilerTest {
 	void aFailedCreateDoesNotAbortTheRestOfReconciliation() {
 		when(boringProxyClient.listTunnels()).thenReturn(Map.of());
 		Server blog = new Server("blog", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null, null), null, null, null);
 		Server shop = new Server("shop", "example.com", "lab1", "127.0.0.1",
-				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null), null, null, null);
+				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null, null), null, null, null);
 		when(serverStore.values()).thenReturn(List.of(blog, shop));
 		when(localWebsiteStore.list()).thenReturn(List.of());
 		// Same single-conditional-stub idiom as above, applied to createTunnel instead.

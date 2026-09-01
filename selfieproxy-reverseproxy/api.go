@@ -417,6 +417,11 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		tokenHeader = params.Get("token-header")
 	}
 
+	// Newline-separated URL path patterns exempt from whichever gate above is set. Not
+	// gated on any of the *-protect flags: the same list applies to single sign on and to
+	// both credential gates, and a tunnel with no gate at all simply never consults it.
+	authExemptPaths := params.Get("auth-exempt-paths")
+
 	tlsTerm := params.Get("tls-termination")
 	if tlsTerm != "server" && tlsTerm != "client" && tlsTerm != "passthrough" && tlsTerm != "client-tls" && tlsTerm != "server-tls" {
 		return nil, errors.New("Invalid tls-termination parameter")
@@ -450,6 +455,7 @@ func (a *Api) CreateTunnel(tokenData TokenData, params url.Values) (*Tunnel, err
 		AuthPassword:     password,
 		AuthTokenHeader:  tokenHeader,
 		AuthTokenValue:   tokenValue,
+		AuthExemptPaths:  authExemptPaths,
 		TlsTermination:   tlsTerm,
 		SsoProtected:     ssoProtect,
 		ServerAddress:    sshServerAddr,

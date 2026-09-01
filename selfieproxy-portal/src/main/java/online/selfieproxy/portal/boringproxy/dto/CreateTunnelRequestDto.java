@@ -24,6 +24,7 @@ public record CreateTunnelRequestDto(
 		@JsonProperty("token-protect") Boolean tokenProtect,
 		@JsonProperty("token-header") String tokenHeader,
 		@JsonProperty("token-value") String tokenValue,
+		@JsonProperty("auth-exempt-paths") String authExemptPaths,
 		@JsonProperty("ssh-server-addr") String sshServerAddr,
 		@JsonProperty("ssh-server-port") Integer sshServerPort) {
 }

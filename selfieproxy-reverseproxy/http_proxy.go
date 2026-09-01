@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -227,6 +228,10 @@ func proxyRequest(w http.ResponseWriter, r *http.Request, tunnel Tunnel, httpCli
 // put it on the homelab LAN in the clear for a backend that has no use for it.
 func checkTunnelAuth(w http.ResponseWriter, r *http.Request, tunnel Tunnel) bool {
 
+	if authPathExempt(tunnel, r.URL.Path) {
+		return true
+	}
+
 	if tunnel.AuthUsername != "" || tunnel.AuthPassword != "" {
 		username, password, ok := r.BasicAuth()
 		// Both comparisons run unconditionally rather than short-circuiting, so response
@@ -269,6 +274,87 @@ func checkTunnelAuth(w http.ResponseWriter, r *http.Request, tunnel Tunnel) bool
 	}
 
 	return true
+}
+
+// authPathExempt reports whether urlPath is covered by one of the tunnel's exempt path
+// patterns -- the "make an exception for certain URLs" escape hatch an admin configures
+// under Advanced in the portal's Authentication methods block. It is consulted by both
+// gates: here for the Basic/token credential check, and in boringproxy.go's dispatch for
+// the single sign on check, so one list covers whichever method the Server uses.
+//
+// The match runs against path.Clean of the request path, never the raw one. r.URL.Path is
+// already percent-decoded, so a request for /login/%2e%2e/admin arrives here as
+// "/login/../admin" -- which a "/login/**" pattern would happily match, after which the
+// backend resolves the .. and serves /admin to an unauthenticated caller. Cleaning first
+// turns it into "/admin", which matches nothing. Only the match decision is made on the
+// cleaned path; the request is still forwarded exactly as it arrived.
+func authPathExempt(tunnel Tunnel, urlPath string) bool {
+
+	if tunnel.AuthExemptPaths == "" {
+		return false
+	}
+
+	if urlPath == "" {
+		urlPath = "/"
+	}
+	cleaned := path.Clean(urlPath)
+
+	remaining := tunnel.AuthExemptPaths
+	for remaining != "" {
+		pattern := remaining
+		if i := strings.IndexByte(remaining, '\n'); i >= 0 {
+			pattern, remaining = remaining[:i], remaining[i+1:]
+		} else {
+			remaining = ""
+		}
+		pattern = strings.TrimSpace(pattern)
+		if pattern != "" && globMatch(pattern, cleaned) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// globMatch matches a URL path against a pattern in which "*" stands for any run of
+// characters within a single path segment and "**" for any run across segments -- the
+// Ant/Spring shape an admin is most likely to already know, and the one the portal's own
+// help text documents. Everything else is literal; matching is case-sensitive, as URL
+// paths are.
+//
+// Written out rather than delegating to path.Match because that has no "**" at all (its
+// "*" already stops at a separator), which would leave no way to exempt a whole subtree.
+func globMatch(pattern, name string) bool {
+
+	for len(pattern) > 0 {
+		if pattern[0] == '*' {
+			// "**" spans separators, a single "*" stops at the next one. Either way the
+			// wildcard is greedy-with-backtracking: try every split point the rest of the
+			// pattern could start at, shortest first.
+			crossSegment := len(pattern) > 1 && pattern[1] == '*'
+			rest := pattern[1:]
+			if crossSegment {
+				rest = pattern[2:]
+			}
+			for i := 0; i <= len(name); i++ {
+				if !crossSegment && i > 0 && name[i-1] == '/' {
+					break
+				}
+				if globMatch(rest, name[i:]) {
+					return true
+				}
+			}
+			return false
+		}
+
+		if len(name) == 0 || name[0] != pattern[0] {
+			return false
+		}
+		pattern = pattern[1:]
+		name = name[1:]
+	}
+
+	return len(name) == 0
 }
 
 // secureEqual compares a presented credential against the expected one in constant time,

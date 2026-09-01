@@ -21,6 +21,7 @@ import online.selfieproxy.portal.boringproxy.BoringProxyClient;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
+import online.selfieproxy.portal.domain.AuthExemptPaths;
 import online.selfieproxy.portal.domain.ServerProtocol;
 import online.selfieproxy.portal.domain.DnsLabelValidator;
 import online.selfieproxy.portal.domain.DomainService;
@@ -102,7 +103,7 @@ public class ServerController {
 		// Web starts enabled and SSO-protected by default -- the common case is a single-sign-on
 		// protected website, and the admin opts out rather than in. Every other protocol checkbox
 		// still starts unchecked -- the admin picks which of those to enable.
-		WebConfig defaultWeb = new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null);
+		WebConfig defaultWeb = new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null, null);
 		Server server = new Server("", defaultDomain, defaultHomelab, "127.0.0.1", defaultWeb, null, null, null);
 		model.addAttribute("server", server);
 		model.addAttribute("isNew", true);
@@ -342,9 +343,14 @@ public class ServerController {
 			String tokenValue = authMethod == WebAuthMethod.TOKEN
 					? resolveSecret(form.webTokenValue(), previousWeb != null ? previousWeb.tokenValue() : null)
 					: null;
+			// Deliberately not conditioned on authMethod, unlike the credentials above: an
+			// exception is a path, not a secret, and means the same thing under every gate --
+			// discarding it on a switch to another method (or to NONE and back while testing
+			// something) would lose work the admin has no reason to expect to be method-specific.
+			List<String> exemptPaths = AuthExemptPaths.parse(form.webAuthExemptPaths());
 			web = new WebConfig(form.webProtocol() != null ? form.webProtocol() : Protocol.HTTPS,
 					form.webPort() != null ? form.webPort() : 0, authMethod,
-					basicUsername, basicPassword, tokenHeaderName, tokenValue);
+					basicUsername, basicPassword, tokenHeaderName, tokenValue, exemptPaths);
 		} else {
 			web = null;
 		}
@@ -433,6 +439,20 @@ public class ServerController {
 				errors.add("Enter a token for token header authentication.");
 			}
 		}
+	}
+
+	/**
+	 * Checked against the already-parsed list rather than the raw textarea, so the messages name
+	 * exactly the patterns that will be stored. Skipped entirely under NONE: the list is still kept
+	 * in servers.json (see toServer) but never sent to boringproxy, so nothing it says can be wrong
+	 * yet -- rejecting a save over a pattern that currently does nothing would just block an admin
+	 * mid-way through switching a Server back on.
+	 */
+	private void validateAuthExemptPaths(WebConfig web, List<String> errors) {
+		if (web.authMethodOrDefault() == WebAuthMethod.NONE) {
+			return;
+		}
+		errors.addAll(AuthExemptPaths.validate(web.authExemptPathsOrEmpty()));
 	}
 
 	/** RFC 9110's `token` production -- the only thing that can legally name a header. */
@@ -530,6 +550,7 @@ public class ServerController {
 		if (server.hasWeb()) {
 			validatePortRange(server.web().port(), "Homelab server port", errors);
 			validateWebAuth(server.web(), errors);
+			validateAuthExemptPaths(server.web(), errors);
 		}
 		if (server.hasTerminal()) {
 			validatePortRange(server.terminal().port(), "Homelab server port", errors);

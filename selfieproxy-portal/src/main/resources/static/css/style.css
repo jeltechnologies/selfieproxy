@@ -269,6 +269,28 @@ select {
 /* Indented under the option that owns them, so it's obvious which method they belong to. */
 .auth-method-fields { margin: 0.5rem 0 0 1.6rem; }
 
+/* Collapsed-by-default disclosure (currently only the "Exceptions" list on edit-server.html).
+   Deliberately not indented like .auth-method-fields above -- it belongs to the whole radio group,
+   not to one option. */
+.disclosure { margin-top: 1rem; }
+
+.disclosure > summary {
+	cursor: pointer;
+	font-weight: 600;
+	color: var(--text);
+	list-style-position: inside;
+}
+
+.disclosure > summary:hover { color: var(--accent); }
+
+.disclosure > div { margin-top: 0.75rem; }
+
+/* A path pattern is the one thing on this page where a fixed-width font actually helps read a
+   wildcard. */
+.editable-row-table input[name="webAuthExemptPaths"] {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .field-row {
 	display: flex;
 	gap: 0.75rem;
@@ -431,19 +453,22 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 	margin: 0;
 }
 
-.port-forwarding-table {
+/* A table of repeatable rows, each removable, with a trailing blank row that turns into an
+   ordinary one on "Add" -- the Port Forwarding ports and the authentication exceptions on
+   edit-server.html, which behave identically apart from their columns. */
+.editable-row-table {
 	width: 100%;
 	max-width: 42rem;
 	border-collapse: collapse;
 	margin-bottom: 0.75rem;
 }
 
-.port-forwarding-table th, .port-forwarding-table td {
+.editable-row-table th, .editable-row-table td {
 	text-align: left;
 	padding: 0.4rem 0.5rem 0.4rem 0;
 }
 
-.port-forwarding-table th:last-child, .port-forwarding-table td:last-child {
+.editable-row-table th:last-child, .editable-row-table td:last-child {
 	width: 1%;
 	white-space: nowrap;
 	padding-right: 0;
@@ -451,13 +476,13 @@ legend { padding: 0 0.4rem; color: var(--muted); }
 
 /* Fixed width so the column doesn't shift when a row's button switches between "Add" and the
    wider "Remove" text. */
-.port-forwarding-table .button-small {
+.editable-row-table .button-small {
 	min-width: 4.5rem;
 	text-align: center;
 }
 
-.port-forwarding-table input[type="number"],
-.port-forwarding-table input[type="text"] {
+.editable-row-table input[type="number"],
+.editable-row-table input[type="text"] {
 	margin-bottom: 0;
 }
 

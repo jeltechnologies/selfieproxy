@@ -163,3 +163,90 @@ func TestBasicTakesPrecedenceAndTokenIsNotAlsoConsulted(t *testing.T) {
 		t.Errorf("status = %d, want 401", w.Code)
 	}
 }
+
+// globMatch is the whole security boundary of the exempt-path feature -- a pattern that
+// matches more than the admin thinks it does silently opens a protected Server.
+
+func TestGlobMatch(t *testing.T) {
+	cases := []struct {
+		pattern string
+		path    string
+		want    bool
+	}{
+		{"/login", "/login", true},
+		{"/login", "/logins", false},
+		{"/login", "/Login", false},
+		{"/login*", "/login", true},
+		{"/login*.*", "/login.html", true},
+		{"/login*.*", "/login-page.css", true},
+		{"/login*.*", "/login", false},
+		// A single * stops at a separator, so a one-segment pattern can never be widened
+		// into a subtree by a crafted request path.
+		{"/login*", "/login/secret", false},
+		{"/static/*", "/static/app.js", true},
+		{"/static/*", "/static/js/app.js", false},
+		{"/static/**", "/static/js/app.js", true},
+		{"/static/**", "/static/", true},
+		{"/static/**", "/staticky/app.js", false},
+		{"/**/*.css", "/a/b/c/style.css", true},
+		{"/**/*.css", "/style.css", false},
+		{"*", "/login", false},
+		{"/*", "/login", true},
+		{"/*", "/a/b", false},
+		{"/**", "/a/b", true},
+	}
+	for _, tc := range cases {
+		if got := globMatch(tc.pattern, tc.path); got != tc.want {
+			t.Errorf("globMatch(%q, %q) = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestAuthPathExempt(t *testing.T) {
+	tunnel := Tunnel{AuthExemptPaths: "/login*.*\n/health\n\n  /static/**  "}
+
+	for _, p := range []string{"/login.html", "/health", "/static/js/app.js"} {
+		if !authPathExempt(tunnel, p) {
+			t.Errorf("authPathExempt(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []string{"/", "/admin", "/healthz", "/login"} {
+		if authPathExempt(tunnel, p) {
+			t.Errorf("authPathExempt(%q) = true, want false", p)
+		}
+	}
+
+	if authPathExempt(Tunnel{}, "/login.html") {
+		t.Error("a tunnel with no exempt paths must never exempt anything")
+	}
+}
+
+// r.URL.Path arrives already percent-decoded, so /login/%2e%2e/admin reaches the gate as
+// "/login/../admin" -- matching it against the pattern as-is would exempt a path the
+// backend then resolves to /admin.
+func TestAuthPathExemptRejectsTraversal(t *testing.T) {
+	tunnel := Tunnel{AuthExemptPaths: "/login/**"}
+
+	if !authPathExempt(tunnel, "/login/page.html") {
+		t.Fatal("the ordinary case must still be exempt")
+	}
+	if authPathExempt(tunnel, "/login/../admin") {
+		t.Error("a path escaping the exempted subtree must not be exempt")
+	}
+}
+
+func TestExemptPathSkipsCredentialGate(t *testing.T) {
+	tunnel := Tunnel{AuthTokenValue: "tok_abc123", AuthExemptPaths: "/health"}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "https://server.example.com/health", nil)
+	if !checkTunnelAuth(w, r, tunnel) {
+		t.Error("an exempt path must pass with no credential presented")
+	}
+
+	w = httptest.NewRecorder()
+	r = httptest.NewRequest(http.MethodGet, "https://server.example.com/v1/models", nil)
+	if checkTunnelAuth(w, r, tunnel) {
+		t.Error("a path outside the exempt list must still be gated")
+	}
+}

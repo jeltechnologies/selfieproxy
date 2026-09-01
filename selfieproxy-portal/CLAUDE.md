@@ -341,6 +341,38 @@ the `Bearer <token>` form, so a client that adds the prefix itself and one that 
 and the matched header is stripped before the request is forwarded to the homelab (the agent's own
 hop to an `HTTP` backend is cleartext, and the backend has no use for it).
 
+**Exceptions for certain addresses** (the **Exceptions** disclosure at the bottom of the radio
+group, `<details class="disclosure">` in `edit-server.html`, collapsed unless the stored list is
+non-empty): URL path patterns that reach the homelab server *without* passing this Server's gate --
+the "always allow `/login*.*`" case for a web program that has to serve its own login page, static
+assets or a health check to an unauthenticated caller. Entered as repeatable rows with **Add**/
+**Remove** buttons, sharing both the markup idiom and the `.editable-row-table` styling with the
+Port Forwarding rows further down the page (and the same trailing-blank-row rule: it is directly
+submittable without ever clicking Add) -- minus the numeric and uniqueness checks, since blank and
+duplicate entries are simply dropped by `AuthExemptPaths.parse` rather than refused. Spring binds
+them from same-named `<input>`s the same way the Port Forwarding triples are bound. Deliberately a property of
+the Server rather than of the method: it applies to whichever of `SSO`/`BASIC`/`TOKEN` is selected
+(both gates consult one list -- see the reverse proxy's `authPathExempt`), and it is kept in
+servers.json across a method switch, unlike the credentials above, since a path is not a secret and
+means the same thing under every gate. The disclosure hides itself under `NONE` (`edit-server.js`),
+where there is no gate left to make an exception to; the list is still stored but `TunnelMapper`
+sends nothing, so no live tunnel ever carries paths boringproxy would not consult.
+
+Patterns are Ant/Spring-shaped -- `*` matches within one path segment, `**` across them -- and
+matched by the reverse proxy, not the portal (`globMatch`/`authPathExempt` in its `http_proxy.go`).
+`AuthExemptPaths` (`domain/`, alongside `DnsLabelValidator`/`RedirectUrlValidator`) owns parsing and
+validation: empty rows and surrounding whitespace dropped, duplicates collapsed, the admin's own
+order kept, and four rejections -- a pattern that isn't rooted at `/` (it could never match), one
+over 200 characters, one containing a space or control character, and `/`, `/*` or `/**`, each of
+which would silently turn the selected gate into a no-op. That last one is a real thing to want, but
+"Not protected" is the radio for it, and reaching the same state through a wildcard hides the
+decision from whoever reads the page next. Capped at 20 entries so one Server can't bloat every
+agent's tunnel poll.
+
+The list survives a configuration export intact, unlike the credentials next to it (`withoutSecret`
+carries it through) -- it isn't bound to this host's cipher key, and a restore that dropped it would
+quietly start gating paths the original didn't.
+
 **Migrating an existing install**: `WebAuthMigration` rewrites the legacy `ssoProtected` boolean
 into `authMethod` (`true` → `SSO`, `false` → `NONE`, preserving behaviour exactly rather than
 applying the new-Server default -- a server deliberately left open must keep working for its

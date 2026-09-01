@@ -13,7 +13,10 @@ import online.selfieproxy.portal.domain.WebAuthMethod;
  * remoteDesktopSecret are the plaintext credentials -- left blank on an edit to keep the
  * previously stored one unchanged (see ServerController.toServer). webAuthMethod is the
  * "Authentication methods" radio group, an exclusive four-way choice, so only one of the Basic
- * and token credential pairs is ever meaningful on a given submission. Port Forwarding has no protocol field here -- it's always TCP
+ * and token credential pairs is ever meaningful on a given submission. webAuthExemptPaths is that
+ * group's "Exceptions" list -- one repeatable input per path pattern, bound from same-named inputs
+ * the same way the Port Forwarding rows below are, and method-independent, so it is carried over
+ * unchanged whichever radio is selected. Port Forwarding has no protocol field here -- it's always TCP
  * (see ServerController.toServer), so there's nothing for the admin to choose -- just up to 8
  * repeatable target/public port/description triples, rendered as table rows (see edit-server.html);
  * Spring binds these from same-named, repeated &lt;input&gt;s in document order, so
@@ -34,6 +37,7 @@ public record ServerForm(
 		String webBasicPassword,
 		String webTokenHeaderName,
 		String webTokenValue,
+		List<String> webAuthExemptPaths,
 		// Terminal row
 		Boolean terminalEnabled,
 		Integer terminalPort,
