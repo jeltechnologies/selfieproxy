@@ -47,7 +47,7 @@ func NewTunnelManager(config *Config, db *Database, certConfig *certmagic.Config
 	if config.autoCerts {
 		for domainName, tun := range db.GetTunnels() {
 			if isManagedTlsTermination(tun.TlsTermination) {
-				err = certConfig.ManageSync(context.Background(), []string{domainName})
+				err = manageSync(context.Background(), certConfig, domainName)
 				tun.CertPending = err != nil
 				if err != nil {
 					log.Println("CertMagic error at startup, will keep retrying in the background")
@@ -119,7 +119,7 @@ func (m *TunnelManager) startCertRetryLoop() {
 				continue
 			}
 
-			err := m.certConfig.ManageSync(context.Background(), []string{domain})
+			err := manageSync(context.Background(), m.certConfig, domain)
 			if err == nil {
 				tun.CertPending = false
 				m.db.SetTunnel(domain, tun)
@@ -173,7 +173,7 @@ func retryFixedDomainCerts(certConfig *certmagic.Config, domains []string) {
 				continue
 			}
 
-			err := certConfig.ManageSync(context.Background(), []string{domain})
+			err := manageSync(context.Background(), certConfig, domain)
 			if err == nil {
 				log.Printf("CertMagic: successfully obtained certificate for fixed domain %s after retrying\n", domain)
 				delete(pending, domain)
@@ -214,7 +214,7 @@ func (m *TunnelManager) RequestCreateTunnel(tunReq Tunnel) (Tunnel, error) {
 
 	if isManagedTlsTermination(tunReq.TlsTermination) {
 		if m.config.autoCerts {
-			err := m.certConfig.ManageSync(context.Background(), []string{tunReq.Domain})
+			err := manageSync(context.Background(), m.certConfig, tunReq.Domain)
 			tunReq.CertPending = err != nil
 			if err != nil {
 				log.Printf("CertMagic error creating tunnel for %s, will keep retrying in the background\n", tunReq.Domain)

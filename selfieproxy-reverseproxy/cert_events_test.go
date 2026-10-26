@@ -123,3 +123,37 @@ func TestFailedFirstIssuanceIsNotARenewalFailure(t *testing.T) {
 		t.Fatalf("first issuance failures are CertPending's job, not this one: %v", failures.All())
 	}
 }
+
+type fakeCertManager struct {
+	results []error
+	calls   int
+}
+
+func (f *fakeCertManager) ManageSync(ctx context.Context, domainNames []string) error {
+	err := f.results[f.calls]
+	f.calls++
+	return err
+}
+
+func TestManageSyncRetriesOnceAfterAriAccountMismatch(t *testing.T) {
+	manager := &fakeCertManager{results: []error{fmt.Errorf("camunda.example.com: renewing certificate: %w", ariMismatch), nil}}
+
+	if err := manageSync(context.Background(), manager, "camunda.example.com"); err != nil {
+		t.Fatalf("expected the immediate retry to succeed, got %v", err)
+	}
+	if manager.calls != 2 {
+		t.Fatalf("expected exactly 2 attempts, got %d", manager.calls)
+	}
+}
+
+func TestManageSyncDoesNotRetryOtherFailures(t *testing.T) {
+	other := fmt.Errorf("wrapped: %w", acme.Problem{Type: acme.ProblemTypeNamespace + "rateLimited", Status: 429})
+	manager := &fakeCertManager{results: []error{other}}
+
+	if err := manageSync(context.Background(), manager, "camunda.example.com"); err != other {
+		t.Fatalf("expected the original error back, got %v", err)
+	}
+	if manager.calls != 1 {
+		t.Fatalf("expected a single attempt, got %d", manager.calls)
+	}
+}

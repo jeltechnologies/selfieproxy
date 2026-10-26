@@ -84,6 +84,25 @@ func newCertEventHandler(failures *CertRenewalFailures) func(ctx context.Context
 	}
 }
 
+// certManager is the one *certmagic.Config method manageSync needs, so it can be tested without a CA.
+type certManager interface {
+	ManageSync(ctx context.Context, domainNames []string) error
+}
+
+// manageSync is ManageSync for one domain, retried once immediately after an ARI account
+// mismatch. ManageSync makes a single attempt with no retries of its own, so without this the
+// mismatch that newCertEventHandler just fixed would leave the domain on its self-signed
+// fallback until the next background retry (an hour later), even for an already expired
+// certificate. Use it instead of calling ManageSync directly.
+func manageSync(ctx context.Context, certConfig certManager, domain string) error {
+	err := certConfig.ManageSync(ctx, []string{domain})
+	if err != nil && isAriAccountMismatch(err) {
+		log.Printf("CertMagic: retrying %s right away without ARI's \"replaces\"\n", domain)
+		err = certConfig.ManageSync(ctx, []string{domain})
+	}
+	return err
+}
+
 // isAriAccountMismatch matches Let's Encrypt rejecting an ARI renewal because the stored
 // certificate was issued under a different ACME account than the one renewing it -- eg.
 // LETSENCRYPT_EMAIL changed or was removed (certmagic keeps one account per email address),

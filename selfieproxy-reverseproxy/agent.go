@@ -608,7 +608,7 @@ func (c *Agent) BoreTunnel(ctx context.Context, tunnel Tunnel) error {
 	}
 
 	if tunnel.TlsTermination == "client" || tunnel.TlsTermination == "client-tls" {
-		err = c.getCertConfig(tunnel.TlsTermination).ManageSync(ctx, []string{tunnel.Domain})
+		err = manageSync(ctx, c.getCertConfig(tunnel.TlsTermination), tunnel.Domain)
 		certPending.Store(err != nil)
 		if err != nil {
 			log.Printf("CertMagic error for %s, will keep retrying in the background\n", tunnel.Domain)
@@ -641,7 +641,7 @@ func (c *Agent) retryCertUntilSuccess(ctx context.Context, domain string, pendin
 		case <-timer.C:
 		}
 
-		if err := c.certConfig.ManageSync(context.Background(), []string{domain}); err == nil {
+		if err := manageSync(context.Background(), c.certConfig, domain); err == nil {
 			pending.Store(false)
 			c.selfSignedCerts.Forget(domain)
 			log.Printf("CertMagic: successfully obtained certificate for %s after retrying\n", domain)

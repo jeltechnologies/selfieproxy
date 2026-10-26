@@ -195,7 +195,7 @@ func Listen() {
 		}
 	} else {
 		if autoCerts {
-			err = certConfig.ManageSync(context.Background(), []string{adminDomain})
+			err = manageSync(context.Background(), certConfig, adminDomain)
 			if err != nil {
 				log.Printf("CertMagic error obtaining certificate for admin domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", adminDomain, err)
 				pendingFixedDomains = append(pendingFixedDomains, adminDomain)
@@ -206,7 +206,7 @@ func Listen() {
 	}
 
 	if *portalDomain != "" && autoCerts {
-		err = certConfig.ManageSync(context.Background(), []string{*portalDomain})
+		err = manageSync(context.Background(), certConfig, *portalDomain)
 		if err != nil {
 			log.Printf("CertMagic error obtaining certificate for portal domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", *portalDomain, err)
 			pendingFixedDomains = append(pendingFixedDomains, *portalDomain)
@@ -216,7 +216,7 @@ func Listen() {
 	}
 
 	if *ssoDomain != "" && autoCerts {
-		err = certConfig.ManageSync(context.Background(), []string{*ssoDomain})
+		err = manageSync(context.Background(), certConfig, *ssoDomain)
 		if err != nil {
 			log.Printf("CertMagic error obtaining certificate for sso domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", *ssoDomain, err)
 			pendingFixedDomains = append(pendingFixedDomains, *ssoDomain)
@@ -226,7 +226,7 @@ func Listen() {
 	}
 
 	if *consoleDomain != "" && autoCerts {
-		err = certConfig.ManageSync(context.Background(), []string{*consoleDomain})
+		err = manageSync(context.Background(), certConfig, *consoleDomain)
 		if err != nil {
 			log.Printf("CertMagic error obtaining certificate for console domain (%s), serving a self-signed certificate for now and retrying in the background: %v\n", *consoleDomain, err)
 			pendingFixedDomains = append(pendingFixedDomains, *consoleDomain)
@@ -407,7 +407,7 @@ func Listen() {
 
 				if autoCerts {
 					// TODO: Might want to get all certs here, not just the admin domain
-					err := certConfig.ManageSync(r.Context(), []string{fqdn})
+					err := manageSync(r.Context(), certConfig, fqdn)
 					if err != nil {
 						log.Fatal(err)
 					}
@@ -641,7 +641,7 @@ func setAdminDomain(certConfig *certmagic.Config, db *Database, namedropClient *
 		adminDomain := prompt("\nEnter admin domain:\n")
 
 		if autoCerts {
-			err := certConfig.ManageSync(context.Background(), []string{adminDomain})
+			err := manageSync(context.Background(), certConfig, adminDomain)
 			if err != nil {
 				log.Fatal(err)
 			}
