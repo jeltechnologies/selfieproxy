@@ -28,6 +28,24 @@
 			<a th:href="@{/servers}" th:classappend="${active == 'servers'} ? 'active'">Servers</a>
 			<a th:href="@{/local-websites}" th:classappend="${active == 'local-websites'} ? 'active'">Local websites</a>
 		</nav>
+		<th:block th:with="certRenewalFailures=${@certRenewalStatusService.failures()}">
+			<details class="user-menu cert-renewal-alert" th:unless="${#maps.isEmpty(certRenewalFailures)}">
+				<summary>&#9888; Certificate renewal failing</summary>
+				<div class="user-menu-panel cert-renewal-panel">
+					<p>
+						Selfie Proxy could not renew the Let's Encrypt certificate for these domains. They still
+						work for now, but browsers will show a security warning once a certificate expires.
+						Selfie Proxy keeps retrying automatically.
+					</p>
+					<dl>
+						<th:block th:each="failure : ${certRenewalFailures}">
+							<dt th:text="${failure.key}">photos.example.com</dt>
+							<dd th:text="${failure.value}">error</dd>
+						</th:block>
+					</dl>
+				</div>
+			</details>
+		</th:block>
 		<details class="user-menu">
 			<summary>Settings</summary>
 			<div class="user-menu-panel">

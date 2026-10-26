@@ -90,7 +90,7 @@ func Listen() {
 	httpsPort := flagSet.Int("https-port", 443, "HTTPS (secure) port")
 	allowHttp := flagSet.Bool("allow-http", false, "Allow unencrypted (HTTP) requests")
 	publicIp := flagSet.String("public-ip", "", "Public IP")
-	acmeEmail := flagSet.String("acme-email", "", "Email for ACME (ie Let's Encrypt)")
+	acmeEmail := flagSet.String("acme-email", "", "Ignored, kept so existing command lines still parse")
 	acmeUseStaging := flagSet.Bool("acme-use-staging", false, "Use ACME (ie Let's Encrypt) staging servers")
 	acceptCATerms := flagSet.Bool("accept-ca-terms", false, "Automatically accept CA terms")
 	acmeCa := flagSet.String("acme-certificate-authority", "", "URI for ACME Certificate Authority")
@@ -142,13 +142,18 @@ func Listen() {
 	//certmagic.DefaultACME.DisableHTTPChallenge = true
 	//certmagic.DefaultACME.DisableTLSALPNChallenge = true
 
+	// Ignored: certmagic keeps a separate ACME account per email address, so changing the
+	// email silently switched to a new account, and certificates issued under the old one then
+	// failed every ARI renewal (see cert_events.go). Without an email, certmagic reuses the
+	// most recently used account in storage (or "default" on a fresh install), so the account
+	// can no longer change. Let's Encrypt no longer sends any email anyway.
 	if *acmeEmail != "" {
-		certmagic.DefaultACME.Email = *acmeEmail
+		log.Printf("Ignoring -acme-email (%s): Let's Encrypt no longer uses contact emails\n", *acmeEmail)
 	}
 
 	if *acceptCATerms {
 		certmagic.DefaultACME.Agreed = true
-		log.Print(fmt.Sprintf("Automatic agreement to CA terms with email (%s)", *acmeEmail))
+		log.Print("Automatic agreement to CA terms")
 	}
 
 	if *acmeUseStaging {
@@ -158,6 +163,9 @@ func Listen() {
 	if *acmeCa != "" {
 		certmagic.DefaultACME.CA = *acmeCa
 	}
+
+	certRenewalFailures := NewCertRenewalFailures()
+	certmagic.Default.OnEvent = newCertEventHandler(certRenewalFailures)
 
 	certConfig := certmagic.NewDefault()
 
@@ -272,7 +280,7 @@ func Listen() {
 
 	auth := NewAuth(db)
 
-	api := NewApi(config, db, auth, tunMan)
+	api := NewApi(config, db, auth, tunMan, certRenewalFailures)
 
 	internalToken, err := genRandomCode(32)
 	if err != nil {

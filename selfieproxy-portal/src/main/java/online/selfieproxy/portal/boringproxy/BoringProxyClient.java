@@ -158,6 +158,16 @@ public class BoringProxyClient {
 				}));
 	}
 
+	/** Domain -> CA error message for every managed certificate whose latest renewal failed (see selfieproxy-reverseproxy's cert_events.go). */
+	public Map<String, String> listCertRenewalFailures() {
+		return withToken(token -> restClient.get()
+				.uri("/cert-renewal-failures")
+				.header("access_token", token)
+				.retrieve()
+				.body(new ParameterizedTypeReference<Map<String, String>>() {
+				}));
+	}
+
 	public TunnelDto createTunnel(CreateTunnelRequestDto request) {
 		return withToken(token -> restClient.post()
 				.uri("/tunnels")

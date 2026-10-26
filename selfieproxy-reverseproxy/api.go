@@ -17,13 +17,15 @@ type Api struct {
 	auth   *Auth
 	tunMan *TunnelManager
 	mux    *http.ServeMux
+
+	certRenewalFailures *CertRenewalFailures
 }
 
-func NewApi(config *Config, db *Database, auth *Auth, tunMan *TunnelManager) *Api {
+func NewApi(config *Config, db *Database, auth *Auth, tunMan *TunnelManager, certRenewalFailures *CertRenewalFailures) *Api {
 
 	mux := http.NewServeMux()
 
-	api := &Api{config, db, auth, tunMan, mux}
+	api := &Api{config, db, auth, tunMan, mux, certRenewalFailures}
 
 	mux.Handle("/tunnels", http.StripPrefix("/tunnels", http.HandlerFunc(api.handleTunnels)))
 	mux.Handle("/users/", http.StripPrefix("/users", http.HandlerFunc(api.handleUsers)))

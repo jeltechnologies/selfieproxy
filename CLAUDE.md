@@ -298,8 +298,7 @@ force-revalidates so a rebuilt+redeployed container never keeps serving stale JS
 already-open tab; `selfieproxy-remote-console` has no `env_file: .env` of its own the other two
 get for free, so it needs `DEBUG_MODE` passed through explicitly via `docker-compose.yaml`'s
 `environment:` block instead.
-`LETSENCRYPT_EMAIL` (blank by default) is passed through as `-acme-email`
-to boringproxy — see below. `SSO_SESSION_IDLE_MINUTES`/`SSO_SESSION_MAX_MINUTES` (default `30`/
+`SSO_SESSION_IDLE_MINUTES`/`SSO_SESSION_MAX_MINUTES` (default `30`/
 `600`, i.e. 30 minutes idle / 10 hours absolute, matching Keycloak's own SSO Session Idle/Max
 defaults) become boringproxy's `-sso-idle-minutes`/`-sso-max-minutes`, governing the `_selfieproxy_sso`
 cookie's sliding idle deadline and absolute cap, and also size `selfieproxy-identity-provider`'s own
@@ -330,14 +329,20 @@ sshd on port 22. No new subdomain, DNS record, or cert is needed -- agents alrea
 domain for SSH. Toggling `STEALTH_MODE` is a global switch, not a per-homelab setting: every
 connected agent picks up the new `ServerPort`/`SshTls` values on its next poll and re-bores all its
 tunnels (the same `SyncTunnels` diff-and-restart mechanism already used for any tunnel change).
-`docker-compose.yaml` passes `-acme-email "${LETSENCRYPT_EMAIL:-}"` to both boringproxy
-invocations (the main server and the colocated `selfieproxy-localsites-agent`) — it's optional for
-ACME/Let's Encrypt (used only for expiry notices), so `-accept-ca-terms` alone is already enough
-to issue certs unattended, and leaving `LETSENCRYPT_EMAIL` unset in `.env` is fine. On the agent
-side this value is currently inert -- `selfieproxy-localsites-agent` has no cert-dir volume at all
-(see above) and never actually calls into certmagic in practice, so `-acme-email` there has
-nothing to attach to; it's passed for parity with the server invocation, not because the agent
-does anything with it today.
+There is deliberately no `LETSENCRYPT_EMAIL`/`-acme-email` setting anymore (removed 2026-10):
+`-accept-ca-terms` alone issues certs unattended, Let's Encrypt stopped sending expiry emails in
+2025, and the setting was actively harmful -- certmagic keeps one ACME account per email address,
+so changing it silently switched accounts, after which every ARI renewal of a cert issued under the
+old account fails with `403 ... Could not validate ARI 'replaces' field` (certmagic's own fallback
+for that is unreachable, see `selfieproxy-reverseproxy/cert_events.go`). The flag is still
+*accepted* by both binary roles, but ignored, so an older `docker-compose.yaml` passing it doesn't
+crash on an unknown flag. With no email configured, certmagic reuses the most recently written
+account in `certmagic/acme/<ca>/users/` (`mostRecentAccountEmail`), or creates `default` on a fresh
+install -- so removing the email does *not* switch an existing deployment's account (confirmed on
+the test server: it kept renewing as `ask@me.com`), and the account can no longer change at all. A
+mismatch that already exists (eg. account files lost, as on the live server 2026-10) is self-healed
+once per cert by `cert_events.go`'s certmagic `OnEvent` hook (see
+`selfieproxy-reverseproxy/CLAUDE.md`'s "Certificate events" section).
 `data/reverseproxy/storage` and `data/reverseproxy/certmagic` persist the boringproxy database and
 TLS certs across restarts (`data/reverseproxy/this-server-certmagic` is a leftover, no-longer-mounted
 directory from before the agent role's cert-dir was removed -- safe to delete, kept only because

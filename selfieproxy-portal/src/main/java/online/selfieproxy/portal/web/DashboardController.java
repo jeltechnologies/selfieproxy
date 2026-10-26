@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import online.selfieproxy.portal.boringproxy.AgentStatusService;
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
+import online.selfieproxy.portal.boringproxy.CertRenewalStatusService;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
 import online.selfieproxy.portal.config.BoringProxyProperties;
 import online.selfieproxy.portal.config.ThisServerAgentProperties;
@@ -30,6 +31,7 @@ import online.selfieproxy.portal.domain.ServerStore;
 public class DashboardController {
 
 	private final BoringProxyClient boringProxyClient;
+	private final CertRenewalStatusService certRenewalStatusService;
 	private final ServerStore serverStore;
 	private final ThisServerAgentProperties thisServerAgentProperties;
 	private final DomainService domainService;
@@ -38,11 +40,13 @@ public class DashboardController {
 	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
 	private final GatewayPortsChecker gatewayPortsChecker;
 
-	public DashboardController(BoringProxyClient boringProxyClient, ServerStore serverStore,
+	public DashboardController(BoringProxyClient boringProxyClient, CertRenewalStatusService certRenewalStatusService,
+			ServerStore serverStore,
 			ThisServerAgentProperties thisServerAgentProperties, DomainService domainService,
 			AgentStatusService agentStatusService, BoringProxyProperties properties,
 			DomainFilterPreferenceStore domainFilterPreferenceStore, GatewayPortsChecker gatewayPortsChecker) {
 		this.boringProxyClient = boringProxyClient;
+		this.certRenewalStatusService = certRenewalStatusService;
 		this.serverStore = serverStore;
 		this.thisServerAgentProperties = thisServerAgentProperties;
 		this.domainService = domainService;
@@ -80,6 +84,7 @@ public class DashboardController {
 		model.addAttribute("hasOrphanedServers", hasOrphanedServers);
 		model.addAttribute("certPendingByDomain", certPendingByDomain);
 		model.addAttribute("hasPendingCerts", hasPendingCerts);
+		model.addAttribute("certRenewalErrorByDomain", certRenewalStatusService.failures());
 		model.addAttribute("serverStatusMessage", serverStatusMessage);
 		model.addAttribute("domainService", domainService);
 		model.addAttribute("domains", domainService.allDomains());

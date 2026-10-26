@@ -8,6 +8,7 @@ require (
 	github.com/caddyserver/certmagic v0.25.4
 	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/mdp/qrterminal/v3 v3.2.1
+	github.com/mholt/acmez/v3 v3.1.6
 	github.com/takingnames/namedrop-go v0.8.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/oauth2 v0.36.0
@@ -18,7 +19,6 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/libdns/libdns v1.1.1 // indirect
-	github.com/mholt/acmez/v3 v3.1.6 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

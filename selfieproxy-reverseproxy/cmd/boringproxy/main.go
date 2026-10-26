@@ -96,7 +96,7 @@ func main() {
 		secret := flagSet.String("secret", "", "Agent secret")
 		name := flagSet.String("agent-name", "", "Agent name")
 		user := flagSet.String("user", "", "user")
-		acmeEmail := flagSet.String("acme-email", "", "Email for ACME (ie Let's Encrypt)")
+		flagSet.String("acme-email", "", "Ignored, kept so existing command lines still parse")
 		acmeUseStaging := flagSet.Bool("acme-use-staging", false, "Use ACME (ie Let's Encrypt) staging servers")
 		acmeCa := flagSet.String("acme-certificate-authority", "", "URI for ACME Certificate Authority")
 		dnsServer := flagSet.String("dns-server", "", "Custom DNS server")
@@ -126,7 +126,6 @@ func main() {
 			AgentName:      *name,
 			User:           *user,
 			CertDir:        agentCertDir,
-			AcmeEmail:      *acmeEmail,
 			AcmeUseStaging: *acmeUseStaging,
 			AcmeCa:         *acmeCa,
 			DnsServer:      *dnsServer,

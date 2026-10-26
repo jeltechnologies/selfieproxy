@@ -62,6 +62,9 @@
 						<span th:if="${certPendingByDomain.get(fqdn)}"
 							  class="cert-pending-badge"
 							  title="Temporary self-signed certificate -- browsers will show a security warning until Selfie Proxy obtains a trusted certificate from Let's Encrypt">Self-signed (temporary)</span>
+						<span th:if="${certRenewalErrorByDomain.containsKey(fqdn)}"
+							  class="cert-pending-badge"
+							  th:title="'Certificate renewal is failing: ' + ${certRenewalErrorByDomain.get(fqdn)}">Renewal failing</span>
 					</td>
 					<td>
 						<a class="button-small" th:href="@{/local-websites/{fqdn}/edit(fqdn=${fqdn})}">Edit</a>

@@ -56,6 +56,8 @@ func NewRestApi(config *Config, db *Database, auth *Auth, api *Api, internalToke
 	mux.HandleFunc("/agents", restApi.handleAgentsCollection)
 	mux.Handle("/agents/", http.StripPrefix("/agents", http.HandlerFunc(restApi.handleAgentItem)))
 
+	mux.HandleFunc("/cert-renewal-failures", restApi.handleCertRenewalFailures)
+
 	return restApi
 }
 
@@ -218,6 +220,30 @@ func (a *RestApi) handleTunnelsCollection(w http.ResponseWriter, r *http.Request
 	default:
 		writeJSONError(w, 405, "Invalid method for /tunnels")
 	}
+}
+
+// handleCertRenewalFailures lists every managed domain (tunnels and the fixed admin/portal/
+// sso/console domains alike) whose latest certificate renewal failed, mapped to the CA's
+// error message, so the admin portal can warn before the certificate actually expires.
+func (a *RestApi) handleCertRenewalFailures(w http.ResponseWriter, r *http.Request) {
+
+	tokenData, ok := a.authenticate(w, r)
+	if !ok {
+		return
+	}
+
+	user, _ := a.db.GetUser(tokenData.Owner)
+	if tokenData.Agent != "" || !user.IsAdmin {
+		writeJSONError(w, 403, "Not authorized")
+		return
+	}
+
+	if r.Method != "GET" {
+		writeJSONError(w, 405, "Invalid method for /cert-renewal-failures")
+		return
+	}
+
+	writeJSON(w, 200, a.api.certRenewalFailures.All())
 }
 
 // handleTunnelItem serves /tunnels/{domain} and /tunnels/{domain}/private-key

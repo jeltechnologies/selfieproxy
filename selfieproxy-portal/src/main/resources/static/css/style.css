@@ -124,6 +124,15 @@ h1 { font-size: 32px; }
 .user-menu-panel a.active { color: var(--accent); font-weight: 600; }
 .user-menu-panel form { margin: 0; }
 
+.cert-renewal-alert { margin-right: 1.5rem; }
+.cert-renewal-alert summary,
+.cert-renewal-alert summary:hover { color: var(--warning-border); font-weight: 600; }
+.cert-renewal-panel { width: 26rem; max-width: calc(100vw - 2rem); font-size: 0.8rem; }
+.cert-renewal-panel p { margin: 0; }
+.cert-renewal-panel dl { margin: 0; }
+.cert-renewal-panel dt { font-weight: 600; margin-top: 0.4rem; }
+.cert-renewal-panel dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+
 .secret-field { display: flex; align-items: center; gap: 0.5rem; }
 
 .secret-input-wrap { position: relative; width: 24rem; height: 2.5rem; }

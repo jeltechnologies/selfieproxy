@@ -36,7 +36,7 @@ go build -ldflags "-X main.Version=$(git describe --tags)"
 sudo setcap cap_net_bind_service=+ep boringproxy
 ```
 
-There are no test files in this repo (`*_test.go` does not exist) and no lint config — `go build ./...` and `go vet ./...` are the available correctness checks.
+Tests: `go test -vet=off ./...` (`http_proxy_test.go`, `cert_events_test.go`) -- `-vet=off` because `go vet` already fails on pre-existing warnings in untouched code (which also blocks `go test`'s implicit vet step). No lint config.
 
 ## Running
 
@@ -46,7 +46,7 @@ There are no test files in this repo (`*_test.go` does not exist) and no lint co
 ./boringproxy tuntls -server example.com                                # raw TLS tunnel over stdin/stdout, ported from anderspitman/tuntls
 ```
 
-Key server flags: `-admin-domain`, `-portal-domain`/`-portal-port`, `-sso-domain`/`-sso-port`, `-oidc-issuer`/`-oidc-client-id`/`-oidc-client-secret`, `-sso-idle-minutes`/`-sso-max-minutes` (default `30`/`600`, i.e. 30 minutes idle / 10 hours absolute -- see the OIDC section below), `-db-dir`, `-cert-dir`, `-http-port`/`-https-port`, `-allow-http`, `-acme-email`, `-acme-use-staging`, `-ssh-server-port` (default `22` -- see "What this is" above for why this only changes what agents are told, not the host sshd's own listening port), `-stealth-mode` (default `false` -- see "What this is" above), `-debug` (logs every request -- timestamp, remote IP, method, host, path -- to stdout; off by default since every agent poll and portal auto-refresh would otherwise log a line).
+Key server flags: `-admin-domain`, `-portal-domain`/`-portal-port`, `-sso-domain`/`-sso-port`, `-oidc-issuer`/`-oidc-client-id`/`-oidc-client-secret`, `-sso-idle-minutes`/`-sso-max-minutes` (default `30`/`600`, i.e. 30 minutes idle / 10 hours absolute -- see the OIDC section below), `-db-dir`, `-cert-dir`, `-http-port`/`-https-port`, `-allow-http`, `-acme-use-staging`, `-ssh-server-port` (default `22` -- see "What this is" above for why this only changes what agents are told, not the host sshd's own listening port), `-stealth-mode` (default `false` -- see "What this is" above), `-debug` (logs every request -- timestamp, remote IP, method, host, path -- to stdout; off by default since every agent poll and portal auto-refresh would otherwise log a line).
 
 Key agent flags: `-server`, `-secret`, `-agent-name`, `-user`, `-poll-interval-ms` (min 100ms, 0 disables polling), `-dns-server`.
 
@@ -131,6 +131,13 @@ whether `-oidc-issuer` points elsewhere) for a confirmation page, then a `return
 into the server that triggered the logout.
 
 OIDC discovery against `-oidc-issuer` runs in a background goroutine with retry/backoff (`StartOidcAuth`), never synchronously at startup -- `oidcAuthHolder` (an `atomic.Pointer[OidcAuthenticator]`) starts nil and every dispatch-path caller treats nil as "Selfieproxy is starting... please retry shortly" (503), not "single sign on disabled". This matters because boringproxy's own discovery call is an HTTP request that has to reach the single sign on server *through boringproxy's own listener* (the `-sso-domain` carve-out above) -- doing discovery synchronously before that listener starts would deadlock, since the listener can't be up yet during discovery's own call site in `main()`. `selfieproxy-identity-provider` boots concurrently with boringproxy (`docker-compose.yaml` has no `depends_on` between them -- both only wait on the `check-prerequisites` preflight), rather than waiting for boringproxy to report healthy first, so it's typically most of the way through its own (independent) Spring Boot startup by the time boringproxy's listener comes up. The retry backoff (`ssoDiscoveryMinWait`/`ssoDiscoveryMaxWait`, 250ms-3s) is deliberately short, since this is a same-host loopback call with no external rate limit to respect -- it exists only to bound the polling rate, not to protect a remote service.
+
+### Certificate events (`cert_events.go`)
+
+`newCertEventHandler` is certmagic's `OnEvent` hook, installed on `certmagic.Default` (server: `boringproxy.go`, agent: `agent.go`) *before* the first `certmagic.NewDefault()` -- background renewals run on a fresh `NewDefault()` config from the cache's `GetConfigForCert`, which copies `OnEvent` from `Default`, so setting it on `certConfig` alone would miss them. It must always return nil (a non-nil return from e.g. `cert_obtaining` aborts the operation). Two jobs:
+
+- **ARI account-mismatch self-heal.** On a renewal failing with `unauthorized` + `'replaces'` in the detail (the stored cert was issued under a different ACME account than the current one -- see root `CLAUDE.md` on why `-acme-email` is now ignored), it deletes the `ca` field from that cert's stored metadata (`issuer_data` in `certificates/<issuer>/<domain>/<domain>.json`). certmagic only sends ARI's `replaces` when that field equals the issuer's CA (`config.go` `renewCert`), and reloads the metadata on every attempt, so the next attempt is a plain renewal under the current account; the renewed cert gets a fresh `ca`, so ARI works normally afterwards. Needed because certmagic's own fallback (skip `replaces` on retry attempt 2) is unreachable: attempt 1 tests on the staging CA, succeeds, then retries production *with* `replaces`, fails, and ends the job with `ErrNoRetry`. Not upstream-fixed as of certmagic v0.25.6. `-acme-email` was removed for the same reason.
+- **Renewal-failure reporting.** Any other failed *renewal* (not first issuance -- that's `Tunnel.CertPending`'s job) is kept in memory in `CertRenewalFailures` (domain -> CA problem detail) until a later `cert_obtained` for that domain clears it. Exposed admin-only at `GET /rest/cert-renewal-failures` (`rest_api.go`, so the portal's internal token works) (also covers the fixed admin/portal/sso/console domains, which aren't tunnels); selfieproxy-portal surfaces it. In-memory only, since certmagic re-checks every managed cert shortly after startup and a still-failing renewal re-reports itself. The agent installs the same hook with nil failures (self-heal only; agent-side cert state isn't reported back to the server).
 
 ### TakingNames.io / namedrop integration
 

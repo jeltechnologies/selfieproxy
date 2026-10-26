@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 import online.selfieproxy.portal.boringproxy.BoringProxyClient;
+import online.selfieproxy.portal.boringproxy.CertRenewalStatusService;
 import online.selfieproxy.portal.boringproxy.BoringProxyException;
 import online.selfieproxy.portal.boringproxy.dto.CreateTunnelRequestDto;
 import online.selfieproxy.portal.boringproxy.dto.TunnelDto;
@@ -62,6 +63,7 @@ public class LocalWebsiteController {
 	private static final String OWNER = "admin";
 
 	private final BoringProxyClient boringProxyClient;
+	private final CertRenewalStatusService certRenewalStatusService;
 	private final LocalWebsiteStore localWebsiteStore;
 	private final StaticSiteProvisioner staticSiteProvisioner;
 	private final SitesWebserverProperties sitesWebserverProperties;
@@ -71,12 +73,14 @@ public class LocalWebsiteController {
 	private final LocalWebsiteDemoStatus localWebsiteDemoStatus;
 	private final DomainFilterPreferenceStore domainFilterPreferenceStore;
 
-	public LocalWebsiteController(BoringProxyClient boringProxyClient, LocalWebsiteStore localWebsiteStore,
+	public LocalWebsiteController(BoringProxyClient boringProxyClient, CertRenewalStatusService certRenewalStatusService,
+			LocalWebsiteStore localWebsiteStore,
 			StaticSiteProvisioner staticSiteProvisioner, SitesWebserverProperties sitesWebserverProperties,
 			ThisServerAgentProperties thisServerAgentProperties, BoringProxyProperties boringProxyProperties,
 			DomainService domainService, LocalWebsiteDemoStatus localWebsiteDemoStatus,
 			DomainFilterPreferenceStore domainFilterPreferenceStore) {
 		this.boringProxyClient = boringProxyClient;
+		this.certRenewalStatusService = certRenewalStatusService;
 		this.localWebsiteStore = localWebsiteStore;
 		this.staticSiteProvisioner = staticSiteProvisioner;
 		this.sitesWebserverProperties = sitesWebserverProperties;
@@ -107,6 +111,7 @@ public class LocalWebsiteController {
 		model.addAttribute("certPendingByDomain", certPendingByDomain);
 		boolean hasPendingCerts = certPendingByDomain.values().stream().anyMatch(Boolean::booleanValue);
 		model.addAttribute("hasPendingCerts", hasPendingCerts);
+		model.addAttribute("certRenewalErrorByDomain", certRenewalStatusService.failures());
 
 		// Only shown while the demo content site LocalWebsiteDemoBootstrap created on first boot is
 		// still byte-for-byte the bundled demo -- disappears the moment it's replaced with real

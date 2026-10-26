@@ -79,7 +79,6 @@ type AgentConfig struct {
 	AgentName      string `json:"agentName,omitempty"`
 	User           string `json:"user,omitempty"`
 	CertDir        string `json:"certDir,omitempty"`
-	AcmeEmail      string `json:"acmeEmail,omitempty"`
 	AcmeUseStaging bool   `json:"acmeUseStaging,omitempty"`
 	AcmeCa         string `json:"acmeCa,omitempty"`
 	DnsServer      string `json:"dnsServer,omitempty"`
@@ -119,9 +118,7 @@ func NewAgent(config *AgentConfig) (*Agent, error) {
 		certmagic.Default.Storage = &certmagic.FileStorage{config.CertDir}
 	}
 
-	if config.AcmeEmail != "" {
-		certmagic.DefaultACME.Email = config.AcmeEmail
-	}
+	certmagic.Default.OnEvent = newCertEventHandler(nil)
 
 	if config.AcmeUseStaging {
 		certmagic.DefaultACME.CA = certmagic.LetsEncryptStagingCA
