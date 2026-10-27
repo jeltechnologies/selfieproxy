@@ -141,7 +141,7 @@ class BackupServiceTest {
 		when(boringProxyClient.listAgents()).thenReturn(Map.of("lab1", new AgentStatusDto(null)));
 		Server server = new Server("proxmox", "example.com", "lab1", "127.0.0.1",
 				new WebConfig(Protocol.HTTPS, 443, WebAuthMethod.SSO, null, null, null, null,
-						List.of("/login*.*", "/static/**")),
+						List.of("/login*.*", "/static/*")),
 				new TerminalConfig("proxmox-example-com-22.example.com", 22, 51000, "root", "cipher-ssh"),
 				new RemoteDesktopConfig("proxmox-example-com-3389.example.com", RemoteDesktopProtocol.RDP, 3389,
 						51001, "admin", "cipher-rdp", true),
@@ -164,7 +164,7 @@ class BackupServiceTest {
 		// Unlike a credential, an authentication exception is not host-bound and survives an export
 		// intact -- restoring onto a new host has to bring the same exceptions with it, or the
 		// restored Server quietly starts gating paths it did not gate before.
-		assertEquals(List.of("/login*.*", "/static/**"), exported.web().authExemptPathsOrEmpty());
+		assertEquals(List.of("/login*.*", "/static/*"), exported.web().authExemptPathsOrEmpty());
 		assertEquals("proxmox-example-com-22.example.com", exported.terminal().fqdn());
 		assertEquals(22, exported.terminal().port());
 		assertNull(exported.terminal().encryptedSecret(), "an export must never carry a live credential");

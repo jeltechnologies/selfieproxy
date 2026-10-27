@@ -284,10 +284,18 @@ func checkTunnelAuth(w http.ResponseWriter, r *http.Request, tunnel Tunnel) bool
 //
 // The match runs against path.Clean of the request path, never the raw one. r.URL.Path is
 // already percent-decoded, so a request for /login/%2e%2e/admin arrives here as
-// "/login/../admin" -- which a "/login/**" pattern would happily match, after which the
+// "/login/../admin" -- which a "/login/*" pattern would happily match, after which the
 // backend resolves the .. and serves /admin to an unauthenticated caller. Cleaning first
 // turns it into "/admin", which matches nothing. Only the match decision is made on the
-// cleaned path; the request is still forwarded exactly as it arrived.
+// cleaned path; the request is still forwarded exactly as it arrived. Clean also drops a
+// trailing slash, which is put back so a literal "/docs/" pattern still matches.
+//
+// A trailing "/*" means the whole folder: "/ext/*" covers "/ext", "/ext/" and
+// "/ext/api/widget/123.js" alike, since that is what an admin writing it means -- and
+// without "/ext" itself, the backend's usual "/ext" -> "/ext/" redirect would never get
+// past the gate. A "*" anywhere else stays within one path segment, so "/login*" can't be
+// widened into "/login/secret". There is deliberately no "**": it confused more than it
+// helped. A run of stars in an older pattern ("/static/**") is read as one.
 func authPathExempt(tunnel Tunnel, urlPath string) bool {
 
 	if tunnel.AuthExemptPaths == "" {
@@ -298,6 +306,9 @@ func authPathExempt(tunnel Tunnel, urlPath string) bool {
 		urlPath = "/"
 	}
 	cleaned := path.Clean(urlPath)
+	if strings.HasSuffix(urlPath, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
 
 	remaining := tunnel.AuthExemptPaths
 	for remaining != "" {
@@ -308,7 +319,35 @@ func authPathExempt(tunnel Tunnel, urlPath string) bool {
 			remaining = ""
 		}
 		pattern = strings.TrimSpace(pattern)
-		if pattern != "" && globMatch(pattern, cleaned) {
+		for strings.Contains(pattern, "**") {
+			pattern = strings.ReplaceAll(pattern, "**", "*")
+		}
+		if pattern == "" {
+			continue
+		}
+
+		if folder, ok := strings.CutSuffix(pattern, "/*"); ok {
+			if folderMatch(folder, cleaned) {
+				return true
+			}
+		} else if globMatch(pattern, cleaned) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// folderMatch reports whether name is the folder itself or anything inside it, at any
+// depth -- the meaning of a pattern's trailing "/*". The folder part may still carry its
+// own single-segment wildcards ("/api/*/docs/*").
+func folderMatch(folder, name string) bool {
+
+	if globMatch(folder, name) {
+		return true
+	}
+	for i := 0; i < len(name); i++ {
+		if name[i] == '/' && globMatch(folder, name[:i]) {
 			return true
 		}
 	}
@@ -317,30 +356,22 @@ func authPathExempt(tunnel Tunnel, urlPath string) bool {
 }
 
 // globMatch matches a URL path against a pattern in which "*" stands for any run of
-// characters within a single path segment and "**" for any run across segments -- the
-// Ant/Spring shape an admin is most likely to already know, and the one the portal's own
-// help text documents. Everything else is literal; matching is case-sensitive, as URL
-// paths are.
+// characters within a single path segment. Everything else is literal; matching is
+// case-sensitive, as URL paths are.
 //
-// Written out rather than delegating to path.Match because that has no "**" at all (its
-// "*" already stops at a separator), which would leave no way to exempt a whole subtree.
+// Written out rather than delegating to path.Match because that also gives "?", "[" and
+// "\" special meaning, none of which an admin typing a URL path expects.
 func globMatch(pattern, name string) bool {
 
 	for len(pattern) > 0 {
 		if pattern[0] == '*' {
-			// "**" spans separators, a single "*" stops at the next one. Either way the
-			// wildcard is greedy-with-backtracking: try every split point the rest of the
-			// pattern could start at, shortest first.
-			crossSegment := len(pattern) > 1 && pattern[1] == '*'
-			rest := pattern[1:]
-			if crossSegment {
-				rest = pattern[2:]
-			}
+			// Greedy-with-backtracking, never past a separator: try every split point
+			// the rest of the pattern could start at, shortest first.
 			for i := 0; i <= len(name); i++ {
-				if !crossSegment && i > 0 && name[i-1] == '/' {
+				if i > 0 && name[i-1] == '/' {
 					break
 				}
-				if globMatch(rest, name[i:]) {
+				if globMatch(pattern[1:], name[i:]) {
 					return true
 				}
 			}

@@ -26,7 +26,9 @@ public final class AuthExemptPaths {
 	 * Tidies what the rows submitted. Empty entries are dropped rather than rejected (the always-
 	 * present trailing blank row submits one every time, and a row the admin cleared instead of
 	 * removing is the same intent) and duplicates are collapsed, but the admin's own order is kept
-	 * -- a list that comes back reordered after every save reads like the page mangled it.
+	 * -- a list that comes back reordered after every save reads like the page mangled it. A run
+	 * of stars is folded into one: "**" is no longer a pattern of its own (a trailing "/*" already
+	 * covers a whole folder), so an older "/static/**" is saved back as "/static/*".
 	 */
 	public static List<String> parse(List<String> submitted) {
 		if (submitted == null || submitted.isEmpty()) {
@@ -35,6 +37,7 @@ public final class AuthExemptPaths {
 		return submitted.stream()
 				.filter(java.util.Objects::nonNull)
 				.map(String::trim)
+				.map(entry -> entry.replaceAll("\\*{2,}", "*"))
 				.filter(entry -> !entry.isEmpty())
 				.distinct()
 				.toList();
@@ -72,9 +75,9 @@ public final class AuthExemptPaths {
 		return errors;
 	}
 
-	/** "/", "/*" and "/**" each match every path the Server can serve, gate included. */
+	/** "/" and "/*" each match every path the Server can serve, gate included. */
 	private static boolean matchesEverything(String pattern) {
-		return pattern.equals("/") || pattern.equals("/*") || pattern.equals("/**");
+		return pattern.equals("/") || pattern.equals("/*");
 	}
 
 	/**

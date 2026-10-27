@@ -358,12 +358,12 @@ means the same thing under every gate. The disclosure hides itself under `NONE` 
 where there is no gate left to make an exception to; the list is still stored but `TunnelMapper`
 sends nothing, so no live tunnel ever carries paths boringproxy would not consult.
 
-Patterns are Ant/Spring-shaped -- `*` matches within one path segment, `**` across them -- and
+Patterns use one wildcard only -- `*` matches within one path segment, except that a trailing `/*` means the whole folder at any depth, the folder itself included (`/ext/*` covers `/ext` and `/ext/api/widget/123.js`). There is deliberately no `**` and no help text on the page (both the user's call, 2026-10-27: `**` only confused); `parse` folds any run of stars into one, so an older `/static/**` is saved back as `/static/*` -- and
 matched by the reverse proxy, not the portal (`globMatch`/`authPathExempt` in its `http_proxy.go`).
 `AuthExemptPaths` (`domain/`, alongside `DnsLabelValidator`/`RedirectUrlValidator`) owns parsing and
 validation: empty rows and surrounding whitespace dropped, duplicates collapsed, the admin's own
 order kept, and four rejections -- a pattern that isn't rooted at `/` (it could never match), one
-over 200 characters, one containing a space or control character, and `/`, `/*` or `/**`, each of
+over 200 characters, one containing a space or control character, and `/` or `/*`, each of
 which would silently turn the selected gate into a no-op. That last one is a real thing to want, but
 "Not protected" is the radio for it, and reaching the same state through a wildcard hides the
 decision from whoever reads the page next. Capped at 20 entries so one Server can't bloat every

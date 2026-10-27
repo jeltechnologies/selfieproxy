@@ -16,8 +16,15 @@ class AuthExemptPathsTest {
 	/** The always-present trailing blank row submits an empty entry on every single save. */
 	@Test
 	void parseDropsEmptyRowsAndDuplicatesButKeepsOrder() {
-		assertEquals(List.of("/login*.*", "/static/**"),
-				AuthExemptPaths.parse(java.util.Arrays.asList("/login*.*", "", "  /static/**  ", "/login*.*", null)));
+		assertEquals(List.of("/login*.*", "/static/*"),
+				AuthExemptPaths.parse(java.util.Arrays.asList("/login*.*", "", "  /static/*  ", "/login*.*", null)));
+	}
+
+	/** "**" is gone; a pattern saved before that is folded into the "/*" that now means the same. */
+	@Test
+	void parseFoldsRunsOfStarsIntoOne() {
+		assertEquals(List.of("/static/*", "/a/*/b*"),
+				AuthExemptPaths.parse(List.of("/static/**", "/a/***/b**")));
 	}
 
 	@Test
@@ -30,7 +37,7 @@ class AuthExemptPathsTest {
 	@Test
 	void ordinaryPatternsAreAccepted() {
 		assertEquals(List.of(), AuthExemptPaths.validate(
-				List.of("/login", "/login*.*", "/static/**", "/api/v1/*/health")));
+				List.of("/login", "/login*.*", "/static/*", "/api/v1/*/health")));
 	}
 
 	@Test
@@ -44,7 +51,7 @@ class AuthExemptPathsTest {
 	@Test
 	void aPatternMatchingEveryPathIsRejected() {
 		for (String pattern : List.of("/", "/*", "/**")) {
-			List<String> errors = AuthExemptPaths.validate(List.of(pattern));
+			List<String> errors = AuthExemptPaths.validate(AuthExemptPaths.parse(List.of(pattern)));
 			assertEquals(1, errors.size(), pattern);
 			assertTrue(errors.get(0).contains("would leave the whole server open"), pattern);
 		}

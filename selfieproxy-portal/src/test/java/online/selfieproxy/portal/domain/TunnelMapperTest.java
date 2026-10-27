@@ -35,10 +35,10 @@ class TunnelMapperTest {
 	@Test
 	void exemptPathsReachTheWebTunnelNewlineJoined() {
 		TunnelMapper.ProtocolTunnel plan = mapper()
-				.tunnelPlans(serverWith(WebAuthMethod.SSO, List.of("/login*.*", "/static/**")), "admin")
+				.tunnelPlans(serverWith(WebAuthMethod.SSO, List.of("/login*.*", "/static/*")), "admin")
 				.get(ServerProtocol.WEB);
 
-		assertEquals("/login*.*\n/static/**", plan.request().authExemptPaths());
+		assertEquals("/login*.*\n/static/*", plan.request().authExemptPaths());
 	}
 
 	@Test

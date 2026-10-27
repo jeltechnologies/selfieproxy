@@ -185,15 +185,9 @@ func TestGlobMatch(t *testing.T) {
 		{"/login*", "/login/secret", false},
 		{"/static/*", "/static/app.js", true},
 		{"/static/*", "/static/js/app.js", false},
-		{"/static/**", "/static/js/app.js", true},
-		{"/static/**", "/static/", true},
-		{"/static/**", "/staticky/app.js", false},
-		{"/**/*.css", "/a/b/c/style.css", true},
-		{"/**/*.css", "/style.css", false},
 		{"*", "/login", false},
 		{"/*", "/login", true},
 		{"/*", "/a/b", false},
-		{"/**", "/a/b", true},
 	}
 	for _, tc := range cases {
 		if got := globMatch(tc.pattern, tc.path); got != tc.want {
@@ -203,7 +197,7 @@ func TestGlobMatch(t *testing.T) {
 }
 
 func TestAuthPathExempt(t *testing.T) {
-	tunnel := Tunnel{AuthExemptPaths: "/login*.*\n/health\n\n  /static/**  "}
+	tunnel := Tunnel{AuthExemptPaths: "/login*.*\n/health\n\n  /static/*  "}
 
 	for _, p := range []string{"/login.html", "/health", "/static/js/app.js"} {
 		if !authPathExempt(tunnel, p) {
@@ -224,8 +218,43 @@ func TestAuthPathExempt(t *testing.T) {
 // r.URL.Path arrives already percent-decoded, so /login/%2e%2e/admin reaches the gate as
 // "/login/../admin" -- matching it against the pattern as-is would exempt a path the
 // backend then resolves to /admin.
+func TestAuthPathExemptCoversSubtreeRoot(t *testing.T) {
+	// "/ext/**" is no longer documented, but a pattern saved before it was removed must keep
+	// meaning the same folder.
+	for _, pattern := range []string{"/ext/*", "/ext/**"} {
+		tunnel := Tunnel{AuthExemptPaths: pattern}
+		for _, p := range []string{"/ext", "/ext/", "/ext/page", "/ext/api/widget/123.js"} {
+			if !authPathExempt(tunnel, p) {
+				t.Errorf("pattern %q: authPathExempt(%q) = false, want true", pattern, p)
+			}
+		}
+		for _, p := range []string{"/", "/extra", "/extra/page", "/ex"} {
+			if authPathExempt(tunnel, p) {
+				t.Errorf("pattern %q: authPathExempt(%q) = true, want false", pattern, p)
+			}
+		}
+	}
+}
+
+// Only a trailing "/*" reaches into subfolders; one anywhere else, or inside the folder
+// part, still stays within its own segment.
+func TestAuthPathExemptFolderWildcards(t *testing.T) {
+	tunnel := Tunnel{AuthExemptPaths: "/api/*/docs/*\n/assets/*.css"}
+
+	for _, p := range []string{"/api/v1/docs", "/api/v1/docs/a/b.html", "/assets/site.css"} {
+		if !authPathExempt(tunnel, p) {
+			t.Errorf("authPathExempt(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []string{"/api/v1/v2/docs/a", "/api/v1/other", "/assets/css/site.css"} {
+		if authPathExempt(tunnel, p) {
+			t.Errorf("authPathExempt(%q) = true, want false", p)
+		}
+	}
+}
+
 func TestAuthPathExemptRejectsTraversal(t *testing.T) {
-	tunnel := Tunnel{AuthExemptPaths: "/login/**"}
+	tunnel := Tunnel{AuthExemptPaths: "/login/*"}
 
 	if !authPathExempt(tunnel, "/login/page.html") {
 		t.Fatal("the ordinary case must still be exempt")
