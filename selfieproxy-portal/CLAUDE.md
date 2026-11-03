@@ -188,7 +188,7 @@ host/IP.
 
 - The top of the page manages Homelab selection: a dropdown of Homelab names in alphabetical
   order, first one auto-selected. The user cannot add or delete Homelabs from this page.
-- Servers are listed with sortable column headers (Domain, Homelab, Local address --
+- Servers are listed with sortable column headers (Domain, Homelab, Address --
   click any header to sort ascending/descending, plain client-side JS,
   `static/js/sortable-table.js`, no server round-trip), and two independently remembered filter
   dropdowns side by side above the table (`DomainFilterPreferenceStore`, persisted across page
@@ -198,8 +198,11 @@ host/IP.
   bare domain if the subdomain is blank; there is no separate Name column anymore, and no separate
   user-entered Name field), with a warning icon if that domain was since removed from the Domains
   page (the Server keeps working, it's just orphaned from Selfie Proxy's own domain registry) and/or
-  a second warning icon if the Server's homelab no longer exists, then the Homelab, the address
-  within the homelab, then three independent columns -- **Web**, **Terminal**, **Remote desktop**
+  a second warning icon if the Server's homelab no longer exists, then the Homelab, then the
+  Address (`Server.homelabAddress()` -- the host plus every enabled protocol's Homelab
+  server port, deduplicated and comma-separated, Port Forwarding's included, eg.
+  `192.168.1.22:443,22`; the column still sorts by host alone), then three independent columns --
+  **Web**, **Terminal**, **Remote desktop**
   -- each showing a **Connect** button only when that Server has that protocol enabled (blank
   otherwise; Port Forwarding is never shown as a column here, its entries stay hidden). Web's
   Connect opens the Server's own public URL directly in a new tab; Terminal's/Remote desktop's

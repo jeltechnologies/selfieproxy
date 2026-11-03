@@ -1,6 +1,9 @@
 package online.selfieproxy.portal.domain;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Selfie Proxy's own model of a published Application. One Application can simultaneously expose
@@ -52,6 +55,27 @@ public record Server(
 
 	public boolean hasPortForwarding() {
 		return portForwarding != null && !portForwarding.isEmpty();
+	}
+
+	/** The host plus every enabled protocol's Homelab server port, eg. "192.168.1.22:443,22" -- for the Servers list. */
+	public String homelabAddress() {
+		Set<Integer> ports = new LinkedHashSet<>();
+		if (hasWeb()) {
+			ports.add(web.port());
+		}
+		if (hasTerminal()) {
+			ports.add(terminal.port());
+		}
+		if (hasRemoteDesktop()) {
+			ports.add(remoteDesktop.port());
+		}
+		if (hasPortForwarding()) {
+			portForwarding.forEach(entry -> ports.add(entry.targetPort()));
+		}
+		if (ports.isEmpty()) {
+			return host;
+		}
+		return host + ":" + ports.stream().map(String::valueOf).collect(Collectors.joining(","));
 	}
 
 	/** Same record with terminal's exposedPort replaced -- see ServerController.syncTunnels. */

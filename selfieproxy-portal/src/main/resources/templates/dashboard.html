@@ -52,7 +52,7 @@
 					<th></th>
 					<th data-sort-key="domain">Domain</th>
 					<th data-sort-key="homelab">Homelab</th>
-					<th data-sort-key="localAddress">Local address</th>
+					<th data-sort-key="homelabAddress">Address</th>
 					<th>Web</th>
 					<th>Terminal</th>
 					<th>Remote desktop</th>
@@ -76,7 +76,7 @@
 							  class="warning-icon" title="This server's domain no longer exists">&#9888;</span>
 					</td>
 					<td th:text="${server.homelabName()}"></td>
-					<td th:attr="data-sort-value=${server.host()}" th:text="${server.host()}"></td>
+					<td th:attr="data-sort-value=${server.host()}" th:text="${server.homelabAddress()}"></td>
 					<td>
 						<a th:if="${server.hasWeb()}" class="button-small connect-button"
 						   th:attr="aria-disabled=${offline} ? 'true' : null, tabindex=${offline} ? '-1' : null"
