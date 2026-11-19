@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.0</version>
+    <version>4.1.2</version>
     <relativePath/>
   </parent>
 
@@ -71,7 +71,7 @@
              to be fed straight into StaticSiteProvisioner.replaceContents at bootstrap time. -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
-        <version>3.1.0</version>
+        <version>3.2.0</version>
         <executions>
           <execution>
             <id>zip-local-website-demo</id>

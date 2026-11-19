@@ -1,4 +1,4 @@
-FROM alpine:3.24
+FROM alpine:3
 
 RUN apk add --no-cache curl bind-tools
 
