@@ -73,15 +73,15 @@ jobs:
           context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
           push: true
+          pull: true        # always re-pull base images (nginx, etc.)
+          no-cache: true    # no layer cache, so package installs fetch current patches
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   release:
     name: Create GitHub release
     needs: build-and-push
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
